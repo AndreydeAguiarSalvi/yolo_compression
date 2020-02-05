@@ -1021,7 +1021,7 @@ def plot_results_overlay(start=0, stop=0):  # from utils.utils import *; plot_re
         fig.savefig(f.replace('.txt', '.png'), dpi=200)
 
 
-def plot_results(start=0, stop=0, bucket='', id=()):  # from utils.utils import *; plot_results()
+def plot_results(start=0, stop=0, bucket='', id=(), name='results.png'):  # from utils.utils import *; plot_results()
     # Plot training results files 'results*.txt'
     fig, ax = plt.subplots(2, 5, figsize=(14, 7))
     ax = ax.ravel()
