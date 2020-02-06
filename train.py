@@ -146,7 +146,7 @@ def train():
     prebias = start_epoch == 0
     model.nc = nc  # attach number of classes to model
     model.arc = opt['arc']  # attach yolo architecture
-    model.opt['hyp'] = opt['hyp']  # attach hyperparameters to model
+    model.hyp = opt['hyp']  # attach hyperparameters to model
     model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device)  # attach class weights
     maps = np.zeros(nc)  # mAP per class
     # torch.autograd.set_detect_anomaly(True)
@@ -193,21 +193,21 @@ def train():
             imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
             targets = targets.to(device)
 
+            # Plot images with bounding boxes
+            if ni == 0:
+                fname = 'train_batch%g.png' % i
+                plot_images(imgs=imgs, targets=targets, paths=paths, fname=fname)
+                if tb_writer:
+                    tb_writer.add_image(fname, cv2.imread(fname)[:, :, ::-1], dataformats='HWC')
+
             # Multi-Scale training
-            if opt['multi_scale']:
-                if ni / accumulate % 10 == 0:  #  adjust (67% - 150%) every 10 batches
+            if opt.multi_scale:
+                if ni / accumulate % 10 == 0:  #  adjust (67% - 150%) every 10 batches
                     img_size = random.randrange(img_sz_min, img_sz_max + 1) * 32
                 sf = img_size / max(imgs.shape[2:])  # scale factor
                 if sf != 1:
                     ns = [math.ceil(x * sf / 32.) * 32 for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
-
-            # Plot images with bounding boxes
-            if ni == 0:
-                fname = opt['sub_working_dir'] + 'train_batch%g.png' % i
-                plot_images(imgs=imgs, targets=targets, paths=paths, fname=fname)
-                if tb_writer:
-                    tb_writer.add_image(fname, cv2.imread(fname)[:, :, ::-1], dataformats='HWC')
 
             # Run model
             pred = model(imgs)
@@ -235,9 +235,8 @@ def train():
 
             # Print batch results
             mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
-            mem = torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0  # (GB)
-            s = ('%10s' * 2 + '%10.3g' * 6) % (
-                '%g/%g' % (epoch, epochs - 1), '%.3gG' % mem, *mloss, len(targets), img_size)
+            mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
+            s = ('%10s' * 2 + '%10.3g' * 6) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
             pbar.set_description(s)
         ##################
         # End mini-batch #
@@ -416,17 +415,3 @@ if __name__ == '__main__':
 
             # Plot results
             # plot_evolution_results(opt['hyp'])
-
-# https://github.com/gcastex/PruNet/blob/master/prunet_models.py
-
-# https://paperswithcode.com/paper/winning-the-lottery-with-continuous-1#code
-
-# https://www.cs.montana.edu/sheppard/pubs/ijcnn-2019d.pdf
-
-# https://arxiv.org/pdf/1912.04427v1.pdf
-
-# https://arxiv.org/pdf/1905.07785.pdf
-
-# https://github.com/rahulvigneswaran/Lottery-Ticket-Hypothesis-in-Pytorch/blob/master/main.py
-
-# https://tensorboardx.readthedocs.io/en/latest/tensorboard.html
