@@ -18,9 +18,10 @@ def apply_mask(model, mask):
     with torch.no_grad():
         for name, param in mask.items():
             name_ = name.replace('-', '.') # Changing to the original key
-            model.state_dict()[name_].data = model.state_dict()[name_].data.mul(param.data)
+            model.state_dict()[name_].data.copy_( model.state_dict()[name_].data.mul(param.data) )
 
     return model, mask
+
 
 def create_backup(model):
     from copy import deepcopy
@@ -34,11 +35,10 @@ def create_backup(model):
 
 
 def rewind_weights(model, backup):
-    from copy import deepcopy
     with torch.no_grad():
         for name, param in backup.items():
             name_ = name.replace('-', '.') # Changing to the original key
-            model.state_dict()[name_].data = deepcopy( param ) 
+            model.state_dict()[name_].data.copy_( param )
 
 
 def sum_of_the_weights(item):
