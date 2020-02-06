@@ -46,7 +46,7 @@ def create_config(opt):
     # Create sub_working_dir
     sub_working_dir = '{}/{}/size-{}/{}'.format(
         config['working_dir'], opt['cfg'].split('/')[1].split('.')[0], opt['img_size'],
-        '{}_{}_{}/{}_{}'.format(
+        '{}_{}_{}/{}_{}/'.format(
             time.strftime("%Y", time.localtime()),
             time.strftime("%m", time.localtime()),
             time.strftime("%d", time.localtime()),

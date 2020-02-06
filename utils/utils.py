@@ -7,6 +7,7 @@ from pathlib import Path
 
 import cv2
 import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -1021,7 +1022,7 @@ def plot_results_overlay(start=0, stop=0):  # from utils.utils import *; plot_re
         fig.savefig(f.replace('.txt', '.png'), dpi=200)
 
 
-def plot_results(start=0, stop=0, bucket='', id=(), name='results.png'):  # from utils.utils import *; plot_results()
+def plot_results(start=0, stop=0, bucket='', id=(), folder =''):  # from utils.utils import *; plot_results()
     # Plot training results files 'results*.txt'
     fig, ax = plt.subplots(2, 5, figsize=(14, 7))
     ax = ax.ravel()
@@ -1031,7 +1032,7 @@ def plot_results(start=0, stop=0, bucket='', id=(), name='results.png'):  # from
         os.system('rm -rf storage.googleapis.com')
         files = ['https://storage.googleapis.com/%s/results%g.txt' % (bucket, x) for x in id]
     else:
-        files = glob.glob('results*.txt') + glob.glob('../../Downloads/results*.txt')
+        files = glob.glob(folder + 'results*.txt') + glob.glob('../../Downloads/results*.txt')
     for f in sorted(files):
         results = np.loadtxt(f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2).T
         n = results.shape[1]  # number of rows
@@ -1048,4 +1049,4 @@ def plot_results(start=0, stop=0, bucket='', id=(), name='results.png'):  # from
 
     fig.tight_layout()
     ax[1].legend()
-    fig.savefig('results.png', dpi=200)
+    fig.savefig(folder + 'results.png', dpi=200)
