@@ -359,7 +359,7 @@ if __name__ == '__main__':
             ######################
             # Save in the future #
             ######################
-            tb_writer = SummaryWriter()
+            tb_writer = SummaryWriter(logdir= opt['sub_working_dir'] + 'runs/')
         except:
             pass
 
@@ -416,3 +416,17 @@ if __name__ == '__main__':
 
             # Plot results
             # plot_evolution_results(opt['hyp'])
+
+# https://github.com/gcastex/PruNet/blob/master/prunet_models.py
+
+# https://paperswithcode.com/paper/winning-the-lottery-with-continuous-1#code
+
+# https://www.cs.montana.edu/sheppard/pubs/ijcnn-2019d.pdf
+
+# https://arxiv.org/pdf/1912.04427v1.pdf
+
+# https://arxiv.org/pdf/1905.07785.pdf
+
+# https://github.com/rahulvigneswaran/Lottery-Ticket-Hypothesis-in-Pytorch/blob/master/main.py
+
+# https://tensorboardx.readthedocs.io/en/latest/tensorboard.html

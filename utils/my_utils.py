@@ -9,7 +9,7 @@ def create_argparser():
     parser.add_argument('--batch-size', type=int, default=16)  # effective bs = batch_size * accumulate = 16 * 4 = 64
     parser.add_argument('--accumulate', type=int, default=4, help='batches to accumulate before optimizing')
     parser.add_argument('--cfg', type=str, default='cfg/yolov3-spp.cfg', help='*.cfg path')
-    parser.add_argument('--data', type=str, default='data/coco2017.data', help='*.data path')
+    parser.add_argument('--data', type=str, default='data/coco2014.data', help='*.data path')
     parser.add_argument('--multi-scale', action='store_true', help='adjust (67% - 150%) img_size every 10 batches')
     parser.add_argument('--img-size', nargs='+', type=int, default=[416], help='train and test image-sizes')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
@@ -29,6 +29,7 @@ def create_argparser():
     parser.add_argument('--scheduler', type=str, default='multi-step', help='kind of learning rate scheduler')
     parser.add_argument('--decay_steps', type=str, default='0.2161 0.2564')
     parser.add_argument('--gamma', type=float, default= 0.8, help='gamma used in learning rate decay')
+    parser.add_argument('--params', type=str, default='params/default.json', help='json config to load the hyperparameters')
     args = vars(parser.parse_args())
 
     return args
