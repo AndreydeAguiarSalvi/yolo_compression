@@ -1,7 +1,7 @@
 import os
 
 
-def create_argparser():
+def train_argparser():
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -35,6 +35,33 @@ def create_argparser():
     return args
 
 
+def test_argparser():
+    import argparse
+
+    parser = argparse.ArgumentParser(prog='test.py')
+    parser.add_argument('--cfg', type=str, default='cfg/yolov3-spp.cfg', help='*.cfg path')
+    parser.add_argument('--data', type=str, default='data/coco2014.data', help='*.data path')
+    parser.add_argument('--weights', type=str, default='weights/yolov3-spp.weights', help='path to weights file')
+    parser.add_argument('--batch-size', type=int, default=32, help='size of each image batch')
+    parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
+    parser.add_argument('--conf-thres', type=float, default=0.001, help='object confidence threshold')
+    parser.add_argument('--iou-thres', type=float, default=0.6, help='IOU threshold for NMS')
+    parser.add_argument('--save-json', action='store_true', help='save a cocoapi-compatible JSON results file')
+    parser.add_argument('--task', default='test', help="'test', 'study', 'benchmark'")
+    parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
+    parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
+    args = vars(parser.parse_args())
+
+    pieces = args['weights'].split('/')
+    working_dir = ''
+    if len(pieces) > 0:
+        for i in range(len(pieces) - 1): # eliminate the last part (*.pt) to take the folder
+            working_dir += pieces[i] + '/'
+    args['working_dir'] = working_dir
+
+    return args
+
+
 def create_config(opt):
     import json
     import time 
@@ -59,8 +86,9 @@ def create_config(opt):
     config["sub_working_dir"] = sub_working_dir
 
     for key, value in opt.items():
+        print(f'Changing config with key: {key}  value: {value}')
         config[key] = value
-    
+    exit()
     return config
 
 
@@ -98,6 +126,7 @@ def create_optimizer(model, opt):
         # optimizer = AdaBound(pg0, lr=opt['hyp']['lr0'], final_lr=0.1)
     else:
         optimizer = optim.SGD(pg0, lr=opt['hyp']['lr0'], momentum=opt['hyp']['momentum'], nesterov=True)
+    
     optimizer.add_param_group({'params': pg1, 'weight_decay': opt['hyp']['weight_decay']})  # add pg1 with weight_decay
     optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
     del pg0, pg1, pg2

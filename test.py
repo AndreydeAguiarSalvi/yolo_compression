@@ -1,4 +1,3 @@
-import argparse
 import json
 
 from torch.utils.data import DataLoader
@@ -6,6 +5,7 @@ from torch.utils.data import DataLoader
 from models import *
 from utils.datasets import *
 from utils.utils import *
+from utils.my_utils import test_argparser
 
 
 def test(cfg,
@@ -18,14 +18,15 @@ def test(cfg,
          save_json=False,
          single_cls=False,
          model=None,
-         dataloader=None):
+         dataloader=None,
+         folder=''):
     # Initialize/load model and set device
     if model is None:
-        device = torch_utils.select_device(opt.device, batch_size=batch_size)
-        verbose = opt.task == 'test'
+        device = torch_utils.select_device(args['device'], batch_size=batch_size) # BUG HERE
+        verbose = args['task'] == 'test' # BUG HERE
 
         # Remove previous
-        for f in glob.glob('test_batch*.jpg'):
+        for f in glob.glob(folder + 'test_batch*.jpg'):
             os.remove(f)
 
         # Initialize model
@@ -76,11 +77,8 @@ def test(cfg,
         _, _, height, width = imgs.shape  # batch size, channels, height, width
 
         # Plot images with bounding boxes
-        ######################
-        # Save in the future #
-        ######################
-        if batch_i == 0 and not os.path.exists('test_batch0.png'):
-            plot_images(imgs=imgs, targets=targets, paths=paths, fname='test_batch0.png')
+        if batch_i == 0 and not os.path.exists(folder + 'test_batch0.png'):
+            plot_images(imgs=imgs, targets=targets, paths=paths, fname=folder + 'test_batch0.png')
 
 
         # Disable gradients
@@ -170,24 +168,29 @@ def test(cfg,
     else:
         nt = torch.zeros(1)
 
-    ######################
-    # Save in the future #
-    ######################
     pf = '%20s' + '%10.3g' * 6  # print format
     print(pf % ('all', seen, nt.sum(), mp, mr, map, mf1))
+    
+    # Saving the evarage evaluations
+    class_results = open(folder + 'per_class_evaluations.txt', 'w')
+    print(s)
+    print(pf % ('all', seen, nt.sum(), mp, mr, map, mf1), file=class_results)
 
-    ######################
-    # Save in the future #
-    ######################
+
     # Print results per class
     if verbose and nc > 1 and len(stats):
         for i, c in enumerate(ap_class):
             print(pf % (names[c], seen, nt[c], p[i], r[i], ap[i], f1[i]))
+            # Saving the evaluations per class
+            print(pf % (names[c], seen, nt[c], p[i], r[i], ap[i], f1[i]), file=class_results)
+
+    # Closing the evaluations .txt
+    class_results.close()
 
     # Save JSON
     if save_json and map and len(jdict):
         imgIds = [int(Path(x).stem.split('_')[-1]) for x in dataloader.dataset.img_files]
-        with open('results.json', 'w') as file:
+        with open(folder + 'results.json', 'w') as file:
             json.dump(jdict, file)
 
         try:
@@ -198,7 +201,7 @@ def test(cfg,
 
         # https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocoEvalDemo.ipynb
         cocoGt = COCO(glob.glob('../COCO2014/annotations/instances_val*.json')[0])  # initialize COCO ground truth api
-        cocoDt = cocoGt.loadRes('results.json')  # initialize COCO pred api
+        cocoDt = cocoGt.loadRes(folder + 'results.json')  # initialize COCO pred api
 
         cocoEval = COCOeval(cocoGt, cocoDt, 'bbox')
         cocoEval.params.imgIds = imgIds  # [:32]  # only evaluate these images
@@ -218,53 +221,46 @@ def test(cfg,
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='test.py')
-    parser.add_argument('--cfg', type=str, default='cfg/yolov3-spp.cfg', help='*.cfg path')
-    parser.add_argument('--data', type=str, default='data/coco2014.data', help='*.data path')
-    parser.add_argument('--weights', type=str, default='weights/yolov3-spp.weights', help='path to weights file')
-    parser.add_argument('--batch-size', type=int, default=32, help='size of each image batch')
-    parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
-    parser.add_argument('--conf-thres', type=float, default=0.001, help='object confidence threshold')
-    parser.add_argument('--iou-thres', type=float, default=0.6, help='IOU threshold for NMS')
-    parser.add_argument('--save-json', action='store_true', help='save a cocoapi-compatible JSON results file')
-    parser.add_argument('--task', default='test', help="'test', 'study', 'benchmark'")
-    parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
-    parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
-    opt = parser.parse_args()
-    opt.save_json = opt.save_json or any([x in opt.data for x in ['coco.data', 'coco2014.data', 'coco2017.data']])
-    print(opt)
+    args = test_argparser()
+    args['save_json'] = args['save_json'] or any([x in args['data'] for x in ['coco.data', 'coco2014.data', 'coco2017.data']])
+    print(args)
 
-    if opt.task == 'test':  # task = 'test', 'study', 'benchmark'
+    if args['task'] == 'test':  # task = 'test', 'study', 'benchmark'
         # Test
-        test(opt.cfg,
-             opt.data,
-             opt.weights,
-             opt.batch_size,
-             opt.img_size,
-             opt.conf_thres,
-             opt.iou_thres,
-             opt.save_json,
-             opt.single_cls)
+        test(
+                cfg = args['cfg'], data = args['data'], weights = args['weights'],
+                batch_size = args['batch_size'], img_size = args['img_size'], conf_thres = args['conf_thres'],
+                iou_thres = args['iou_thres'], save_json = args['save_json'], single_cls = args['single_cls'],
+                folder = args['working_dir']
+            )
 
-    elif opt.task == 'benchmark':
+    elif args['task'] == 'benchmark':
         # mAPs at 320-608 at conf 0.5 and 0.7
         y = []
         for i in [320, 416, 512, 608]:
             for j in [0.5, 0.7]:
                 t = time.time()
-                r = test(opt.cfg, opt.data, opt.weights, opt.batch_size, i, opt.conf_thres, j, opt.save_json)[0]
+                r = test(
+                        cfg = args['cfg'], data = args['data'], weights = args['weights'], 
+                        batch_size = args['batch_size'], img_size = i, conf_thres = args['conf_thres'], 
+                        iou_thres = j, save_json = args['save_json'], folder = args['working_dir']
+                    )[0]
                 y.append(r + (time.time() - t,))
-        np.savetxt('benchmark.txt', y, fmt='%10.4g')  # y = np.loadtxt('study.txt')
+        np.savetxt(args['working_dir'] + 'benchmark.txt', y, fmt='%10.4g')  # y = np.loadtxt('study.txt')
 
-    elif opt.task == 'study':
+    elif args['task'] == 'study':
         # Parameter study
         y = []
         x = np.arange(0.4, 0.9, 0.05)
         for i in x:
             t = time.time()
-            r = test(opt.cfg, opt.data, opt.weights, opt.batch_size, opt.img_size, opt.conf_thres, i, opt.save_json)[0]
+            r = test(
+                cfg = args['cfg'], data = args['data'], weights = args['weights'], 
+                batch_size = args['batch_size'], img_size = args['img_size'], conf_thres = args['conf_thres'], 
+                iou_thres = i, save_json = args['save_json'], folder = args['working_dir']
+            )[0]
             y.append(r + (time.time() - t,))
-        np.savetxt('study.txt', y, fmt='%10.4g')  # y = np.loadtxt('study.txt')
+        np.savetxt(args['working_dir'] + 'study.txt', y, fmt='%10.4g')  # y = np.loadtxt('study.txt')
 
         # Plot
         fig, ax = plt.subplots(3, 1, figsize=(6, 6))
@@ -279,4 +275,4 @@ if __name__ == '__main__':
             ax[i].legend()
             ax[i].set_xlabel('iou_thr')
         fig.tight_layout()
-        plt.savefig('study.jpg', dpi=200)
+        plt.savefig(args['working_dir'] + 'study.jpg', dpi=200)

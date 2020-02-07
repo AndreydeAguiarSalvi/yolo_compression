@@ -7,7 +7,7 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_argparser, create_config, create_scheduler, create_optimizer
+from utils.my_utils import train_argparser, create_config, create_scheduler, create_optimizer
 
 mixed_precision = True
 try:  # Mixed precision training https://github.com/NVIDIA/apex
@@ -17,17 +17,17 @@ except:
 
 
 def train():
-    cfg = opt['cfg']
-    data = opt['data']
-    img_size, img_size_test = opt['img_size'] if len(opt['img_size']) == 2 else opt['img_size'] * 2  # train, test sizes
-    epochs = opt['epochs']  # 500200 batches at bs 64, 117263 images = 273 epochs
-    batch_size = opt['batch_size']
-    accumulate = opt['accumulate']  # effective bs = batch_size * accumulate = 16 * 4 = 64
-    weights = opt['weights']  # initial training weights
+    cfg = config['cfg']
+    data = config['data']
+    img_size, img_size_test = config['img_size'] if len(config['img_size']) == 2 else config['img_size'] * 2  # train, test sizes
+    epochs = config['epochs']  # 500200 batches at bs 64, 117263 images = 273 epochs
+    batch_size = config['batch_size']
+    accumulate = config['accumulate']  # effective bs = batch_size * accumulate = 16 * 4 = 64
+    weights = config['weights']  # initial training weights
 
     # Initialize
     init_seeds()
-    if opt['multi_scale']:
+    if config['multi_scale']:
         img_sz_min = round(img_size / 32 / 1.5)
         img_sz_max = round(img_size / 32 * 1.5)
         img_size = img_sz_max * 32  # initiate with maximum multi_scale size
@@ -37,19 +37,19 @@ def train():
     data_dict = parse_data_cfg(data)
     train_path = data_dict['train']
     test_path = data_dict['valid']
-    nc = 1 if opt['single_cls'] else int(data_dict['classes'])  # number of classes
+    nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
 
     # Remove previous results
     ##############################
     # Maybe remove in the future #
     ##############################
-    for f in glob.glob('*_batch*.png') + glob.glob(opt['results_file']):
+    for f in glob.glob('*_batch*.png') + glob.glob(config['results_file']):
         os.remove(f)
 
     # Initialize model
-    model = Darknet(cfg, arc=opt['arc']).to(device)
+    model = Darknet(cfg, arc=config['arc']).to(device)
 
-    optimizer = create_optimizer(model, opt)
+    optimizer = create_optimizer(model, config)
 
     start_epoch = 0
     best_fitness = 0.0
@@ -64,7 +64,7 @@ def train():
             model.load_state_dict(chkpt['model'], strict=False)
         except KeyError as e:
             s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
-                "See https://github.com/ultralytics/yolov3/issues/657" % (opt['weights'], opt['cfg'], opt['weights'])
+                "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
             raise KeyError(s) from e
 
         # load optimizer
@@ -74,7 +74,7 @@ def train():
 
         # load results
         if chkpt.get('training_results') is not None:
-            with open(opt['results_file'], 'w') as file:
+            with open(config['results_file'], 'w') as file:
                 file.write(chkpt['training_results'])  # write results.txt
 
         start_epoch = chkpt['epoch'] + 1
@@ -84,7 +84,7 @@ def train():
         # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
         load_darknet_weights(model, weights)
 
-    scheduler = create_scheduler(opt, optimizer, start_epoch)
+    scheduler = create_scheduler(config, optimizer, start_epoch)
 
     # # Plot lr schedule
     # y = []
@@ -113,11 +113,11 @@ def train():
     # Dataset
     dataset = LoadImagesAndLabels(train_path, img_size, batch_size,
                                   augment=True,
-                                  hyp=opt['hyp'],  # augmentation hyperparameters
-                                  rect=opt['rect'],  # rectangular training
+                                  hyp=config['hyp'],  # augmentation hyperparameters
+                                  rect=config['rect'],  # rectangular training
                                   cache_labels=True,
-                                  cache_images=opt['cache_images'],
-                                  single_cls=opt['single_cls'])
+                                  cache_images=config['cache_images'],
+                                  single_cls=config['single_cls'])
 
     # Dataloader
     batch_size = min(batch_size, len(dataset))
@@ -125,17 +125,17 @@ def train():
     dataloader = torch.utils.data.DataLoader(dataset,
                                              batch_size=batch_size,
                                              num_workers=nw,
-                                             shuffle=not opt['rect'],  # Shuffle=True unless rectangular training is used
+                                             shuffle=not config['rect'],  # Shuffle=True unless rectangular training is used
                                              pin_memory=True,
                                              collate_fn=dataset.collate_fn)
 
     # Testloader
     testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(test_path, img_size_test, batch_size * 2,
-                                                                 hyp=opt['hyp'],
+                                                                 hyp=config['hyp'],
                                                                  rect=True,
                                                                  cache_labels=True,
-                                                                 cache_images=opt['cache_images'],
-                                                                 single_cls=opt['single_cls']),
+                                                                 cache_images=config['cache_images'],
+                                                                 single_cls=config['single_cls']),
                                              batch_size=batch_size * 2,
                                              num_workers=nw,
                                              pin_memory=True,
@@ -145,8 +145,8 @@ def train():
     nb = len(dataloader)
     prebias = start_epoch == 0
     model.nc = nc  # attach number of classes to model
-    model.arc = opt['arc']  # attach yolo architecture
-    model.hyp = opt['hyp']  # attach hyperparameters to model
+    model.arc = config['arc']  # attach yolo architecture
+    model.hyp = config['hyp']  # attach hyperparameters to model
     model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device)  # attach class weights
     maps = np.zeros(nc)  # mAP per class
     # torch.autograd.set_detect_anomaly(True)
@@ -167,7 +167,7 @@ def train():
             if epoch < 3:  # prebias
                 ps = 0.1, 0.9  # prebias settings (lr=0.1, momentum=0.9)
             else:  # normal training
-                ps = opt['hyp']['lr0'], opt['hyp']['momentum']  # normal training settings
+                ps = config['hyp']['lr0'], config['hyp']['momentum']  # normal training settings
                 print_model_biases(model)
                 prebias = False
 
@@ -195,13 +195,13 @@ def train():
 
             # Plot images with bounding boxes
             if ni == 0:
-                fname = opt['sub_working_dir'] + 'train_batch%g.png' % i
+                fname = config['sub_working_dir'] + 'train_batch%g.png' % i
                 plot_images(imgs=imgs, targets=targets, paths=paths, fname=fname)
                 if tb_writer:
                     tb_writer.add_image(fname, cv2.imread(fname)[:, :, ::-1], dataformats='HWC')
 
             # Multi-Scale training
-            if opt['multi_scale']:
+            if config['multi_scale']:
                 if ni / accumulate % 10 == 0:  #  adjust (67% - 150%) every 10 batches
                     img_size = random.randrange(img_sz_min, img_sz_max + 1) * 32
                 sf = img_size / max(imgs.shape[2:])  # scale factor
@@ -243,29 +243,27 @@ def train():
         ##################
 
         final_epoch = epoch + 1 == epochs
-        if not opt['notest'] or final_epoch:  # Calculate mAP
+        if not config['notest'] or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
             results, maps = test.test(cfg,
                                       data,
                                       batch_size=batch_size * 2,
                                       img_size=img_size_test,
                                       model=model,
-                                      conf_thres=1E-3 if opt['evolve'] or (final_epoch and is_coco) else 0.1,  # 0.1 faster
+                                      conf_thres=1E-3 if config['evolve'] or (final_epoch and is_coco) else 0.1,  # 0.1 faster
                                       iou_thres=0.6,
                                       save_json=final_epoch and is_coco,
-                                      single_cls=opt['single_cls'],
+                                      single_cls=config['single_cls'],
                                       dataloader=testloader)
 
         # Update scheduler
         scheduler.step()
 
         # Write epoch results
-        with open(opt['results_file'], 'a') as f:
-            if (epoch == 0):
-                f.write(('%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size') + '\n')  # Header    
+        with open(config['results_file'], 'a') as f:
             f.write(s + '%10.3g' * 7 % results + '\n')  # P, R, mAP, F1, test_losses=(GIoU, obj, cls)
-        if len(opt['name']) and opt['bucket']:
-            os.system('gsutil cp results.txt gs://%s/results/results%s.txt' % (opt['bucket'], opt['name']))
+        if len(config['name']) and config['bucket']:
+            os.system('gsutil cp results.txt gs://%s/results/results%s.txt' % (config['bucket'], config['name']))
 
         # Write Tensorboard results
         if tb_writer:
@@ -281,9 +279,9 @@ def train():
             best_fitness = fi
 
         # Save training results
-        save = (not opt['nosave']) or (final_epoch and not opt['evolve'])
+        save = (not config['nosave']) or (final_epoch and not config['evolve'])
         if save:
-            with open(opt['results_file'], 'r') as f:
+            with open(config['results_file'], 'r') as f:
                 # Create checkpoint
                 chkpt = {'epoch': epoch,
                          'best_fitness': best_fitness,
@@ -293,15 +291,15 @@ def train():
                          'optimizer': None if final_epoch else optimizer.state_dict()}
 
             # Save last checkpoint
-            torch.save(chkpt, opt['last'])
+            torch.save(chkpt, config['last'])
 
             # Save best checkpoint
             if best_fitness == fi:
-                torch.save(chkpt, opt['best'])
+                torch.save(chkpt, config['best'])
 
             # Save backup every 10 epochs (optional)
             # if epoch > 0 and epoch % 10 == 0:
-            #     torch.save(chkpt, opt['sub_working_dir'] + 'backup%g.pt' % epoch)
+            #     torch.save(chkpt, config['sub_working_dir'] + 'backup%g.pt' % epoch)
 
             # Delete checkpoint
             del chkpt
@@ -309,25 +307,25 @@ def train():
     # End epoch #
     #############
 
-    n = opt['name']
+    n = config['name']
     if len(n):
         n = '_' + n if not n.isnumeric() else n
         fresults, flast, fbest = 'results%s.txt' % n, 'last%s.pt' % n, 'best%s.pt' % n
-        os.rename(opt['results_file'], opt['sub_working_dir'] + fresults)
-        os.rename(opt['last'], opt['sub_working_dir'] + flast) if os.path.exists(opt['last']) else None
-        os.rename(opt['best'], opt['sub_working_dir'] + fbest) if os.path.exists(opt['best']) else None
+        os.rename(config['results_file'], config['sub_working_dir'] + fresults)
+        os.rename(config['last'], config['sub_working_dir'] + flast) if os.path.exists(config['last']) else None
+        os.rename(config['best'], config['sub_working_dir'] + fbest) if os.path.exists(config['best']) else None
         # Updating results, last and best
-        opt['results_file'] = opt['sub_working_dir'] + fresults
-        opt['last'] = opt['sub_working_dir'] + flast
-        opt['best'] = opt['sub_working_dir'] + fbest
+        config['results_file'] = config['sub_working_dir'] + fresults
+        config['last'] = config['sub_working_dir'] + flast
+        config['best'] = config['sub_working_dir'] + fbest
 
-        if opt['bucket']:  # save to cloud
-            os.system('gsutil cp %s gs://%s/results' % (fresults, opt['bucket']))
-            os.system('gsutil cp %s gs://%s/weights' % (opt['sub_working_dir'] + flast, opt['bucket']))
-            # os.system('gsutil cp %s gs://%s/weights' % (opt['sub_working_dir'] + fbest, opt['bucket']))
+        if config['bucket']:  # save to cloud
+            os.system('gsutil cp %s gs://%s/results' % (fresults, config['bucket']))
+            os.system('gsutil cp %s gs://%s/weights' % (config['sub_working_dir'] + flast, config['bucket']))
+            # os.system('gsutil cp %s gs://%s/weights' % (config['sub_working_dir'] + fbest, config['bucket']))
 
-    if not opt['evolve']:
-        plot_results(folder= opt['sub_working_dir'])
+    if not config['evolve']:
+        plot_results(folder= config['sub_working_dir'])
 
     print('%g epochs completed in %.3f hours.\n' % (epoch - start_epoch + 1, (time.time() - t0) / 3600))
     dist.destroy_process_group() if torch.cuda.device_count() > 1 else None
@@ -337,42 +335,46 @@ def train():
 
 
 if __name__ == '__main__':
-    opt = create_argparser()
-    opt = create_config(opt)
-    print("sub working dir: %s" % opt['sub_working_dir'])
+    args = train_argparser()
+    config = create_config(args)
+    print("sub working dir: %s" % config['sub_working_dir'])
+
+    for key, value in config.items():
+        print(f'{key} : {value}')
+    exit()
 
     # Saving configurations
     import json
-    with open(opt['sub_working_dir'] + 'config.json', 'w') as f:
-        f.dump(opt)
+    with open(config['sub_working_dir'] + 'config.json', 'w') as f:
+        json.dump(config, f)
     f.close()
 
-    opt['last'] = opt['sub_working_dir'] + 'last.pt'
-    opt['best'] = opt['sub_working_dir'] + 'best.pt'
-    opt['results_file'] = opt['sub_working_dir'] + 'results.txt'
-    opt['weights'] = opt['last'] if opt['resume'] else opt['weights']
+    config['last'] = config['sub_working_dir'] + 'last.pt'
+    config['best'] = config['sub_working_dir'] + 'best.pt'
+    config['results_file'] = config['sub_working_dir'] + 'results.txt'
+    config['weights'] = config['last'] if config['resume'] else config['weights']
 
-    print(opt)
+    print(config)
     
-    device = torch_utils.select_device(opt['device'], apex=mixed_precision, batch_size=opt['batch_size'])
+    device = torch_utils.select_device(config['device'], apex=mixed_precision, batch_size=config['batch_size'])
     if device.type == 'cpu':
         mixed_precision = False
 
     tb_writer = None
-    if not opt['evolve']:  # Train normally
+    if not config['evolve']:  # Train normally
         try:
             # Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/
             from torch.utils.tensorboard import SummaryWriter
-            tb_writer = SummaryWriter(logdir= opt['sub_working_dir'] + 'runs/')
+            tb_writer = SummaryWriter(logdir= config['sub_working_dir'] + 'runs/')
         except:
             pass
 
         train()  # train normally
 
     else:  # Evolve hyperparameters (optional)
-        opt['notest'], opt['nosave'] = True, True  # only test/save final epoch
-        if opt['bucket']:
-            os.system('gsutil cp gs://%s/evolve.txt .' % opt['bucket'])  # download evolve.txt if exists
+        config['notest'], config['nosave'] = True, True  # only test/save final epoch
+        if config['bucket']:
+            os.system('gsutil cp gs://%s/evolve.txt .' % config['bucket'])  # download evolve.txt if exists
 
         for _ in range(1):  # generations to evolve
             if os.path.exists('evolve.txt'):  # if evolve.txt exists: select best hyps and mutate
@@ -403,20 +405,20 @@ if __name__ == '__main__':
                     while all(v == 1):  # mutate until a change occurs (prevent duplicates)
                         # v = (g * (npr.random(ng) < mp) * npr.randn(ng) * s + 1) ** 2.0
                         v = (g * (npr.random(ng) < mp) * npr.randn(ng) * npr.random() * s + 1).clip(0.3, 3.0)
-                for i, k in enumerate(opt['hyp'].keys()):  # plt.hist(v.ravel(), 300)
-                    opt['hyp'][k] = x[i + 7] * v[i]  # mutate
+                for i, k in enumerate(config['hyp'].keys()):  # plt.hist(v.ravel(), 300)
+                    config['hyp'][k] = x[i + 7] * v[i]  # mutate
 
             # Clip to limits
             keys = ['lr0', 'iou_t', 'momentum', 'weight_decay', 'hsv_s', 'hsv_v', 'translate', 'scale', 'fl_gamma']
             limits = [(1e-5, 1e-2), (0.00, 0.70), (0.60, 0.98), (0, 0.001), (0, .9), (0, .9), (0, .9), (0, .9), (0, 3)]
             for k, v in zip(keys, limits):
-                opt['hyp'][k] = np.clip(opt['hyp'][k], v[0], v[1])
+                config['hyp'][k] = np.clip(config['hyp'][k], v[0], v[1])
 
             # Train mutation
             results = train()
 
             # Write mutation results
-            print_mutation(opt['hyp'], results, opt['bucket'])
+            print_mutation(config['hyp'], results, config['bucket'])
 
             # Plot results
-            # plot_evolution_results(opt['hyp'])
+            # plot_evolution_results(config['hyp'])
