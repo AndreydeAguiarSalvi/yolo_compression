@@ -261,6 +261,8 @@ def train():
 
         # Write epoch results
         with open(opt['results_file'], 'a') as f:
+            if (epoch == 0):
+                f.write(('%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size') + '\n')  # Header    
             f.write(s + '%10.3g' * 7 % results + '\n')  # P, R, mAP, F1, test_losses=(GIoU, obj, cls)
         if len(opt['name']) and opt['bucket']:
             os.system('gsutil cp results.txt gs://%s/results/results%s.txt' % (opt['bucket'], opt['name']))
@@ -325,7 +327,7 @@ def train():
             # os.system('gsutil cp %s gs://%s/weights' % (opt['sub_working_dir'] + fbest, opt['bucket']))
 
     if not opt['evolve']:
-        plot_results(name= opt['sub_working_dir'] + 'results.png')
+        plot_results(folder= opt['sub_working_dir'])
 
     print('%g epochs completed in %.3f hours.\n' % (epoch - start_epoch + 1, (time.time() - t0) / 3600))
     dist.destroy_process_group() if torch.cuda.device_count() > 1 else None
@@ -338,6 +340,12 @@ if __name__ == '__main__':
     opt = create_argparser()
     opt = create_config(opt)
     print("sub working dir: %s" % opt['sub_working_dir'])
+
+    # Saving configurations
+    import json
+    with open(opt['sub_working_dir'] + 'config.json', 'w') as f:
+        f.dump(opt)
+    f.close()
 
     opt['last'] = opt['sub_working_dir'] + 'last.pt'
     opt['best'] = opt['sub_working_dir'] + 'best.pt'

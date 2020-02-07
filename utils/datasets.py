@@ -370,7 +370,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                             if not os.path.exists(Path(f).parent):
                                 os.makedirs(Path(f).parent)  # make new output folder
 
-                            b = x[1:] * np.array([w, h, w, h])  # box
+                            b = x[1:] * [w, h, w, h]  # box
                             b[2:] = b[2:].max()  # rectangle to square
                             b[2:] = b[2:] * 1.3 + 30  # pad
                             b = xywh2xyxy(b.reshape(-1, 4)).ravel().astype(np.int)
@@ -530,8 +530,9 @@ def load_image(self, index):
 
 
 def augment_hsv(img, hgain=0.5, sgain=0.5, vgain=0.5):
-    x = (np.random.uniform(-1, 1, 3) * np.array([hgain, sgain, vgain]) + 1).astype(np.float32)  # random gains
-    img_hsv = (cv2.cvtColor(img, cv2.COLOR_BGR2HSV) * x.reshape((1, 1, 3))).clip(None, 255).astype(np.uint8)
+     x = np.random.uniform(-1, 1, 3) * [hgain, sgain, vgain] + 1  # random gains
+    img_hsv = (cv2.cvtColor(img, cv2.COLOR_BGR2HSV) * x).clip(None, 255).astype(np.uint8)
+    np.clip(img_hsv[:, :, 0], None, 179, out=img_hsv[:, :, 0])  # inplace hue clip (0 - 179 deg)
     cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR, dst=img)  # no return needed
 
 
@@ -731,7 +732,7 @@ def cutout(image, labels):
         return inter_area / box2_area
 
     # create random masks
-    scales = [0.5] * 1  # + [0.25] * 4 + [0.125] * 16 + [0.0625] * 64 + [0.03125] * 256  # image size fraction
+    scales = [0.5] * 1 + [0.25] * 2 + [0.125] * 4 + [0.0625] * 8 + [0.03125] * 16  # image size fraction
     for s in scales:
         mask_h = random.randint(1, int(h * s))
         mask_w = random.randint(1, int(w * s))
@@ -743,14 +744,13 @@ def cutout(image, labels):
         ymax = min(h, ymin + mask_h)
 
         # apply random color mask
-        mask_color = [random.randint(0, 255) for _ in range(3)]
-        image[ymin:ymax, xmin:xmax] = mask_color
+        image[ymin:ymax, xmin:xmax] = [random.randint(64, 191) for _ in range(3)]
 
         # return unobscured labels
         if len(labels) and s > 0.03:
             box = np.array([xmin, ymin, xmax, ymax], dtype=np.float32)
             ioa = bbox_ioa(box, labels[:, 1:5])  # intersection over area
-            labels = labels[ioa < 0.90]  # remove >90% obscured labels
+            labels = labels[ioa < 0.60]  # remove >60% obscured labels
 
     return labels
 
