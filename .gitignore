@@ -41,6 +41,7 @@ gcp_test*.sh
 !targets*.mat
 
 # Neural Network weights -----------------------------------------------------------------------------------------------
+weights/
 *.weights
 *.pt
 *.onnx
