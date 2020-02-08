@@ -245,16 +245,13 @@ def train():
         final_epoch = epoch + 1 == epochs
         if not config['notest'] or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
-            results, maps = test.test(cfg,
-                                      data,
-                                      batch_size=batch_size * 2,
-                                      img_size=img_size_test,
-                                      model=model,
-                                      conf_thres=1E-3 if config['evolve'] or (final_epoch and is_coco) else 0.1,  # 0.1 faster
-                                      iou_thres=0.6,
-                                      save_json=final_epoch and is_coco,
-                                      single_cls=config['single_cls'],
-                                      dataloader=testloader)
+            results, maps = test.test(
+                cfg = cfg, data = data, batch_size=batch_size * 2,
+                img_size=img_size_test, model=model, 
+                conf_thres=1E-3 if config['evolve'] or (final_epoch and is_coco) else 0.1,  # 0.1 faster
+                iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
+                dataloader=testloader, folder = config['sub_working_dir']
+            )    
 
         # Update scheduler
         scheduler.step()
