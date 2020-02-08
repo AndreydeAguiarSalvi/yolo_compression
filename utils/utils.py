@@ -1044,6 +1044,7 @@ def plot_results(start=0, stop=0, bucket='', id=(), folder =''):  # from utils.u
                 # y /= y[0]  # normalize
             ax[i].plot(x, y, marker='.', label=Path(f).stem)
             ax[i].set_title(s[i])
+            ax[i].grid(color='gray', linestyle=':', linewidth=1)
             if i in [5, 6, 7]:  # share train and val loss y axes
                 ax[i].get_shared_y_axes().join(ax[i], ax[i - 5])
 
