@@ -336,10 +336,6 @@ if __name__ == '__main__':
     config = create_config(args)
     print("sub working dir: %s" % config['sub_working_dir'])
 
-    for key, value in config.items():
-        print(f'{key} : {value}')
-    exit()
-
     # Saving configurations
     import json
     with open(config['sub_working_dir'] + 'config.json', 'w') as f:
