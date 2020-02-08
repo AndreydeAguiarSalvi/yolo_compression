@@ -171,7 +171,7 @@ def test(cfg,
     pf = '%20s' + '%10.3g' * 6  # print format
     print(pf % ('all', seen, nt.sum(), mp, mr, map, mf1))
     
-    # Saving the evarage evaluations
+    # Saving the average evaluations
     class_results = open(folder + 'per_class_evaluations.txt', 'w')
     print(s)
     print(pf % ('all', seen, nt.sum(), mp, mr, map, mf1), file=class_results)

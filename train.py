@@ -7,7 +7,8 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import train_argparser, create_config, create_scheduler, create_optimizer
+from utils.my_utils import train_argparser, create_config, create_scheduler, create_optimizer, initialize_model
+from utils.pruning import sum_of_the_weights
 
 mixed_precision = True
 try:  # Mixed precision training https://github.com/NVIDIA/apex
@@ -48,7 +49,13 @@ def train():
 
     # Initialize model
     model = Darknet(cfg, arc=config['arc']).to(device)
+    
+    if config['xavier_norm']:
+        initialize_model(model, torch.nn.init.xavier_normal_)
+    elif config['xavier_uniform']:
+        initialize_model(model, torch.nn.init.xavier_uniform_)
 
+    exit()
     optimizer = create_optimizer(model, config)
 
     start_epoch = 0

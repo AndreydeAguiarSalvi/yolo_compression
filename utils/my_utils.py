@@ -1,6 +1,3 @@
-import os
-
-
 def train_argparser():
     import argparse
 
@@ -26,8 +23,12 @@ def train_argparser():
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
     parser.add_argument('--single_cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--var', type=float, help='debug variable')
+    # My additioned parameters
     parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
     parser.add_argument('--decay_steps', type=str)
+    parser.add_argument('--exponential_ramp', action='store_true', help="changes inverse exponential learning rate decay to be exponential")
+    parser.add_argument('--xavier_uniform', action='store_true', help='initialize model with xavier uniform function')
+    parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
     parser.add_argument('--params', type=str, default='params/default.json', help='json config to load the hyperparameters')
     args = vars(parser.parse_args())
@@ -64,7 +65,8 @@ def test_argparser():
 
 def create_config(opt):
     import json
-    import time 
+    import time
+    import os 
 
     json_file = open(opt['params'])
     json_str = json_file.read()
@@ -73,7 +75,8 @@ def create_config(opt):
     # Create sub_working_dir
     sub_working_dir = '{}/{}/size-{}/{}'.format(
         config['working_dir'],
-        opt['cfg'].split('/')[1].split('.')[0], # Get the architecture name
+        opt['cfg'].split('/')[1].split('.')[0] if opt['cfg'] is not None 
+            else config['cfg'].split('/')[1].split('.')[0], # Get the architecture name
         config['img_size'][0] if opt['multi_scale'] is False and opt['img_size'] is None 
             else 'multi_scale' if opt['multi_scale'] is True else opt['img_size'][0],
 
@@ -100,11 +103,18 @@ def create_scheduler(opt, optimizer, start_epoch):
     import torch.optim.lr_scheduler as lr_scheduler
 
     if opt['scheduler'] == 'multi-step':
-        milestones = [round(opt['epochs'] * float(x)) for x in opt['decay_steps'].split(' ')]
+        values = opt['decay_steps'].split(' ')
+        try:
+            milestones = [int(x) for x in values]
+        except:
+            milestones = [round(opt['epochs'] * float(x)) for x in values]
+
         scheduler = lr_scheduler.MultiStepLR(optimizer, milestones= milestones, gamma= opt['gamma'])
     elif opt['scheduler'] == 'lambda':
-        # lf = lambda x: 10 ** (opt['hyp']['lrf'] * x / epochs)  # exp ramp
-        lf = lambda x: 1 - 10 ** (opt['hyp']['lrf'] * (1 - x / opt['epochs']))  # inverse exp ramp
+        if opt['exponential_ramp']:
+            lf = lambda x: 10 ** (opt['hyp']['lrf'] * x / opt['epochs'])  # exp ramp
+        else:
+            lf = lambda x: 1 - 10 ** (opt['hyp']['lrf'] * (1 - x / opt['epochs']))  # inverse exp ramp
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch - 1
 
@@ -139,3 +149,10 @@ def create_optimizer(model, opt):
     # optimizer = torch_utils.Lookahead(optimizer, k=5, alpha=0.5)
 
     return optimizer
+
+
+def initialize_model(model, function):
+    
+    for name, param in model.named_parameters():
+        if 'BatchNorm2d' not in name and 'bias' not in name:
+            function(param)

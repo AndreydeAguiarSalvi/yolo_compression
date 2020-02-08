@@ -44,7 +44,7 @@ def rewind_weights(model, backup):
 def sum_of_the_weights(item):
     count = 0
     for name in item.state_dict():
-        count += torch.sum(item.state_dict()[name].data)
+        count += torch.sum(torch.abs(item.state_dict()[name].data))
     
     return count
 
