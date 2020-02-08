@@ -40,22 +40,14 @@ def train():
     test_path = data_dict['valid']
     nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
 
-    # Remove previous results
-    ##############################
-    # Maybe remove in the future #
-    ##############################
-    for f in glob.glob('*_batch*.png') + glob.glob(config['results_file']):
-        os.remove(f)
-
     # Initialize model
     model = Darknet(cfg, arc=config['arc']).to(device)
-    
+
     if config['xavier_norm']:
         initialize_model(model, torch.nn.init.xavier_normal_)
     elif config['xavier_uniform']:
         initialize_model(model, torch.nn.init.xavier_uniform_)
 
-    exit()
     optimizer = create_optimizer(model, config)
 
     start_epoch = 0

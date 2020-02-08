@@ -20,7 +20,7 @@
        "shear": 0.641
     },
     "epochs" : 273,
-    "batch-size" : 16,
+    "batch_size" : 16,
     "accumulate": 4,
     "cfg" : "cfg/yolov3-spp.cfg",
     "data" : "data/coco2014.data",
@@ -32,6 +32,6 @@
     "device" : "",
     "working_dir" : "/A/andrey/yolo_ultra/weights",
     "scheduler" : "multi-step",
-    "decay_steps" : "0.2161 0.2564",
+    "decay_steps" : "0.8 0.9",
     "gamma" : 0.8
 }
