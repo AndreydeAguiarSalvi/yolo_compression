@@ -5,30 +5,30 @@ def train_argparser():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epochs', type=int, default=273)  # 500200 batches at bs 16, 117263 COCO images = 273 epochs
-    parser.add_argument('--batch-size', type=int, default=16)  # effective bs = batch_size * accumulate = 16 * 4 = 64
-    parser.add_argument('--accumulate', type=int, default=4, help='batches to accumulate before optimizing')
-    parser.add_argument('--cfg', type=str, default='cfg/yolov3-spp.cfg', help='*.cfg path')
-    parser.add_argument('--data', type=str, default='data/coco2014.data', help='*.data path')
+    parser.add_argument('--epochs', type=int)  # 500200 batches at bs 16, 117263 COCO images = 273 epochs
+    parser.add_argument('--batch-size', type=int)  # effective bs = batch_size * accumulate = 16 * 4 = 64
+    parser.add_argument('--accumulate', type=int, help='batches to accumulate before optimizing')
+    parser.add_argument('--cfg', type=str, help='*.cfg path')
+    parser.add_argument('--data', type=str, help='*.data path')
     parser.add_argument('--multi-scale', action='store_true', help='adjust (67% - 150%) img_size every 10 batches')
-    parser.add_argument('--img-size', nargs='+', type=int, default=[416], help='train and test image-sizes')
+    parser.add_argument('--img-size', nargs='+', type=int, help='train and test image-sizes')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
     parser.add_argument('--resume', action='store_true', help='resume training from last.pt')
     parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
     parser.add_argument('--notest', action='store_true', help='only test final epoch')
     parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
-    parser.add_argument('--bucket', type=str, default='', help='gsutil bucket')
+    parser.add_argument('--bucket', type=str, help='gsutil bucket')
     parser.add_argument('--cache-images', action='store_true', help='cache images for faster training')
-    parser.add_argument('--weights', type=str, default='weights/ultralytics68.pt', help='initial weights')
-    parser.add_argument('--arc', type=str, default='default', help='yolo architecture')  # default, uCE, uBCE
-    parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
-    parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1 or cpu)')
+    parser.add_argument('--weights', type=str, help='initial weights')
+    parser.add_argument('--arc', type=str, help='yolo architecture')  # default, uCE, uBCE
+    parser.add_argument('--name', help='renames results.txt to results_name.txt if supplied')
+    parser.add_argument('--device', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
     parser.add_argument('--single-cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--var', type=float, help='debug variable')
-    parser.add_argument('--scheduler', type=str, default='multi-step', help='kind of learning rate scheduler')
-    parser.add_argument('--decay_steps', type=str, default='0.2161 0.2564')
-    parser.add_argument('--gamma', type=float, default= 0.8, help='gamma used in learning rate decay')
+    parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
+    parser.add_argument('--decay_steps', type=str)
+    parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
     parser.add_argument('--params', type=str, default='params/default.json', help='json config to load the hyperparameters')
     args = vars(parser.parse_args())
 
@@ -72,7 +72,11 @@ def create_config(opt):
 
     # Create sub_working_dir
     sub_working_dir = '{}/{}/size-{}/{}'.format(
-        config['working_dir'], opt['cfg'].split('/')[1].split('.')[0], opt['img_size'],
+        config['working_dir'],
+        opt['cfg'].split('/')[1].split('.')[0], # Get the architecture name
+        config['img_size'][0] if opt['multi_scale'] is False and opt['img_size'] is None 
+            else 'multi_scale' if opt['multi_scale'] is True else opt['img_size'][0],
+
         '{}_{}_{}/{}_{}/'.format(
             time.strftime("%Y", time.localtime()),
             time.strftime("%m", time.localtime()),
@@ -86,9 +90,9 @@ def create_config(opt):
     config["sub_working_dir"] = sub_working_dir
 
     for key, value in opt.items():
-        print(f'Changing config with key: {key}  value: {value}')
-        config[key] = value
-    exit()
+        if value is not None:
+            config[key] = value
+
     return config
 
 
