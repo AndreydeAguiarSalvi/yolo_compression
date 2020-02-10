@@ -1,0 +1,5 @@
+classes=80
+train=../COCO2014/train.txt
+valid=../COCO2014/valno5k.txt
+test=../COCO2014/5k.txt
+names=data/coco.names

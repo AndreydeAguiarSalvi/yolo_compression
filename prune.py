@@ -7,14 +7,9 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_train_argparser, create_config, create_scheduler, create_optimizer, initialize_model
-from utils.pruning import sum_of_the_weights
+from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model
+from utils.pruning import sum_of_the_weights, create_backup, rewind_weights, create_mask, apply_mask, IMP_LOCAL
 
-mixed_precision = True
-try:  # Mixed precision training https://github.com/NVIDIA/apex
-    from apex import amp
-except:
-    mixed_precision = False  # not installed
 
 
 def train():
@@ -37,16 +32,16 @@ def train():
     # Configure run
     data_dict = parse_data_cfg(data)
     train_path = data_dict['train']
-    test_path = data_dict['valid']
-    nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
+    valid_path = data_dict['valid']
+    nc = int(data_dict['classes'])  # number of classes
 
     # Initialize model
     model = Darknet(cfg, arc=config['arc']).to(device)
 
-    if config['xavier_norm']:
-        initialize_model(model, torch.nn.init.xavier_normal_)
-    elif config['xavier_uniform']:
-        initialize_model(model, torch.nn.init.xavier_uniform_)
+    # Create masks and backup
+    mask = create_mask(model)
+    backup = create_backup(model)
+    torch.save(backup.state_dict(), config['sub_working_dir'] + 'bckp.pt')
 
     optimizer = create_optimizer(model, config)
 
@@ -83,22 +78,14 @@ def train():
         # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
         load_darknet_weights(model, weights)
 
+    # Kind of initialization
+    if config['xavier_norm']:
+        initialize_model(model, torch.nn.init.xavier_normal_)
+    elif config['xavier_uniform']:
+        initialize_model(model, torch.nn.init.xavier_uniform_)
+
     scheduler = create_scheduler(config, optimizer, start_epoch)
 
-    # # Plot lr schedule
-    # y = []
-    # for _ in range(epochs):
-    #     scheduler.step()
-    #     y.append(optimizer.param_groups[0]['lr'])
-    # plt.plot(y, label='LambdaLR')
-    # plt.xlabel('epoch')
-    # plt.ylabel('LR')
-    # plt.tight_layout()
-    # plt.savefig('LR.png', dpi=300)
-
-    # Mixed precision training https://github.com/NVIDIA/apex
-    if mixed_precision:
-        model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
 
     # Initialize distributed training
     if device.type != 'cpu' and torch.cuda.device_count() > 1:
@@ -110,35 +97,29 @@ def train():
         model.yolo_layers = model.module.yolo_layers  # move yolo layer indices to top level
 
     # Dataset
-    dataset = LoadImagesAndLabels(train_path, img_size, batch_size,
-                                  augment=True,
-                                  hyp=config['hyp'],  # augmentation hyperparameters
-                                  rect=config['rect'],  # rectangular training
-                                  cache_labels=True,
-                                  cache_images=config['cache_images'],
-                                  single_cls=config['single_cls'])
+    dataset = LoadImagesAndLabels(
+        train_path, img_size, batch_size,
+        augment=True, hyp=config['hyp'],  cache_labels=True,# augmentation hyperparameters
+        cache_images=config['cache_images'],
+    )
 
     # Dataloader
     batch_size = min(batch_size, len(dataset))
     nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8])  # number of workers
-    dataloader = torch.utils.data.DataLoader(dataset,
-                                             batch_size=batch_size,
-                                             num_workers=nw,
-                                             shuffle=not config['rect'],  # Shuffle=True unless rectangular training is used
-                                             pin_memory=True,
-                                             collate_fn=dataset.collate_fn)
+    dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size = batch_size, num_workers = nw,
+        pin_memory = True, collate_fn = dataset.collate_fn
+    )
 
     # Testloader
-    testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(test_path, img_size_test, batch_size * 2,
-                                                                 hyp=config['hyp'],
-                                                                 rect=True,
-                                                                 cache_labels=True,
-                                                                 cache_images=config['cache_images'],
-                                                                 single_cls=config['single_cls']),
-                                             batch_size=batch_size * 2,
-                                             num_workers=nw,
-                                             pin_memory=True,
-                                             collate_fn=dataset.collate_fn)
+    testloader = torch.utils.data.DataLoader(
+        LoadImagesAndLabels(
+            valid_path, img_size_test, batch_size * 2,
+            hyp = config['hyp'], rect = True, cache_labels = True,
+            cache_images = config['cache_images']
+        ),
+        batch_size = batch_size * 2, num_workers = nw, pin_memory = True, collate_fn = dataset.collate_fn
+    )
 
     # Start training
     nb = len(dataloader)
@@ -160,6 +141,27 @@ def train():
     ###############
     for epoch in range(start_epoch, epochs):  
         model.train()
+
+        #########
+        # Prune #
+        #########
+        if epoch % config['prune_each'] == 0 and epoch != 0:
+            # Saving before prune
+            torch.save(mask.state_dict(), config['sub_working_dir'] + 'mask_{}.pt'.format(config['pruning_time']))
+            config['pruning_time'] += 1
+
+            if config['prune_kind'] == 'IMP':
+                print(f"Applying IMP with {config['pruning_rate'] * 100}\%.")
+                mask = mask.to(device)
+                IMP_LOCAL(model, mask, config['pruning_rate'])
+                mask = mask.to('cpu')
+                print('Rewind weights.')
+                backup = backup.to(device)
+                rewind_weights(model, backup)
+                backup = backup.to('cpu')
+        #########
+        # Prune #
+        #########
 
         # Prebias
         if prebias:
@@ -184,11 +186,18 @@ def train():
         mloss = torch.zeros(4).to(device)  # mean losses
         print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
         pbar = tqdm(enumerate(dataloader), total=nb)  # progress bar
+
         ####################
         # Start mini-batch #
         ####################
         for i, (imgs, targets, paths, _) in pbar: 
             ni = i + nb * epoch  # number integrated batches (since train start)
+            
+            # Apply mask #
+            mask = mask.to(device)
+            model, mask = apply_mask(model, mask)
+            mask = mask.to('cpu')
+
             imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
             targets = targets.to(device)
 
@@ -211,6 +220,8 @@ def train():
             # Run model
             pred = model(imgs)
 
+            imgs = imgs.to('cpu')
+
             # Compute loss
             loss, loss_items = compute_loss(pred, targets, model, not prebias)
             if not torch.isfinite(loss):
@@ -221,11 +232,7 @@ def train():
             loss *= batch_size / 64
 
             # Compute gradient
-            if mixed_precision:
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
-            else:
-                loss.backward()
+            loss.backward()
 
             # Accumulate gradient for x batches before optimizing
             if ni % accumulate == 0:
@@ -248,7 +255,7 @@ def train():
                 cfg = cfg, data = data, batch_size=batch_size * 2,
                 img_size=img_size_test, model=model, 
                 conf_thres=1E-3 if config['evolve'] or (final_epoch and is_coco) else 0.1,  # 0.1 faster
-                iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
+                iou_thres=0.6, save_json=final_epoch and is_coco,
                 dataloader=testloader, folder = config['sub_working_dir']
             )    
 
@@ -293,10 +300,6 @@ def train():
             if best_fitness == fi:
                 torch.save(chkpt, config['best'])
 
-            # Save backup every 10 epochs (optional)
-            # if epoch > 0 and epoch % 10 == 0:
-            #     torch.save(chkpt, config['sub_working_dir'] + 'backup%g.pt' % epoch)
-
             # Delete checkpoint
             del chkpt
     #############
@@ -331,7 +334,7 @@ def train():
 
 
 if __name__ == '__main__':
-    args = create_train_argparser()
+    args = create_prune_argparser()
     config = create_config(args)
     print("sub working dir: %s" % config['sub_working_dir'])
 
@@ -348,69 +351,14 @@ if __name__ == '__main__':
 
     print(config)
     
-    device = torch_utils.select_device(config['device'], apex=mixed_precision, batch_size=config['batch_size'])
-    if device.type == 'cpu':
-        mixed_precision = False
+    device = torch_utils.select_device(config['device'], batch_size=config['batch_size'])
 
     tb_writer = None
-    if not config['evolve']:  # Train normally
-        try:
-            # Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/
-            from torch.utils.tensorboard import SummaryWriter
-            tb_writer = SummaryWriter(logdir= config['sub_working_dir'] + 'runs/')
-        except:
-            pass
+    try:
+        # Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/
+        from torch.utils.tensorboard import SummaryWriter
+        tb_writer = SummaryWriter(logdir= config['sub_working_dir'] + 'runs/')
+    except:
+        pass
 
-        train()  # train normally
-
-    else:  # Evolve hyperparameters (optional)
-        config['notest'], config['nosave'] = True, True  # only test/save final epoch
-        if config['bucket']:
-            os.system('gsutil cp gs://%s/evolve.txt .' % config['bucket'])  # download evolve.txt if exists
-
-        for _ in range(1):  # generations to evolve
-            if os.path.exists('evolve.txt'):  # if evolve.txt exists: select best hyps and mutate
-                # Select parent(s)
-                parent = 'single'  # parent selection method: 'single' or 'weighted'
-                x = np.loadtxt('evolve.txt', ndmin=2)
-                n = min(5, len(x))  # number of previous results to consider
-                x = x[np.argsort(-fitness(x))][:n]  # top n mutations
-                w = fitness(x) - fitness(x).min()  # weights
-                if parent == 'single' or len(x) == 1:
-                    # x = x[random.randint(0, n - 1)]  # random selection
-                    x = x[random.choices(range(n), weights=w)[0]]  # weighted selection
-                elif parent == 'weighted':
-                    x = (x * w.reshape(n, 1)).sum(0) / w.sum()  # weighted combination
-
-                # Mutate
-                method, mp, s = 3, 0.9, 0.2  # method, mutation probability, sigma
-                npr = np.random
-                npr.seed(int(time.time()))
-                g = np.array([1, 1, 1, 1, 1, 1, 1, 0, .1, 1, 0, 1, 1, 1, 1, 1, 1, 1])  # gains
-                ng = len(g)
-                if method == 1:
-                    v = (npr.randn(ng) * npr.random() * g * s + 1) ** 2.0
-                elif method == 2:
-                    v = (npr.randn(ng) * npr.random(ng) * g * s + 1) ** 2.0
-                elif method == 3:
-                    v = np.ones(ng)
-                    while all(v == 1):  # mutate until a change occurs (prevent duplicates)
-                        # v = (g * (npr.random(ng) < mp) * npr.randn(ng) * s + 1) ** 2.0
-                        v = (g * (npr.random(ng) < mp) * npr.randn(ng) * npr.random() * s + 1).clip(0.3, 3.0)
-                for i, k in enumerate(config['hyp'].keys()):  # plt.hist(v.ravel(), 300)
-                    config['hyp'][k] = x[i + 7] * v[i]  # mutate
-
-            # Clip to limits
-            keys = ['lr0', 'iou_t', 'momentum', 'weight_decay', 'hsv_s', 'hsv_v', 'translate', 'scale', 'fl_gamma']
-            limits = [(1e-5, 1e-2), (0.00, 0.70), (0.60, 0.98), (0, 0.001), (0, .9), (0, .9), (0, .9), (0, .9), (0, 3)]
-            for k, v in zip(keys, limits):
-                config['hyp'][k] = np.clip(config['hyp'][k], v[0], v[1])
-
-            # Train mutation
-            results = train()
-
-            # Write mutation results
-            print_mutation(config['hyp'], results, config['bucket'])
-
-            # Plot results
-            # plot_evolution_results(config['hyp'])
+    train()  # train normally

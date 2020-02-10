@@ -1,4 +1,4 @@
-def train_argparser():
+def create_train_argparser():
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -36,7 +36,7 @@ def train_argparser():
     return args
 
 
-def test_argparser():
+def create_test_argparser():
     import argparse
 
     parser = argparse.ArgumentParser(prog='test.py')
@@ -59,6 +59,41 @@ def test_argparser():
         for i in range(len(pieces) - 1): # eliminate the last part (*.pt) to take the folder
             working_dir += pieces[i] + '/'
     args['working_dir'] = working_dir
+
+    return args
+
+
+def create_prune_argparser():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--epochs', type=int)  # 500200 batches at bs 16, 117263 COCO images = 273 epochs
+    parser.add_argument('--batch_size', type=int)  # effective bs = batch_size * accumulate = 16 * 4 = 64
+    parser.add_argument('--accumulate', type=int, help='batches to accumulate before optimizing')
+    parser.add_argument('--cfg', type=str, help='*.cfg path')
+    parser.add_argument('--data', type=str, help='*.data path')
+    parser.add_argument('--multi_scale', action='store_true', help='adjust (67% - 150%) img_size every 10 batches')
+    parser.add_argument('--img_size', nargs='+', type=int, help='train and test image-sizes')
+    parser.add_argument('--resume', action='store_true', help='resume training from last.pt')
+    parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
+    parser.add_argument('--notest', action='store_true', help='only test final epoch')
+    parser.add_argument('--bucket', type=str, help='gsutil bucket')
+    parser.add_argument('--cache_images', action='store_true', help='cache images for faster training')
+    parser.add_argument('--weights', type=str, help='initial weights')
+    parser.add_argument('--arc', type=str, help='yolo architecture')  # default, uCE, uBCE
+    parser.add_argument('--name', help='renames results.txt to results_name.txt if supplied')
+    parser.add_argument('--device', help='device id (i.e. 0 or 0,1 or cpu)')
+    parser.add_argument('--adam', action='store_true', help='use adam optimizer')
+    # My additioned parameters
+    parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
+    parser.add_argument('--decay_steps', type=str)
+    parser.add_argument('--exponential_ramp', action='store_true', help="changes inverse exponential learning rate decay to be exponential")
+    parser.add_argument('--xavier_uniform', action='store_true', help='initialize model with xavier uniform function')
+    parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
+    parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
+
+    parser.add_argument('--params', type=str, default='params/default.json', help='json config to load the hyperparameters')
+    args = vars(parser.parse_args())
 
     return args
 

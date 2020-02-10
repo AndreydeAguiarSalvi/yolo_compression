@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import test_argparser
+from utils.my_utils import create_test_argparser
 
 
 def test(cfg,
@@ -221,7 +221,7 @@ def test(cfg,
 
 
 if __name__ == '__main__':
-    args = test_argparser()
+    args = create_test_argparser()
     args['save_json'] = args['save_json'] or any([x in args['data'] for x in ['coco.data', 'coco2014.data', 'coco2017.data']])
     print(args)
 

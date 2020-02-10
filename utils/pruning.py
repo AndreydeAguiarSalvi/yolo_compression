@@ -53,7 +53,7 @@ def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements an Iterative Mag
     for name, param in model.named_parameters():
         if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
             name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
-            # Number of neurons to be prunned
+            # Locally number of neurons to be prunned
             n_pruned_neurons = math.floor(torch.sum(mask[name_]) * percentage_of_pruning)
             # Getting all the available values to possibly be pruned
             valid_values = torch.masked_select(param, mask[name_].data.byte())
@@ -63,6 +63,34 @@ def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements an Iterative Mag
             # All non-zero elements smaller than higher_of_smallest
             # will be pruned.
             higher_of_smallest = smallest_values.values[-1]
+            # Create the new mask
+            with torch.no_grad():
+                mask[name_] = torch.nn.Parameter( 
+                    torch.where(torch.abs(param) <= higher_of_smallest, torch.tensor(.0), mask[name_]) 
+                    # torch.where(torch.abs(param) <= higher_of_smallest, torch.tensor(.0, device='cuda'), mask[name_]) 
+                )
+
+
+def IMP_GLOBAL(model, mask, percentage_of_pruning): # Implements an Iterative Magnitude Pruning globally
+    valid_values = torch.Tensor(0)
+    for name, param in model.named_parameters():
+        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
+            name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
+            # Getting all the available values to possibly be pruned
+            valid_values = torch.cat( ( valid_values, torch.masked_select(param, mask[name_].data.byte()) ) )
+    
+    # Globally number of neurons to be prunned
+    n_pruned_neurons = math.floor(valid_values.shape[0] * percentage_of_pruning)
+    # Getting the values to be prunned.
+    smallest_values = torch.topk(input=torch.abs(valid_values), k=n_pruned_neurons, largest=False)
+    # Getting the higher valid value to be prune.
+    # All non-zero elements smaller than higher_of_smallest
+    # will be pruned.
+    higher_of_smallest = smallest_values.values[-1]
+
+    for name, param in model.named_parameters():
+        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
+            name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
             # Create the new mask
             with torch.no_grad():
                 mask[name_] = torch.nn.Parameter( 
