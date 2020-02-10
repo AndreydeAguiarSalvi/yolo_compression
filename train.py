@@ -37,7 +37,7 @@ def train():
     # Configure run
     data_dict = parse_data_cfg(data)
     train_path = data_dict['train']
-    test_path = data_dict['valid']
+    test_path = data_dict['test'] if 'test' in data_dict else data_dict['valid']
     nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
 
     # Initialize model

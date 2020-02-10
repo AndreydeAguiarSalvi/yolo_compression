@@ -73,25 +73,28 @@ def create_config(opt):
     config = json.loads(json_str)
 
     # Create sub_working_dir
-    sub_working_dir = '{}/{}/size-{}/{}'.format(
-        config['working_dir'],
-        opt['cfg'].split('/')[1].split('.')[0] if opt['cfg'] is not None 
-            else config['cfg'].split('/')[1].split('.')[0], # Get the architecture name
-        config['img_size'][0] if opt['multi_scale'] is False and opt['img_size'] is None 
-            else 'multi_scale' if opt['multi_scale'] is True else opt['img_size'][0],
+    if opt['resume']:
+        config['sub_workin_dir'] = config['weights']
+    else:
+        sub_working_dir = '{}/{}/size-{}/{}'.format(
+            config['working_dir'],
+            opt['cfg'].split('/')[1].split('.')[0] if opt['cfg'] is not None 
+                else config['cfg'].split('/')[1].split('.')[0], # Get the architecture name
+            config['img_size'][0] if opt['multi_scale'] is False and opt['img_size'] is None 
+                else 'multi_scale' if opt['multi_scale'] is True else opt['img_size'][0],
 
-        '{}_{}_{}/{}_{}_{}/'.format(
-            time.strftime("%Y", time.localtime()),
-            time.strftime("%m", time.localtime()),
-            time.strftime("%d", time.localtime()),
-            time.strftime("%H", time.localtime()),
-            time.strftime("%M", time.localtime()),
-            time.strftime("%S", time.localtime())
+            '{}_{}_{}/{}_{}_{}/'.format(
+                time.strftime("%Y", time.localtime()),
+                time.strftime("%m", time.localtime()),
+                time.strftime("%d", time.localtime()),
+                time.strftime("%H", time.localtime()),
+                time.strftime("%M", time.localtime()),
+                time.strftime("%S", time.localtime())
+            )
         )
-    )
-    if not os.path.exists(sub_working_dir):
-        os.makedirs(sub_working_dir)
-    config["sub_working_dir"] = sub_working_dir
+        if not os.path.exists(sub_working_dir):
+            os.makedirs(sub_working_dir)
+        config["sub_working_dir"] = sub_working_dir
 
     for key, value in opt.items():
         if value is not None:

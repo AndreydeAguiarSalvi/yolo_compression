@@ -7,7 +7,7 @@ def create_mask(model):
     from collections import OrderedDict
     mask = OrderedDict()
     for name, param in model.named_parameters():
-        if 'bias' not in name and 'bn' not in name:
+        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
             name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
             mask[name_] = nn.Parameter( torch.ones_like(param), requires_grad = False )
 
@@ -51,7 +51,7 @@ def sum_of_the_weights(item):
 
 def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements an Iterative Magnitude Pruning locally
     for name, param in model.named_parameters():
-        if 'bias' not in name and 'bn' not in name:
+        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
             name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
             # Number of neurons to be prunned
             n_pruned_neurons = math.floor(torch.sum(mask[name_]) * percentage_of_pruning)
