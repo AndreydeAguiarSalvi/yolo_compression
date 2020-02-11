@@ -99,7 +99,7 @@ def train():
     # Dataset
     dataset = LoadImagesAndLabels(
         train_path, img_size, batch_size,
-        augment=True, hyp=config['hyp'],  cache_labels=True,# augmentation hyperparameters
+        augment=True, hyp=config['hyp'],  cache_labels=config['cache_labels'],# augmentation hyperparameters
         cache_images=config['cache_images'],
     )
 
@@ -114,7 +114,7 @@ def train():
     # Testloader
     testloader = torch.utils.data.DataLoader(
         LoadImagesAndLabels(
-            valid_path, img_size_test, batch_size * 2,
+            valid_path, img_size_test, batch_size,
             hyp = config['hyp'], rect = True, cache_labels = True,
             cache_images = config['cache_images']
         ),

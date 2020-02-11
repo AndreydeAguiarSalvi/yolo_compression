@@ -114,7 +114,7 @@ def train():
                                   augment=True,
                                   hyp=config['hyp'],  # augmentation hyperparameters
                                   rect=config['rect'],  # rectangular training
-                                  cache_labels=True,
+                                  cache_labels=config['cache_labels'],
                                   cache_images=config['cache_images'],
                                   single_cls=config['single_cls'])
 
@@ -129,10 +129,10 @@ def train():
                                              collate_fn=dataset.collate_fn)
 
     # Testloader
-    testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(test_path, img_size_test, batch_size * 2,
+    testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(test_path, img_size_test, batch_size,
                                                                  hyp=config['hyp'],
                                                                  rect=True,
-                                                                 cache_labels=True,
+                                                                 cache_labels=config['cache_labels'],
                                                                  cache_images=config['cache_images'],
                                                                  single_cls=config['single_cls']),
                                              batch_size=batch_size * 2,

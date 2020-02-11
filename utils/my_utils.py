@@ -16,6 +16,7 @@ def create_train_argparser():
     parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
     parser.add_argument('--bucket', type=str, help='gsutil bucket')
     parser.add_argument('--cache_images', action='store_true', help='cache images for faster training')
+    parser.add_argument('--cache_labels', action='store_true', help='cache labels for faster training')
     parser.add_argument('--weights', type=str, help='initial weights')
     parser.add_argument('--arc', type=str, help='yolo architecture')  # default, uCE, uBCE
     parser.add_argument('--name', help='renames results.txt to results_name.txt if supplied')
@@ -79,6 +80,7 @@ def create_prune_argparser():
     parser.add_argument('--notest', action='store_true', help='only test final epoch')
     parser.add_argument('--bucket', type=str, help='gsutil bucket')
     parser.add_argument('--cache_images', action='store_true', help='cache images for faster training')
+    parser.add_argument('--cache_labels', action='store_true', help='cache labels for faster training')
     parser.add_argument('--weights', type=str, help='initial weights')
     parser.add_argument('--arc', type=str, help='yolo architecture')  # default, uCE, uBCE
     parser.add_argument('--name', help='renames results.txt to results_name.txt if supplied')
