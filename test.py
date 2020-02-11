@@ -175,17 +175,16 @@ def test(cfg,
     class_results = open(folder + 'per_class_evaluations.txt', 'w')
     print(s)
     print(pf % ('all', seen, nt.sum(), mp, mr, map, mf1), file=class_results)
-
+    for i, c in enumerate(ap_class):
+        # Saving the evaluations per class
+        print(pf % (names[c], seen, nt[c], p[i], r[i], ap[i], f1[i]), file=class_results)
+    # Closing the evaluations .txt
+    class_results.close()
 
     # Print results per class
     if verbose and nc > 1 and len(stats):
         for i, c in enumerate(ap_class):
             print(pf % (names[c], seen, nt[c], p[i], r[i], ap[i], f1[i]))
-            # Saving the evaluations per class
-            print(pf % (names[c], seen, nt[c], p[i], r[i], ap[i], f1[i]), file=class_results)
-
-    # Closing the evaluations .txt
-    class_results.close()
 
     # Save JSON
     if save_json and map and len(jdict):
@@ -211,9 +210,6 @@ def test(cfg,
         mf1, map = cocoEval.stats[:2]  # update to pycocotools results (mAP@0.5:0.95, mAP@0.5)
 
     # Return results
-    ######################
-    # Save in the future #
-    ######################
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]

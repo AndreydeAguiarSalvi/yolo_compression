@@ -43,11 +43,6 @@ def train():
     # Initialize model
     model = Darknet(cfg, arc=config['arc']).to(device)
 
-    if config['xavier_norm']:
-        initialize_model(model, torch.nn.init.xavier_normal_)
-    elif config['xavier_uniform']:
-        initialize_model(model, torch.nn.init.xavier_uniform_)
-
     optimizer = create_optimizer(model, config)
 
     start_epoch = 0
@@ -82,6 +77,11 @@ def train():
     elif len(weights) > 0:  # darknet format
         # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
         load_darknet_weights(model, weights)
+
+    if config['xavier_norm']:
+        initialize_model(model, torch.nn.init.xavier_normal_)
+    elif config['xavier_uniform']:
+        initialize_model(model, torch.nn.init.xavier_uniform_)
 
     scheduler = create_scheduler(config, optimizer, start_epoch)
 
