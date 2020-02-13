@@ -3,13 +3,16 @@ import torch
 import torch.nn as nn
 
 
-def create_mask(model):
+def create_mask(model, init_value=1):
     from collections import OrderedDict
     mask = OrderedDict()
     for name, param in model.named_parameters():
         if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
             name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
-            mask[name_] = nn.Parameter( torch.ones_like(param), requires_grad = False )
+            if init_value == 1:
+                mask[name_] = nn.Parameter( torch.ones_like(param), requires_grad = False )
+            else:
+                mask[name_] = nn.Parameter( param.new_full(param.shape, fill_value = init_value), requires_grad = True ) # Learned Mask in Contiguous Sparsification
 
     return nn.ParameterDict(mask)
 
