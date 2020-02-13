@@ -20,8 +20,6 @@ def apply_mask(model, mask):
             name_ = name.replace('-', '.') # Changing to the original key
             model.state_dict()[name_].data.copy_( model.state_dict()[name_].data.mul(param.data) )
 
-    return model, mask
-
 
 def create_backup(model):
     from copy import deepcopy
@@ -66,8 +64,7 @@ def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements an Iterative Mag
             # Create the new mask
             with torch.no_grad():
                 mask[name_] = torch.nn.Parameter( 
-                    torch.where(torch.abs(param) <= higher_of_smallest, torch.tensor(.0), mask[name_]) 
-                    # torch.where(torch.abs(param) <= higher_of_smallest, torch.tensor(.0, device='cuda'), mask[name_]) 
+                    torch.where(torch.abs(param) <= higher_of_smallest, torch.tensor(.0, device='cuda'), mask[name_]) 
                 )
 
 
@@ -94,6 +91,5 @@ def IMP_GLOBAL(model, mask, percentage_of_pruning): # Implements an Iterative Ma
             # Create the new mask
             with torch.no_grad():
                 mask[name_] = torch.nn.Parameter( 
-                    torch.where(torch.abs(param) <= higher_of_smallest, torch.tensor(.0), mask[name_]) 
-                    # torch.where(torch.abs(param) <= higher_of_smallest, torch.tensor(.0, device='cuda'), mask[name_]) 
+                    torch.where(torch.abs(param) <= higher_of_smallest, torch.tensor(.0, device='cuda'), mask[name_]) 
                 )

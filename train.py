@@ -7,7 +7,7 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_train_argparser, create_config, create_scheduler, create_optimizer, initialize_model
+from utils.my_utils import create_train_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders
 from utils.pruning import sum_of_the_weights
 
 mixed_precision = True
@@ -109,50 +109,20 @@ def train():
         model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
         model.yolo_layers = model.module.yolo_layers  # move yolo layer indices to top level
 
-    # Dataset
-    dataset = LoadImagesAndLabels(train_path, img_size, batch_size,
-                                  augment=True,
-                                  hyp=config['hyp'],  # augmentation hyperparameters
-                                  rect=config['rect'],  # rectangular training
-                                  cache_labels=config['cache_labels'],
-                                  cache_images=config['cache_images'],
-                                  single_cls=config['single_cls'])
-
-    # Dataloader
-    batch_size = min(batch_size, len(dataset))
-    nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8])  # number of workers
-    dataloader = torch.utils.data.DataLoader(dataset,
-                                             batch_size=batch_size,
-                                             num_workers=nw,
-                                             shuffle=not config['rect'],  # Shuffle=True unless rectangular training is used
-                                             pin_memory=True,
-                                             collate_fn=dataset.collate_fn)
-
-    # Testloader
-    testloader = torch.utils.data.DataLoader(LoadImagesAndLabels(test_path, img_size_test, batch_size,
-                                                                 hyp=config['hyp'],
-                                                                 rect=True,
-                                                                 cache_labels=config['cache_labels'],
-                                                                 cache_images=config['cache_images'],
-                                                                 single_cls=config['single_cls']),
-                                             batch_size=batch_size * 2,
-                                             num_workers=nw,
-                                             pin_memory=True,
-                                             collate_fn=dataset.collate_fn)
+    trainloader, testloader = create_dataloaders(config)
 
     # Start training
-    nb = len(dataloader)
+    nb = len(trainloader)
     prebias = start_epoch == 0
     model.nc = nc  # attach number of classes to model
     model.arc = config['arc']  # attach yolo architecture
     model.hyp = config['hyp']  # attach hyperparameters to model
-    model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device)  # attach class weights
+    model.class_weights = labels_to_class_weights(trainloader.dataset.labels, nc).to(device)  # attach class weights
     maps = np.zeros(nc)  # mAP per class
     # torch.autograd.set_detect_anomaly(True)
     results = (0, 0, 0, 0, 0, 0, 0)  # 'P', 'R', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification'
     t0 = time.time()
     torch_utils.model_info(model, report='summary')  # 'full' or 'summary'
-    print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
 
     ###############
@@ -176,14 +146,14 @@ def train():
                 optimizer.param_groups[2]['momentum'] = ps[1]
 
         # Update image weights (optional)
-        if dataset.image_weights:
+        if trainloader.dataset.image_weights:
             w = model.class_weights.cpu().numpy() * (1 - maps) ** 2  # class weights
-            image_weights = labels_to_image_weights(dataset.labels, nc=nc, class_weights=w)
-            dataset.indices = random.choices(range(dataset.n), weights=image_weights, k=dataset.n)  # rand weighted idx
+            image_weights = labels_to_image_weights(trainloader.dataset.labels, nc=nc, class_weights=w)
+            trainloader.dataset.indices = random.choices(range(trainloader.dataset.n), weights=image_weights, k=trainloader.dataset.n)  # rand weighted idx
 
         mloss = torch.zeros(4).to(device)  # mean losses
         print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
-        pbar = tqdm(enumerate(dataloader), total=nb)  # progress bar
+        pbar = tqdm(enumerate(trainloader), total=nb)  # progress bar
         ####################
         # Start mini-batch #
         ####################
@@ -357,7 +327,7 @@ if __name__ == '__main__':
         try:
             # Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/
             from torch.utils.tensorboard import SummaryWriter
-            tb_writer = SummaryWriter(logdir= config['sub_working_dir'] + 'runs/')
+            tb_writer = SummaryWriter(log_dir= config['sub_working_dir'] + 'runs/')
         except:
             pass
 

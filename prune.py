@@ -7,17 +7,15 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model
-from utils.pruning import sum_of_the_weights, create_backup, rewind_weights, create_mask, apply_mask, IMP_LOCAL
+from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints
+from utils.pruning import sum_of_the_weights, create_backup, rewind_weights, create_mask, apply_mask, IMP_LOCAL, IMP_GLOBAL
 
 
 
 def train():
     cfg = config['cfg']
-    data = config['data']
     img_size, img_size_test = config['img_size'] if len(config['img_size']) == 2 else config['img_size'] * 2  # train, test sizes
     epochs = config['epochs']  # 500200 batches at bs 64, 117263 images = 273 epochs
-    batch_size = config['batch_size']
     accumulate = config['accumulate']  # effective bs = batch_size * accumulate = 16 * 4 = 64
     weights = config['weights']  # initial training weights
 
@@ -30,9 +28,7 @@ def train():
         print('Using multi-scale %g - %g' % (img_sz_min * 32, img_size))
 
     # Configure run
-    data_dict = parse_data_cfg(data)
-    train_path = data_dict['train']
-    valid_path = data_dict['valid']
+    data_dict = parse_data_cfg(config['data'])
     nc = int(data_dict['classes'])  # number of classes
 
     # Initialize model
@@ -41,50 +37,22 @@ def train():
     # Create masks and backup
     mask = create_mask(model)
     backup = create_backup(model)
+    backup = backup.to('cpu')
     torch.save(backup.state_dict(), config['sub_working_dir'] + 'bckp.pt')
 
     optimizer = create_optimizer(model, config)
-
-    start_epoch = 0
-    best_fitness = 0.0
-    attempt_download(weights)
-    if weights.endswith('.pt'):  # pytorch format
-        # possible weights are '*.pt', 'yolov3-spp.pt', 'yolov3-tiny.pt' etc.
-        chkpt = torch.load(weights, map_location=device)
-
-        # load model
-        try:
-            chkpt['model'] = {k: v for k, v in chkpt['model'].items() if model.state_dict()[k].numel() == v.numel()}
-            model.load_state_dict(chkpt['model'], strict=False)
-        except KeyError as e:
-            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
-                "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
-            raise KeyError(s) from e
-
-        # load optimizer
-        if chkpt['optimizer'] is not None:
-            optimizer.load_state_dict(chkpt['optimizer'])
-            best_fitness = chkpt['best_fitness']
-
-        # load results
-        if chkpt.get('training_results') is not None:
-            with open(config['results_file'], 'w') as file:
-                file.write(chkpt['training_results'])  # write results.txt
-
-        start_epoch = chkpt['epoch'] + 1
-        del chkpt
-
-    elif len(weights) > 0:  # darknet format
-        # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-        load_darknet_weights(model, weights)
+    start_epoch, best_fitness, model, weights, optimizer = load_checkpoints(
+        config, model, weights, 
+        optimizer, device, 
+        attempt_download, load_darknet_weights
+    )
+    scheduler = create_scheduler(config, optimizer, start_epoch)
 
     # Kind of initialization
     if config['xavier_norm']:
         initialize_model(model, torch.nn.init.xavier_normal_)
     elif config['xavier_uniform']:
         initialize_model(model, torch.nn.init.xavier_uniform_)
-
-    scheduler = create_scheduler(config, optimizer, start_epoch)
 
 
     # Initialize distributed training
@@ -96,215 +64,213 @@ def train():
         model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
         model.yolo_layers = model.module.yolo_layers  # move yolo layer indices to top level
 
-    # Dataset
-    dataset = LoadImagesAndLabels(
-        train_path, img_size, batch_size,
-        augment=True, hyp=config['hyp'],  cache_labels=config['cache_labels'],# augmentation hyperparameters
-        cache_images=config['cache_images'],
-    )
-
-    # Dataloader
-    batch_size = min(batch_size, len(dataset))
-    nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8])  # number of workers
-    dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size = batch_size, num_workers = nw,
-        pin_memory = True, collate_fn = dataset.collate_fn
-    )
-
-    # Testloader
-    testloader = torch.utils.data.DataLoader(
-        LoadImagesAndLabels(
-            valid_path, img_size_test, batch_size,
-            hyp = config['hyp'], rect = True, cache_labels = True,
-            cache_images = config['cache_images']
-        ),
-        batch_size = batch_size * 2, num_workers = nw, pin_memory = True, collate_fn = dataset.collate_fn
-    )
+    trainloader, testloader = create_dataloaders(config)
 
     # Start training
-    nb = len(dataloader)
+    nb = len(trainloader)
     prebias = start_epoch == 0
     model.nc = nc  # attach number of classes to model
     model.arc = config['arc']  # attach yolo architecture
     model.hyp = config['hyp']  # attach hyperparameters to model
-    model.class_weights = labels_to_class_weights(dataset.labels, nc).to(device)  # attach class weights
+    model.class_weights = labels_to_class_weights(trainloader.dataset.labels, nc).to(device)  # attach class weights
     maps = np.zeros(nc)  # mAP per class
     # torch.autograd.set_detect_anomaly(True)
     results = (0, 0, 0, 0, 0, 0, 0)  # 'P', 'R', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification'
     t0 = time.time()
     torch_utils.model_info(model, report='summary')  # 'full' or 'summary'
-    print('Using %g dataloader workers' % nw)
     print('Starting training for %g epochs...' % epochs)
 
-    ###############
-    # Start epoch #
-    ###############
-    for epoch in range(start_epoch, epochs):  
-        model.train()
+    ###################
+    # Start Iteration #
+    ###################
+    for it in range(config['iterations']):
+        
+        ###############
+        # Start epoch #
+        ###############
+        for epoch in range(start_epoch, epochs):  
+            model.train()
 
-        #########
-        # Prune #
-        #########
-        if epoch % config['prune_each'] == 0 and epoch != 0:
-            # Saving before prune
-            torch.save(mask.state_dict(), config['sub_working_dir'] + 'mask_{}.pt'.format(config['pruning_time']))
-            config['pruning_time'] += 1
+            # Prebias
+            if prebias:
+                if epoch < 3:  # prebias
+                    ps = 0.1, 0.9  # prebias settings (lr=0.1, momentum=0.9)
+                else:  # normal training
+                    ps = config['hyp']['lr0'], config['hyp']['momentum']  # normal training settings
+                    print_model_biases(model)
+                    prebias = False
 
-            if config['prune_kind'] == 'IMP':
-                print(f"Applying IMP with {config['pruning_rate'] * 100}\%.")
-                mask = mask.to(device)
+                # Bias optimizer settings
+                optimizer.param_groups[2]['lr'] = ps[0]
+                if optimizer.param_groups[2].get('momentum') is not None:  # for SGD but not Adam
+                    optimizer.param_groups[2]['momentum'] = ps[1]
+
+            # Update image weights (optional)
+            if trainloader.dataset.image_weights:
+                w = model.class_weights.cpu().numpy() * (1 - maps) ** 2  # class weights
+                image_weights = labels_to_image_weights(trainloader.dataset.labels, nc=nc, class_weights=w)
+                trainloader.dataset.indices = random.choices(range(trainloader.dataset.n), weights=image_weights, k=trainloader.dataset.n)  # rand weighted idx
+
+            mloss = torch.zeros(4).to(device)  # mean losses
+            print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
+            pbar = tqdm(enumerate(trainloader), total=100)  # progress bar
+
+            ####################
+            # Start mini-batch #
+            ####################
+            for i, (imgs, targets, paths, _) in pbar: 
+                ni = i + nb * epoch  # number integrated batches (since train start)
+                
+                ##############
+                # Apply mask #
+                ##############
+                apply_mask(model, mask)
+
+                imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
+                targets = targets.to(device)
+
+                # Plot images with bounding boxes
+                if ni == 0:
+                    fname = config['sub_working_dir'] + 'train_batch%g.png' % i
+                    plot_images(imgs=imgs, targets=targets, paths=paths, fname=fname)
+                    if tb_writer:
+                        tb_writer.add_image(fname, cv2.imread(fname)[:, :, ::-1], dataformats='HWC')
+
+                # Multi-Scale training
+                if config['multi_scale']:
+                    if ni / accumulate % 1 == 0:  #  adjust img_size (67% - 150%) every 1 batch
+                        img_size = random.randrange(img_sz_min, img_sz_max + 1) * 32
+                    sf = img_size / max(imgs.shape[2:])  # scale factor
+                    if sf != 1:
+                        ns = [math.ceil(x * sf / 32.) * 32 for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
+                        imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
+
+                # Run model
+                pred = model(imgs)
+
+                # imgs = imgs.to('cpu')
+
+                # Compute loss
+                loss, loss_items = compute_loss(pred, targets, model, not prebias)
+                if not torch.isfinite(loss):
+                    print('WARNING: non-finite loss, ending training ', loss_items)
+                    return results
+
+                # Scale loss by nominal batch_size of 64
+                loss *= config['batch_size'] / 64
+
+                # Compute gradient
+                loss.backward()
+
+                # Accumulate gradient for x batches before optimizing
+                if ni % accumulate == 0:
+                    optimizer.step()
+                    optimizer.zero_grad()
+
+                # Print batch results
+                mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
+                mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
+                s = ('%10s' * 2 + '%10.3g' * 6) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
+                pbar.set_description(s)
+            ##################
+            # End mini-batch #
+            ##################
+
+            final_epoch = epoch + 1 == epochs
+            if not config['notest'] or final_epoch:  # Calculate mAP
+                is_coco = any([x in config['data'] for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
+                # Apply mask before test
+                apply_mask(model, mask)
+                results, maps = test.test(
+                    cfg = cfg, data = config['data'], batch_size=config['batch_size'] * 2,
+                    img_size= img_size_test, model=model, 
+                    conf_thres=1E-3 if config['evolve'] or (final_epoch and is_coco) else 0.1,  # 0.1 faster
+                    iou_thres=0.6, save_json=final_epoch and is_coco,
+                    dataloader=testloader, folder = config['sub_working_dir']
+                )    
+
+            # Update scheduler
+            scheduler.step()
+
+            # Write epoch results
+            with open(config['results_file'], 'a') as f:
+                f.write(s + '%10.3g' * 7 % results + '\n')  # P, R, mAP, F1, test_losses=(GIoU, obj, cls)
+            if len(config['name']) and config['bucket']:
+                os.system('gsutil cp results.txt gs://%s/results/results%s.txt' % (config['bucket'], config['name']))
+
+            # Write Tensorboard results
+            if tb_writer:
+                x = list(mloss) + list(results)
+                titles = ['GIoU', 'Objectness', 'Classification', 'Train loss',
+                        'Precision', 'Recall', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification']
+                for xi, title in zip(x, titles):
+                    tb_writer.add_scalar(title, xi, epoch)
+
+            # Update best mAP
+            fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
+            if fi > best_fitness:
+                best_fitness = fi
+
+            # Save training results
+            save = (not config['nosave']) or (final_epoch and not config['evolve'])
+            if save:
+                with open(config['results_file'], 'r') as f:
+                    # Create checkpoint
+                    chkpt = {'epoch': epoch,
+                            'best_fitness': best_fitness,
+                            'training_results': f.read(),
+                            'model': model.module.state_dict() if type(
+                                model) is nn.parallel.DistributedDataParallel else model.state_dict(),
+                            'optimizer': None if final_epoch else optimizer.state_dict()}
+
+                # Save last checkpoint
+                torch.save(chkpt, config['last'])
+
+                # Save best checkpoint
+                if best_fitness == fi:
+                    torch.save(chkpt, config['best'])
+
+                # Delete checkpoint
+                del chkpt
+        #############
+        # End epoch #
+        #############
+
+        # Saving current mask before prune
+        torch.save(mask.state_dict(), config['sub_working_dir'] + 'mask_{}_{}.pt'.format(
+                config['pruning_time'], 'prune' if config['pruning_time'] == 1 else 'prunes'
+            )
+        )
+        # Saving current model befor prune
+        torch.save(model.state_dict(), config['sub_working_dir'] + 'model_it_{}')
+        config['pruning_time'] += 1
+
+        if it != config['iterations'] -2: # Train more one iteration without pruning
+            if config['prune_kind'] == 'IMP_LOCAL':
+                print(f"Applying IMP with {config['pruning_rate'] * 100}%.")
                 IMP_LOCAL(model, mask, config['pruning_rate'])
                 mask = mask.to('cpu')
                 print('Rewind weights.')
                 backup = backup.to(device)
                 rewind_weights(model, backup)
                 backup = backup.to('cpu')
-        #########
-        # Prune #
-        #########
+                mask = mask.to(device)
+            elif config['prune_kind'] == 'IMP_GLOBAL':
+                print(f"Applying IMP with {config['pruning_rate'] * 100}%.")
+                IMP_GLOBAL(model, mask, config['pruning_rate'])
+                mask = mask.to('cpu')
+                print('Rewind weights.')
+                backup = backup.to(device)
+                rewind_weights(model, backup)
+                backup = backup.to('cpu')
+                mask = mask.to(device)
 
-        # Prebias
-        if prebias:
-            if epoch < 3:  # prebias
-                ps = 0.1, 0.9  # prebias settings (lr=0.1, momentum=0.9)
-            else:  # normal training
-                ps = config['hyp']['lr0'], config['hyp']['momentum']  # normal training settings
-                print_model_biases(model)
-                prebias = False
-
-            # Bias optimizer settings
-            optimizer.param_groups[2]['lr'] = ps[0]
-            if optimizer.param_groups[2].get('momentum') is not None:  # for SGD but not Adam
-                optimizer.param_groups[2]['momentum'] = ps[1]
-
-        # Update image weights (optional)
-        if dataset.image_weights:
-            w = model.class_weights.cpu().numpy() * (1 - maps) ** 2  # class weights
-            image_weights = labels_to_image_weights(dataset.labels, nc=nc, class_weights=w)
-            dataset.indices = random.choices(range(dataset.n), weights=image_weights, k=dataset.n)  # rand weighted idx
-
-        mloss = torch.zeros(4).to(device)  # mean losses
-        print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
-        pbar = tqdm(enumerate(dataloader), total=nb)  # progress bar
-
-        ####################
-        # Start mini-batch #
-        ####################
-        for i, (imgs, targets, paths, _) in pbar: 
-            ni = i + nb * epoch  # number integrated batches (since train start)
-            
-            # Apply mask #
-            mask = mask.to(device)
-            model, mask = apply_mask(model, mask)
-            mask = mask.to('cpu')
-
-            imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
-            targets = targets.to(device)
-
-            # Plot images with bounding boxes
-            if ni == 0:
-                fname = config['sub_working_dir'] + 'train_batch%g.png' % i
-                plot_images(imgs=imgs, targets=targets, paths=paths, fname=fname)
-                if tb_writer:
-                    tb_writer.add_image(fname, cv2.imread(fname)[:, :, ::-1], dataformats='HWC')
-
-            # Multi-Scale training
-            if config['multi_scale']:
-                if ni / accumulate % 1 == 0:  #  adjust img_size (67% - 150%) every 1 batch
-                    img_size = random.randrange(img_sz_min, img_sz_max + 1) * 32
-                sf = img_size / max(imgs.shape[2:])  # scale factor
-                if sf != 1:
-                    ns = [math.ceil(x * sf / 32.) * 32 for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
-                    imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
-
-            # Run model
-            pred = model(imgs)
-
-            imgs = imgs.to('cpu')
-
-            # Compute loss
-            loss, loss_items = compute_loss(pred, targets, model, not prebias)
-            if not torch.isfinite(loss):
-                print('WARNING: non-finite loss, ending training ', loss_items)
-                return results
-
-            # Scale loss by nominal batch_size of 64
-            loss *= batch_size / 64
-
-            # Compute gradient
-            loss.backward()
-
-            # Accumulate gradient for x batches before optimizing
-            if ni % accumulate == 0:
-                optimizer.step()
-                optimizer.zero_grad()
-
-            # Print batch results
-            mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
-            mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
-            s = ('%10s' * 2 + '%10.3g' * 6) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
-            pbar.set_description(s)
-        ##################
-        # End mini-batch #
-        ##################
-
-        final_epoch = epoch + 1 == epochs
-        if not config['notest'] or final_epoch:  # Calculate mAP
-            is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
-            results, maps = test.test(
-                cfg = cfg, data = data, batch_size=batch_size * 2,
-                img_size=img_size_test, model=model, 
-                conf_thres=1E-3 if config['evolve'] or (final_epoch and is_coco) else 0.1,  # 0.1 faster
-                iou_thres=0.6, save_json=final_epoch and is_coco,
-                dataloader=testloader, folder = config['sub_working_dir']
-            )    
-
-        # Update scheduler
-        scheduler.step()
-
-        # Write epoch results
-        with open(config['results_file'], 'a') as f:
-            f.write(s + '%10.3g' * 7 % results + '\n')  # P, R, mAP, F1, test_losses=(GIoU, obj, cls)
-        if len(config['name']) and config['bucket']:
-            os.system('gsutil cp results.txt gs://%s/results/results%s.txt' % (config['bucket'], config['name']))
-
-        # Write Tensorboard results
-        if tb_writer:
-            x = list(mloss) + list(results)
-            titles = ['GIoU', 'Objectness', 'Classification', 'Train loss',
-                      'Precision', 'Recall', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification']
-            for xi, title in zip(x, titles):
-                tb_writer.add_scalar(title, xi, epoch)
-
-        # Update best mAP
-        fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
-        if fi > best_fitness:
-            best_fitness = fi
-
-        # Save training results
-        save = (not config['nosave']) or (final_epoch and not config['evolve'])
-        if save:
-            with open(config['results_file'], 'r') as f:
-                # Create checkpoint
-                chkpt = {'epoch': epoch,
-                         'best_fitness': best_fitness,
-                         'training_results': f.read(),
-                         'model': model.module.state_dict() if type(
-                             model) is nn.parallel.DistributedDataParallel else model.state_dict(),
-                         'optimizer': None if final_epoch else optimizer.state_dict()}
-
-            # Save last checkpoint
-            torch.save(chkpt, config['last'])
-
-            # Save best checkpoint
-            if best_fitness == fi:
-                torch.save(chkpt, config['best'])
-
-            # Delete checkpoint
-            del chkpt
-    #############
-    # End epoch #
-    #############
+        optimizer = create_optimizer(model, config)
+        start_epoch = 0
+        scheduler = create_scheduler(config, optimizer, start_epoch)
+    #################
+    # End Iteration #
+    #################
 
     n = config['name']
     if len(n):
@@ -322,6 +288,12 @@ def train():
             os.system('gsutil cp %s gs://%s/results' % (fresults, config['bucket']))
             os.system('gsutil cp %s gs://%s/weights' % (config['sub_working_dir'] + flast, config['bucket']))
             # os.system('gsutil cp %s gs://%s/weights' % (config['sub_working_dir'] + fbest, config['bucket']))
+
+    # Saving the last mask
+    torch.save(mask.state_dict(), config['sub_working_dir'] + 'mask_{}_{}.pt'.format(
+                config['pruning_time'], 'prunes'
+            )
+        )
 
     if not config['evolve']:
         plot_results(folder= config['sub_working_dir'])
@@ -357,7 +329,7 @@ if __name__ == '__main__':
     try:
         # Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/
         from torch.utils.tensorboard import SummaryWriter
-        tb_writer = SummaryWriter(logdir= config['sub_working_dir'] + 'runs/')
+        tb_writer = SummaryWriter(log_dir= config['sub_working_dir'] + 'runs/')
     except:
         pass
 

@@ -78,6 +78,7 @@ def create_prune_argparser():
     parser.add_argument('--resume', action='store_true', help='resume training from last.pt')
     parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
     parser.add_argument('--notest', action='store_true', help='only test final epoch')
+    parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
     parser.add_argument('--bucket', type=str, help='gsutil bucket')
     parser.add_argument('--cache_images', action='store_true', help='cache images for faster training')
     parser.add_argument('--cache_labels', action='store_true', help='cache labels for faster training')
@@ -197,3 +198,85 @@ def initialize_model(model, function):
     for name, param in model.named_parameters():
         if 'BatchNorm2d' not in name and 'bias' not in name:
             function(param)
+
+
+def create_dataloaders(config):
+    import os
+    from torch.utils.data import DataLoader
+    from utils.parse_config import parse_data_cfg
+    from utils.datasets import LoadImagesAndLabels
+
+    data = config['data']
+    img_size, img_size_test = config['img_size'] if len(config['img_size']) == 2 else config['img_size'] * 2  # train, test sizes
+    batch_size = config['batch_size']
+
+    # Configure run
+    data_dict = parse_data_cfg(data)
+    train_path = data_dict['train']
+    valid_path = data_dict['valid']
+
+    # Dataset
+    dataset = LoadImagesAndLabels(
+        train_path, img_size, batch_size,
+        augment=True, hyp=config['hyp'],  cache_labels=config['cache_labels'],# augmentation hyperparameters
+        cache_images=config['cache_images'],
+    )
+
+    # Dataloader
+    batch_size = min(batch_size, len(dataset))
+    nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8])  # number of workers
+    trainloader = DataLoader(
+        dataset, batch_size = batch_size, num_workers = nw,
+        pin_memory = True, collate_fn = dataset.collate_fn
+    )
+
+    # Testloader
+    testloader = DataLoader(
+        LoadImagesAndLabels(
+            valid_path, img_size_test, batch_size * 2,
+            hyp = config['hyp'], rect = True, cache_labels = config['cache_labels'],
+            cache_images = config['cache_images']
+        ),
+        batch_size = batch_size * 2, num_workers = nw, pin_memory = True, collate_fn = dataset.collate_fn
+    )
+
+    return trainloader, testloader
+
+
+def load_checkpoints(config, model, weights, optimizer, device, try_download_function, darknet_load_function):
+    import torch
+    
+    start_epoch = 0
+    best_fitness = 0.0
+    try_download_function(weights)
+    if weights.endswith('.pt'):  # pytorch format
+        # possible weights are '*.pt', 'yolov3-spp.pt', 'yolov3-tiny.pt' etc.
+        chkpt = torch.load(weights, map_location=device)
+
+        # load model
+        try:
+            chkpt['model'] = {k: v for k, v in chkpt['model'].items() if model.state_dict()[k].numel() == v.numel()}
+            model.load_state_dict(chkpt['model'], strict=False)
+        except KeyError as e:
+            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
+            raise KeyError(s) from e
+
+        # load optimizer
+        if chkpt['optimizer'] is not None:
+            optimizer.load_state_dict(chkpt['optimizer'])
+            best_fitness = chkpt['best_fitness']
+
+        # load results
+        if chkpt.get('training_results') is not None:
+            with open(config['results_file'], 'w') as file:
+                file.write(chkpt['training_results'])  # write results.txt
+
+        start_epoch = chkpt['epoch'] + 1
+        del chkpt
+
+    elif len(weights) > 0:  # darknet format
+        # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
+        darknet_load_function(model, weights)
+
+    return start_epoch, best_fitness, model, weights, optimizer
