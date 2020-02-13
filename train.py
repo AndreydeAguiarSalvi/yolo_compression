@@ -109,7 +109,7 @@ def train():
         model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
         model.yolo_layers = model.module.yolo_layers  # move yolo layer indices to top level
 
-    trainloader, testloader = create_dataloaders(config)
+    trainloader, validloader = create_dataloaders(config)
 
     # Start training
     nb = len(trainloader)
@@ -219,7 +219,7 @@ def train():
                 img_size=img_size_test, model=model, 
                 conf_thres=1E-3 if config['evolve'] or (final_epoch and is_coco) else 0.1,  # 0.1 faster
                 iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
-                dataloader=testloader, folder = config['sub_working_dir']
+                dataloader=validloader, folder = config['sub_working_dir']
             )    
 
         # Update scheduler

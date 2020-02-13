@@ -94,8 +94,14 @@ def create_prune_argparser():
     parser.add_argument('--xavier_uniform', action='store_true', help='initialize model with xavier uniform function')
     parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
+    # Pruning parameters
+    parser.add_argument('--iterations', type=int, help='One iteration have X epochs. Prune and reseting at the final of each iteration, except the last')
+    parser.add_argument('--reseting', type=int, help='Save backup in each iteration on epoch X for reseting')
+    parser.add_argument('--pruning_time', type=int, help='Counter for the number of prunes')
+    parser.add_argument('--pruning_rate', type=float, help='Percent of connections to remove')
+    parser.add_argument('--prune_kind', type=str, help='Way to perform the prune')
 
-    parser.add_argument('--params', type=str, default='params/default.json', help='json config to load the hyperparameters')
+    parser.add_argument('--params', type=str, default='params/test_prune.json', help='json config to load the hyperparameters')
     args = vars(parser.parse_args())
 
     return args
@@ -231,7 +237,7 @@ def create_dataloaders(config):
     )
 
     # Testloader
-    testloader = DataLoader(
+    validloader = DataLoader(
         LoadImagesAndLabels(
             valid_path, img_size_test, batch_size * 2,
             hyp = config['hyp'], rect = True, cache_labels = config['cache_labels'],
@@ -240,7 +246,7 @@ def create_dataloaders(config):
         batch_size = batch_size * 2, num_workers = nw, pin_memory = True, collate_fn = dataset.collate_fn
     )
 
-    return trainloader, testloader
+    return trainloader, validloader
 
 
 def load_checkpoints(config, model, weights, optimizer, device, try_download_function, darknet_load_function):

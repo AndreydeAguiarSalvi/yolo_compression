@@ -33,12 +33,7 @@ def train():
 
     # Initialize model
     model = Darknet(cfg, arc=config['arc']).to(device)
-
-    # Create masks and backup
     mask = create_mask(model)
-    backup = create_backup(model)
-    backup = backup.to('cpu')
-    torch.save(backup.state_dict(), config['sub_working_dir'] + 'bckp.pt')
 
     optimizer = create_optimizer(model, config)
     start_epoch, best_fitness, model, weights, optimizer = load_checkpoints(
@@ -64,7 +59,7 @@ def train():
         model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
         model.yolo_layers = model.module.yolo_layers  # move yolo layer indices to top level
 
-    trainloader, testloader = create_dataloaders(config)
+    trainloader, validloader = create_dataloaders(config)
 
     # Start training
     nb = len(trainloader)
@@ -80,6 +75,7 @@ def train():
     torch_utils.model_info(model, report='summary')  # 'full' or 'summary'
     print('Starting training for %g epochs...' % epochs)
 
+    counter = 0
     ###################
     # Start Iteration #
     ###################
@@ -113,7 +109,15 @@ def train():
 
             mloss = torch.zeros(4).to(device)  # mean losses
             print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
-            pbar = tqdm(enumerate(trainloader), total=100)  # progress bar
+            pbar = tqdm(enumerate(trainloader), total=nb)  # progress bar
+
+            # Backup for late reseting
+            if epoch == config['reseting']-1:
+                mask = mask.to('cpu')
+                backup = create_backup(model)
+                torch.save(backup.state_dict(), config['sub_working_dir'] + 'bckp_it-{}_epoch-{}.pt'.format(it+1, epoch+1))
+                backup = backup.to('cpu')
+                mask = mask.to(device)
 
             ####################
             # Start mini-batch #
@@ -186,7 +190,7 @@ def train():
                     img_size= img_size_test, model=model, 
                     conf_thres=1E-3 if config['evolve'] or (final_epoch and is_coco) else 0.1,  # 0.1 faster
                     iou_thres=0.6, save_json=final_epoch and is_coco,
-                    dataloader=testloader, folder = config['sub_working_dir']
+                    dataloader=validloader, folder = config['sub_working_dir']
                 )    
 
             # Update scheduler
@@ -204,7 +208,9 @@ def train():
                 titles = ['GIoU', 'Objectness', 'Classification', 'Train loss',
                         'Precision', 'Recall', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification']
                 for xi, title in zip(x, titles):
-                    tb_writer.add_scalar(title, xi, epoch)
+                    tb_writer.add_scalar(title, xi, counter)
+
+            counter == 1
 
             # Update best mAP
             fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
@@ -243,7 +249,6 @@ def train():
         )
         # Saving current model befor prune
         torch.save(model.state_dict(), config['sub_working_dir'] + 'model_it_{}')
-        config['pruning_time'] += 1
 
         if it != config['iterations'] -2: # Train more one iteration without pruning
             if config['prune_kind'] == 'IMP_LOCAL':
@@ -264,6 +269,8 @@ def train():
                 rewind_weights(model, backup)
                 backup = backup.to('cpu')
                 mask = mask.to(device)
+            
+            config['pruning_time'] += 1
 
         optimizer = create_optimizer(model, config)
         start_epoch = 0
