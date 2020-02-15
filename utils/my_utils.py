@@ -118,7 +118,10 @@ def create_config(opt):
 
     # Create sub_working_dir
     if opt['resume']:
-        config['sub_workin_dir'] = config['weights']
+        folders = opt['weights'].split('/')
+        config['sub_working_dir'] = ''
+        for i in range(len(folders) - 1):
+            config['sub_working_dir'] += folders[i] + '/'
     else:
         sub_working_dir = '{}/{}/size-{}/{}'.format(
             config['working_dir'],

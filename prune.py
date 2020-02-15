@@ -254,22 +254,16 @@ def train():
             if config['prune_kind'] == 'IMP_LOCAL':
                 print(f"Applying IMP with {config['pruning_rate'] * 100}%.")
                 IMP_LOCAL(model, mask, config['pruning_rate'])
-                mask = mask.to('cpu')
-                print('Rewind weights.')
-                backup = backup.to(device)
-                rewind_weights(model, backup)
-                backup = backup.to('cpu')
-                mask = mask.to(device)
             elif config['prune_kind'] == 'IMP_GLOBAL':
                 print(f"Applying IMP with {config['pruning_rate'] * 100}%.")
                 IMP_GLOBAL(model, mask, config['pruning_rate'])
-                mask = mask.to('cpu')
-                print('Rewind weights.')
-                backup = backup.to(device)
-                rewind_weights(model, backup)
-                backup = backup.to('cpu')
-                mask = mask.to(device)
-            
+                
+            mask = mask.to('cpu')
+            print('Rewind weights.')
+            backup = backup.to(device)
+            rewind_weights(model, backup)
+            backup = backup.to('cpu')
+            mask = mask.to(device)
             config['pruning_time'] += 1
 
         optimizer = create_optimizer(model, config)
