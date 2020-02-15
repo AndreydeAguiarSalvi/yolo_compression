@@ -50,7 +50,7 @@ def sum_of_the_weights(item):
     return count
 
 
-def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements an Iterative Magnitude Pruning locally
+def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets Hypothesis locally
     for name, param in model.named_parameters():
         if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
             name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
@@ -71,7 +71,7 @@ def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements an Iterative Mag
                 )
 
 
-def IMP_GLOBAL(model, mask, percentage_of_pruning): # Implements an Iterative Magnitude Pruning globally
+def IMP_GLOBAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets Hypothesis globally
     valid_values = torch.Tensor(0)
     for name, param in model.named_parameters():
         if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
@@ -96,3 +96,18 @@ def IMP_GLOBAL(model, mask, percentage_of_pruning): # Implements an Iterative Ma
                 mask[name_] = torch.nn.Parameter( 
                     torch.where(torch.abs(param) <= higher_of_smallest, torch.tensor(.0, device='cuda'), mask[name_]) 
                 )
+
+
+def CS(mask, initial_value, Beta): # Implements Continuous Sparcification
+    for key in mask.keys():
+        mask[key] = nn.Parameter( torch.clamp(Beta * mask[key], max = initial_value), requires_grad = True )
+
+
+def compute_apply_mask(model, mask, Beta = 1., is_ticket = False): # apply_mask from CS
+    for key in mask.keys():
+        scaling = 1. / torch.sigmoid(mask[key])
+        if is_ticket: mask[key] = (mask[key] > 0).float()
+        else: mask[key] = torch.sigmoid(Beta * mask[key])
+        mask[key] = scaling * mask[key]
+    
+    apply_mask(model, mask)

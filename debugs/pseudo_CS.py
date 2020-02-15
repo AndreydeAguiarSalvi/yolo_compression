@@ -34,7 +34,7 @@ for it:
 
 	{ # Train Function
     for epoch:
-        if epoch > 0: model.temp *= temp_increase
+        if epoch > 0: model.temp *= temp_increase # temperature is Beta in equations
         if it == 0 and epoch == args.rewing_epoch: model.checkpoint()
         for optimizer in optimizers: adjust_learning_rate(optimizer, epoch)
 
