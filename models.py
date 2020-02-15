@@ -1,3 +1,6 @@
+# Maybe help to understand this fucking code:
+# https://www.cyberailab.com/home/a-closer-look-at-yolov3
+# https://towardsdatascience.com/yolo-v3-object-detection-53fb7d3bfe6b
 import torch.nn.functional as F
 
 from utils.google_utils import *
