@@ -43,7 +43,7 @@ def create_test_argparser():
     parser = argparse.ArgumentParser(prog='test.py')
     parser.add_argument('--cfg', type=str, default='cfg/yolov3-spp.cfg', help='*.cfg path')
     parser.add_argument('--data', type=str, default='data/coco2014.data', help='*.data path')
-    parser.add_argument('--weights', type=str, default='weights/yolov3-spp.weights', help='path to weights file')
+    parser.add_argument('--weights', type=str, default='weights/yolov3-spp-ultralytics.pt', help='path to weights file')
     parser.add_argument('--batch_size', type=int, default=32, help='size of each image batch')
     parser.add_argument('--img_size', type=int, default=416, help='inference size (pixels)')
     parser.add_argument('--conf_thres', type=float, default=0.001, help='object confidence threshold')

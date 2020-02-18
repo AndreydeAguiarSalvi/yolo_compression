@@ -57,10 +57,10 @@ def create_modules(module_defs, img_size, arc):
 
         elif mdef['type'] == 'upsample':
             if ONNX_EXPORT:  # explicitly state size, avoid scale_factor
-                g = (yolo_index + 1) * 2  # gain
-                modules = nn.Upsample(size=(10 * g, 6 * g), mode='nearest')  # assume img_size = (320, 192)
+                g = (yolo_index + 1) * 2 / 32  # gain
+                modules = nn.Upsample(size=tuple(int(x * g) for x in img_size))  # img_size = (320, 192)
             else:
-                modules = nn.Upsample(scale_factor=int(mdef['stride']), mode='nearest')
+                modules = nn.Upsample(scale_factor=int(mdef['stride']))
 
         elif mdef['type'] == 'route':  # nn.Sequential() placeholder for 'route' layer
             layers = [int(x) for x in mdef['layers'].split(',')]
@@ -70,9 +70,10 @@ def create_modules(module_defs, img_size, arc):
             #     modules = nn.Upsample(scale_factor=1/float(mdef[i+1]['stride']), mode='nearest')  # reorg3d
 
         elif mdef['type'] == 'shortcut':  # nn.Sequential() placeholder for 'shortcut' layer
-            filters = output_filters[int(mdef['from'])]
-            layer = int(mdef['from'])
-            routs.extend([i + layer if layer < 0 else layer])
+            layers = [int(x) for x in mdef['from'].split(',')]
+            filters = output_filters[layers[0]]
+            routs.extend([i + l if l < 0 else l for l in layers])
+            # modules = weightedFeatureFusion(layers=layers)
 
         elif mdef['type'] == 'reorg3d':  # yolov3-spp-pan-scale
             # torch.Size([16, 128, 104, 104])
@@ -118,6 +119,21 @@ def create_modules(module_defs, img_size, arc):
         output_filters.append(filters)
 
     return module_list, routs
+
+
+class weightedFeatureFusion(nn.Module):  # weighted sum of layers https://arxiv.org/abs/1911.09070
+    def __init__(self, layers):
+        super(weightedFeatureFusion, self).__init__()
+        self.n = len(layers)  # number of layers
+        self.layers = layers  # layer indices
+        self.w = torch.nn.Parameter(torch.zeros(self.n + 1))  # layer weights
+
+    def forward(self, x, outputs):
+        w = torch.sigmoid(self.w) * (2 / self.n)  # sigmoid weights (0-1)
+        x = x * w[0]
+        for i in range(self.n):
+            x = x + outputs[self.layers[i]] * w[i + 1]
+        return x
 
 
 class SwishImplementation(torch.autograd.Function):
@@ -242,10 +258,10 @@ class Darknet(nn.Module):
             mtype = mdef['type']
             if mtype in ['convolutional', 'upsample', 'maxpool']:
                 x = module(x)
-            elif mtype == 'route':
+            elif mtype == 'route': # concat
                 layers = [int(x) for x in mdef['layers'].split(',')]
                 if verbose:
-                    print('route concatenating %s' % ([layer_outputs[i].shape for i in layers]))
+                    print('route/concatenate %s' % ([layer_outputs[i].shape for i in layers]))
                 if len(layers) == 1:
                     x = layer_outputs[layers[0]]
                 else:
@@ -255,11 +271,13 @@ class Darknet(nn.Module):
                         layer_outputs[layers[1]] = F.interpolate(layer_outputs[layers[1]], scale_factor=[0.5, 0.5])
                         x = torch.cat([layer_outputs[i] for i in layers], 1)
                     # print(''), [print(layer_outputs[i].shape) for i in layers], print(x.shape)
-            elif mtype == 'shortcut':
-                j = int(mdef['from'])
+            elif mtype == 'shortcut':  # sum
+                # x = module(x, layer_outputs)  # weightedFeatureFusion()
+                layers = [int(x) for x in mdef['from'].split(',')]
                 if verbose:
-                    print('shortcut adding layer %g-%s to %g-%s' % (j, layer_outputs[j].shape, i - 1, x.shape))
-                x = x + layer_outputs[j]
+                    print('shortcut/add %s' % ([layer_outputs[i].shape for i in layers]))
+                for j in layers:
+                    x = x + layer_outputs[j]
             elif mtype == 'yolo':
                 output.append(module(x, img_size))
             layer_outputs.append(x if i in self.routs else [])
@@ -437,7 +455,8 @@ def attempt_download(weights):
              'darknet53.conv.74': '1WUVBid-XuoUBmvzBVUCBl_ELrzqwA8dJ',
              'yolov3-tiny.conv.15': '1Bw0kCpplxUqyRYAJr9RY9SGnOJbo9nEj',
              'ultralytics49.pt': '158g62Vs14E3aj7oPVPuEnNZMKFNgGyNq',
-             'ultralytics68.pt': '1Jm8kqnMdMGUUxGo8zMFZMJ0eaPwLkxSG'}
+            'ultralytics68.pt': '1Jm8kqnMdMGUUxGo8zMFZMJ0eaPwLkxSG',
+             'yolov3-spp-ultralytics.pt': '1UcR-zVoMs7DH5dj3N1bswkiQTA4dmKF4'}
 
         file = Path(weights).name
         if file in d:
