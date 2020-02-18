@@ -72,7 +72,7 @@ def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets 
 
 
 def IMP_GLOBAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets Hypothesis globally
-    valid_values = torch.Tensor(0)
+    valid_values = torch.Tensor(0).cuda()
     for name, param in model.named_parameters():
         if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
             name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key

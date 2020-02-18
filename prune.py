@@ -20,7 +20,7 @@ def train():
     weights = config['weights']  # initial training weights
 
     # Initialize
-    init_seeds()
+    init_seeds(2)
     if config['multi_scale']:
         img_sz_min = round(img_size / 32 / 1.5)
         img_sz_max = round(img_size / 32 * 1.5)
@@ -210,7 +210,7 @@ def train():
                 for xi, title in zip(x, titles):
                     tb_writer.add_scalar(title, xi, counter)
 
-            counter == 1
+            counter += 1
 
             # Update best mAP
             fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
@@ -247,15 +247,15 @@ def train():
                 config['pruning_time'], 'prune' if config['pruning_time'] == 1 else 'prunes'
             )
         )
-        # Saving current model befor prune
-        torch.save(model.state_dict(), config['sub_working_dir'] + 'model_it_{}')
+        # Saving current model before prune
+        torch.save(model.state_dict(), config['sub_working_dir'] + 'model_it_{}.pt'.format(it+1))
 
-        if it != config['iterations'] -2: # Train more one iteration without pruning
+        if it < config['iterations'] -1: # Train more one iteration without pruning
             if config['prune_kind'] == 'IMP_LOCAL':
-                print(f"Applying IMP with {config['pruning_rate'] * 100}%.")
+                print(f"Applying IMP Local with {config['pruning_rate'] * 100}%.")
                 IMP_LOCAL(model, mask, config['pruning_rate'])
             elif config['prune_kind'] == 'IMP_GLOBAL':
-                print(f"Applying IMP with {config['pruning_rate'] * 100}%.")
+                print(f"Applying IMP Global with {config['pruning_rate'] * 100}%.")
                 IMP_GLOBAL(model, mask, config['pruning_rate'])
                 
             mask = mask.to('cpu')
@@ -289,12 +289,6 @@ def train():
             os.system('gsutil cp %s gs://%s/results' % (fresults, config['bucket']))
             os.system('gsutil cp %s gs://%s/weights' % (config['sub_working_dir'] + flast, config['bucket']))
             # os.system('gsutil cp %s gs://%s/weights' % (config['sub_working_dir'] + fbest, config['bucket']))
-
-    # Saving the last mask
-    torch.save(mask.state_dict(), config['sub_working_dir'] + 'mask_{}_{}.pt'.format(
-                config['pruning_time'], 'prunes'
-            )
-        )
 
     if not config['evolve']:
         plot_results(folder= config['sub_working_dir'])

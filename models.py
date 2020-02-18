@@ -470,3 +470,85 @@ def attempt_download(weights):
         if not (r == 0 and os.path.exists(weights) and os.path.getsize(weights) > 1E6):  # weights exist and > 1MB
             os.system('rm ' + weights)  # remove partial downloads
             raise Exception(msg)
+
+################
+# My Additions #
+################
+class YOLO_Teacher(nn.Module):
+    # YOLOv3 object detection model
+
+    def __init__(self, cfg, img_size=(416, 416), arc='default'):
+        super(YOLO_Teacher, self).__init__()
+
+        self.module_defs = parse_model_cfg(cfg)
+        self.module_list, self.routs = create_modules(self.module_defs, img_size, arc)
+        self.yolo_layers = get_yolo_layers(self)
+
+        # Darknet Header https://github.com/AlexeyAB/darknet/issues/2914#issuecomment-496675346
+        self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
+        self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
+
+    def forward(self, x, var=None):
+        img_size = x.shape[-2:]
+        output, layer_outputs = [], []
+        verbose = False
+        if verbose:
+            print('0', x.shape)
+
+        for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
+            mtype = mdef['type']
+            if mtype in ['convolutional', 'upsample', 'maxpool']:
+                x = module(x)
+                if self.module_defs[i+1]['type'] == 'yolo': # Input features from YOLO layer
+                    output.append(x)
+            elif mtype == 'route': # concat
+                layers = [int(x) for x in mdef['layers'].split(',')]
+                if verbose:
+                    print('route/concatenate %s' % ([layer_outputs[i].shape for i in layers]))
+                if len(layers) == 1:
+                    x = layer_outputs[layers[0]]
+                else:
+                    try:
+                        x = torch.cat([layer_outputs[i] for i in layers], 1)
+                    except:  # apply stride 2 for darknet reorg layer
+                        layer_outputs[layers[1]] = F.interpolate(layer_outputs[layers[1]], scale_factor=[0.5, 0.5])
+                        x = torch.cat([layer_outputs[i] for i in layers], 1)
+                    # print(''), [print(layer_outputs[i].shape) for i in layers], print(x.shape)
+            elif mtype == 'shortcut':  # sum
+                # x = module(x, layer_outputs)  # weightedFeatureFusion()
+                layers = [int(x) for x in mdef['from'].split(',')]
+                if verbose:
+                    print('shortcut/add %s' % ([layer_outputs[i].shape for i in layers]))
+                for j in layers:
+                    x = x + layer_outputs[j]
+            elif mtype == 'yolo':
+                output.append(module(x, img_size))
+            layer_outputs.append(x if i in self.routs else [])
+            if verbose:
+                print(i, x.shape)
+
+        # if self.training:
+        #     return output
+        # elif ONNX_EXPORT:
+        #     x = [torch.cat(x, 0) for x in zip(*output)]
+        #     return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4
+        # else:
+        #     io, p = zip(*output)  # inference output, training output
+        #     return torch.cat(io, 1), p
+        return output
+
+    def fuse(self):
+        # Fuse Conv2d + BatchNorm2d layers throughout model
+        fused_list = nn.ModuleList()
+        for a in list(self.children())[0]:
+            if isinstance(a, nn.Sequential):
+                for i, b in enumerate(a):
+                    if isinstance(b, nn.modules.batchnorm.BatchNorm2d):
+                        # fuse this bn layer with the previous conv2d layer
+                        conv = a[i - 1]
+                        fused = torch_utils.fuse_conv_and_bn(conv, b)
+                        a = nn.Sequential(fused, *list(a.children())[i + 1:])
+                        break
+            fused_list.append(a)
+        self.module_list = fused_list
+        # model_info(self)  # yolov3-spp reduced from 225 to 152 layers
