@@ -20,10 +20,10 @@
         "shear": 0.641
     }, 
     "epochs": 30, 
-    "batch_size": 10, 
-    "accumulate": 1, 
+    "batch_size": 8, 
+    "accumulate": 6, 
     "cfg": "cfg/yolov3-spp.cfg", 
-    "data": "data/coco2014.data", 
+    "data": "data/coco_mysplit.data", 
     "img_size": [416], 
     "bucket": "", 
     "weights": "", 
