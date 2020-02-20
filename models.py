@@ -490,8 +490,6 @@ def attempt_download(weights):
 class MultiBiasConv(nn.Module):
     def __init__(self, in_channels, out_channels, n_bias, kernel_size=(3, 3), stride=1, pad=0):
         super(MultiBiasConv, self).__init__()
-        if out_channels % 2 != 0:
-            n_bias = 15
         self.conv = nn.Conv2d(in_channels=int(in_channels), out_channels=int(out_channels/n_bias), bias=False, kernel_size=kernel_size, padding=pad, stride=stride)
         nn.init.xavier_normal_(self.conv.weight)
         self.bias = torch.nn.Parameter( torch.Tensor(n_bias), requires_grad=True )
@@ -505,13 +503,18 @@ class MultiBiasConv(nn.Module):
         
         return torch.cat(y, dim=1)
 
+
 class MultiConvMultiBias(nn.Module):
     def __init__(self, in_channels, out_channels, n_bias, kernel_size=3, stride=1, pad=0):
         super(MultiConvMultiBias, self).__init__()
-        self.conv1 = MultiBiasConv(in_channels=in_channels, out_channels=in_channels, n_bias=n_bias, 
+        # Input is not divisible by 2^n
+        bias_1, bias_2 = n_bias, n_bias
+        if in_channels == 3:
+            bias_1 = 1
+        self.conv1 = MultiBiasConv(in_channels=in_channels, out_channels=in_channels, n_bias=bias_1, 
             kernel_size=(kernel_size, 1), pad=pad, stride=stride
         )
-        self.conv2 = MultiBiasConv(in_channels=in_channels, out_channels=out_channels, n_bias=n_bias, 
+        self.conv2 = MultiBiasConv(in_channels=in_channels, out_channels=out_channels, n_bias=bias_2, 
             kernel_size=(1, kernel_size), pad=pad, stride=stride
         )
     
@@ -521,7 +524,7 @@ class MultiConvMultiBias(nn.Module):
         return x
 
 
-def create_compact_modules(module_defs, img_size, arc):
+def create_compact_modules(module_defs, img_size, arc, conv_type='multi_bias'):
     # Constructs module list of layer blocks from module configuration in module_defs
 
     hyperparams = module_defs.pop(0)
@@ -536,17 +539,27 @@ def create_compact_modules(module_defs, img_size, arc):
         #     modules.add_module('BatchNorm2d_0', nn.BatchNorm2d(output_filters[-1], momentum=0.1))
 
         if mdef['type'] == 'convolutional':
-            bn = int(mdef['batch_normalize'])
-            filters = int(mdef['filters'])
-            size = int(mdef['size'])
-            stride = int(mdef['stride']) if 'stride' in mdef else (int(mdef['stride_y']), int(mdef['stride_x']))
-            pad = (size - 1) // 2 if int(mdef['pad']) else 0
-            modules.add_module('Conv2d', MultiBiasConv(in_channels=output_filters[-1],
-                                                   out_channels=filters,
-                                                   n_bias=16,
-                                                   kernel_size=size,
-                                                   stride=stride,
-                                                   pad=pad))
+            bn = mdef['batch_normalize']
+            filters = mdef['filters']
+            size = mdef['size']
+            stride = mdef['stride'] if 'stride' in mdef else (mdef['stride_y'], mdef['stride_x'])
+            if conv_type == 'multi_bias':
+                modules.add_module(
+                    'Conv2d', MultiBiasConv(
+                        in_channels = output_filters[-1], out_channels = filters, 
+                        n_bias = 16 if filters % 16 == 0 else 15 if filters % 15 == 0 else 1,
+                        kernel_size = size, stride = stride, pad = (size - 1) // 2 if mdef['pad'] else 0
+                    )
+                )
+            elif conv_type == 'multi_conv_multi_bias':
+                modules.add_module(
+                    'Conv2d', MultiConvMultiBias(
+                        in_channels = output_filters[-1], out_channels = filters, 
+                        n_bias = 16 if filters % 16 == 0 else 15 if filters % 15 == 0 else 1,
+                        kernel_size = size, stride = stride, pad = (size - 1) // 2 if mdef['pad'] else 0
+                    )
+                )
+
             if bn:
                 modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
             if mdef['activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
@@ -556,9 +569,9 @@ def create_compact_modules(module_defs, img_size, arc):
                 modules.add_module('activation', Swish())
 
         elif mdef['type'] == 'maxpool':
-            size = int(mdef['size'])
-            stride = int(mdef['stride'])
-            maxpool = nn.MaxPool2d(kernel_size=size, stride=stride, padding=int((size - 1) // 2))
+            size = mdef['size']
+            stride = mdef['stride']
+            maxpool = nn.MaxPool2d(kernel_size=size, stride=stride, padding=(size - 1) // 2)
             if size == 2 and stride == 1:  # yolov3-tiny
                 modules.add_module('ZeroPad2d', nn.ZeroPad2d((0, 1, 0, 1)))
                 modules.add_module('MaxPool2d', maxpool)
@@ -570,20 +583,20 @@ def create_compact_modules(module_defs, img_size, arc):
                 g = (yolo_index + 1) * 2 / 32  # gain
                 modules = nn.Upsample(size=tuple(int(x * g) for x in img_size))  # img_size = (320, 192)
             else:
-                modules = nn.Upsample(scale_factor=int(mdef['stride']))
+                modules = nn.Upsample(scale_factor=mdef['stride'])
 
         elif mdef['type'] == 'route':  # nn.Sequential() placeholder for 'route' layer
-            layers = [int(x) for x in mdef['layers'].split(',')]
+            layers = mdef['layers']
             filters = sum([output_filters[i + 1 if i > 0 else i] for i in layers])
             routs.extend([l if l > 0 else l + i for l in layers])
             # if mdef[i+1]['type'] == 'reorg3d':
             #     modules = nn.Upsample(scale_factor=1/float(mdef[i+1]['stride']), mode='nearest')  # reorg3d
 
         elif mdef['type'] == 'shortcut':  # nn.Sequential() placeholder for 'shortcut' layer
-            layers = [int(x) for x in mdef['from'].split(',')]
-            filters = output_filters[layers[0]]
+            layers = mdef['from']
+            filters = output_filters[-1]
             routs.extend([i + l if l < 0 else l for l in layers])
-            # modules = weightedFeatureFusion(layers=layers)
+            modules = weightedFeatureFusion(layers=layers)
 
         elif mdef['type'] == 'reorg3d':  # yolov3-spp-pan-scale
             # torch.Size([16, 128, 104, 104])
@@ -592,9 +605,9 @@ def create_compact_modules(module_defs, img_size, arc):
 
         elif mdef['type'] == 'yolo':
             yolo_index += 1
-            mask = [int(x) for x in mdef['mask'].split(',')]  # anchor mask
+            mask = mdef['mask']  # anchor mask
             modules = YOLOLayer(anchors=mdef['anchors'][mask],  # anchor list
-                                nc=int(mdef['classes']),  # number of classes
+                                nc=mdef['classes'],  # number of classes
                                 img_size=img_size,  # (416, 416)
                                 yolo_index=yolo_index,  # 0, 1 or 2
                                 arc=arc)  # yolo architecture
@@ -634,11 +647,11 @@ def create_compact_modules(module_defs, img_size, arc):
 class Reduced_Darknet(nn.Module):
     # YOLOv3 object detection model
 
-    def __init__(self, cfg, img_size=(416, 416), arc='default'):
+    def __init__(self, cfg, img_size=(416, 416), arc='default', conv_type='multi_bias'):
         super(Reduced_Darknet, self).__init__()
 
         self.module_defs = parse_model_cfg(cfg)
-        self.module_list, self.routs = create_compact_modules(self.module_defs, img_size, arc)
+        self.module_list, self.routs = create_compact_modules(self.module_defs, img_size, arc, conv_type)
         self.yolo_layers = get_yolo_layers(self)
 
         # Darknet Header https://github.com/AlexeyAB/darknet/issues/2914#issuecomment-496675346
@@ -647,48 +660,51 @@ class Reduced_Darknet(nn.Module):
 
     def forward(self, x, var=None):
         img_size = x.shape[-2:]
-        output, layer_outputs = [], []
+        yolo_out, out = [], []
         verbose = False
         if verbose:
+            str = ''
             print('0', x.shape)
 
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
             if mtype in ['convolutional', 'upsample', 'maxpool']:
                 x = module(x)
-            elif mtype == 'route': # concat
-                layers = [int(x) for x in mdef['layers'].split(',')]
+            elif mtype == 'shortcut':  # sum
                 if verbose:
-                    print('route/concatenate %s' % ([layer_outputs[i].shape for i in layers]))
+                    l = [i - 1] + module.layers  # layers
+                    s = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes
+                    str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
+                x = module(x, out)  # weightedFeatureFusion()
+            elif mtype == 'route': # concat
+                layers = mdef['layers']
+                if verbose:
+                    l = [i - 1] + layers  # layers
+                    s = [list(x.shape)] + [list(out[i].shape) for i in layers]  # shapes
+                    str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
                 if len(layers) == 1:
-                    x = layer_outputs[layers[0]]
+                    x = out[layers[0]]
                 else:
                     try:
-                        x = torch.cat([layer_outputs[i] for i in layers], 1)
+                        x = torch.cat([out[i] for i in layers], 1)
                     except:  # apply stride 2 for darknet reorg layer
-                        layer_outputs[layers[1]] = F.interpolate(layer_outputs[layers[1]], scale_factor=[0.5, 0.5])
-                        x = torch.cat([layer_outputs[i] for i in layers], 1)
-                    # print(''), [print(layer_outputs[i].shape) for i in layers], print(x.shape)
-            elif mtype == 'shortcut':  # sum
-                # x = module(x, layer_outputs)  # weightedFeatureFusion()
-                layers = [int(x) for x in mdef['from'].split(',')]
-                if verbose:
-                    print('shortcut/add %s' % ([layer_outputs[i].shape for i in layers]))
-                for j in layers:
-                    x = x + layer_outputs[j]
+                        out[layers[1]] = F.interpolate(out[layers[1]], scale_factor=[0.5, 0.5])
+                        x = torch.cat([out[i] for i in layers], 1)
+                    # print(''), [print(out[i].shape) for i in layers], print(x.shape)
             elif mtype == 'yolo':
-                output.append(module(x, img_size))
-            layer_outputs.append(x if i in self.routs else [])
+                yolo_out.append(module(x, img_size))
+            out.append(x if i in self.routs else [])
             if verbose:
-                print(i, x.shape)
+                print('%g/%g %s -' % (i, len(self.module_list), mtype), list(x.shape), str)
+                str = ''
 
-        if self.training:
-            return output
-        elif ONNX_EXPORT:
-            x = [torch.cat(x, 0) for x in zip(*output)]
+        if self.training: # train
+            return yolo_out
+        elif ONNX_EXPORT: # export
+            x = [torch.cat(x, 0) for x in zip(*yolo_out)]
             return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4
-        else:
-            io, p = zip(*output)  # inference output, training output
+        else: # test
+            io, p = zip(*yolo_out)  # inference output, training output
             return torch.cat(io, 1), p
 
     def fuse(self):
