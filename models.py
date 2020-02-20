@@ -476,6 +476,212 @@ def attempt_download(weights):
 ################
 # My Additions #
 ################
+class MultiBiasConv(nn.Module):
+    def __init__(self, in_channels, out_channels, n_bias, kernel_size=(3, 3), stride=1, pad=0):
+        super(MultiBiasConv, self).__init__()
+        if out_channels % 2 != 0:
+            n_bias = 15
+        self.conv = nn.Conv2d(in_channels=int(in_channels), out_channels=int(out_channels/n_bias), bias=False, kernel_size=kernel_size, padding=pad, stride=stride)
+        nn.init.xavier_normal_(self.conv.weight)
+        self.bias = torch.nn.Parameter( torch.Tensor(n_bias), requires_grad=True )
+        nn.init.normal_(self.bias)
+    
+    def forward(self, x):
+        x = self.conv(x)
+        y = []
+        for b in self.bias:
+            y.append(x + b)
+        
+        return torch.cat(y, dim=1)
+
+
+def create_compact_modules(module_defs, img_size, arc):
+    # Constructs module list of layer blocks from module configuration in module_defs
+
+    hyperparams = module_defs.pop(0)
+    output_filters = [int(hyperparams['channels'])]
+    module_list = nn.ModuleList()
+    routs = []  # list of layers which rout to deeper layers
+    yolo_index = -1
+
+    for i, mdef in enumerate(module_defs):
+        modules = nn.Sequential()
+        # if i == 0:
+        #     modules.add_module('BatchNorm2d_0', nn.BatchNorm2d(output_filters[-1], momentum=0.1))
+
+        if mdef['type'] == 'convolutional':
+            bn = int(mdef['batch_normalize'])
+            filters = int(mdef['filters'])
+            size = int(mdef['size'])
+            stride = int(mdef['stride']) if 'stride' in mdef else (int(mdef['stride_y']), int(mdef['stride_x']))
+            pad = (size - 1) // 2 if int(mdef['pad']) else 0
+            modules.add_module('Conv2d', MultiBiasConv(in_channels=output_filters[-1],
+                                                   out_channels=filters,
+                                                   n_bias=16,
+                                                   kernel_size=size,
+                                                   stride=stride,
+                                                   pad=pad))
+            if bn:
+                modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+            if mdef['activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
+                modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+            elif mdef['activation'] == 'swish':
+                modules.add_module('activation', Swish())
+
+        elif mdef['type'] == 'maxpool':
+            size = int(mdef['size'])
+            stride = int(mdef['stride'])
+            maxpool = nn.MaxPool2d(kernel_size=size, stride=stride, padding=int((size - 1) // 2))
+            if size == 2 and stride == 1:  # yolov3-tiny
+                modules.add_module('ZeroPad2d', nn.ZeroPad2d((0, 1, 0, 1)))
+                modules.add_module('MaxPool2d', maxpool)
+            else:
+                modules = maxpool
+
+        elif mdef['type'] == 'upsample':
+            if ONNX_EXPORT:  # explicitly state size, avoid scale_factor
+                g = (yolo_index + 1) * 2 / 32  # gain
+                modules = nn.Upsample(size=tuple(int(x * g) for x in img_size))  # img_size = (320, 192)
+            else:
+                modules = nn.Upsample(scale_factor=int(mdef['stride']))
+
+        elif mdef['type'] == 'route':  # nn.Sequential() placeholder for 'route' layer
+            layers = [int(x) for x in mdef['layers'].split(',')]
+            filters = sum([output_filters[i + 1 if i > 0 else i] for i in layers])
+            routs.extend([l if l > 0 else l + i for l in layers])
+            # if mdef[i+1]['type'] == 'reorg3d':
+            #     modules = nn.Upsample(scale_factor=1/float(mdef[i+1]['stride']), mode='nearest')  # reorg3d
+
+        elif mdef['type'] == 'shortcut':  # nn.Sequential() placeholder for 'shortcut' layer
+            layers = [int(x) for x in mdef['from'].split(',')]
+            filters = output_filters[layers[0]]
+            routs.extend([i + l if l < 0 else l for l in layers])
+            # modules = weightedFeatureFusion(layers=layers)
+
+        elif mdef['type'] == 'reorg3d':  # yolov3-spp-pan-scale
+            # torch.Size([16, 128, 104, 104])
+            # torch.Size([16, 64, 208, 208]) <-- # stride 2 interpolate dimensions 2 and 3 to cat with prior layer
+            pass
+
+        elif mdef['type'] == 'yolo':
+            yolo_index += 1
+            mask = [int(x) for x in mdef['mask'].split(',')]  # anchor mask
+            modules = YOLOLayer(anchors=mdef['anchors'][mask],  # anchor list
+                                nc=int(mdef['classes']),  # number of classes
+                                img_size=img_size,  # (416, 416)
+                                yolo_index=yolo_index,  # 0, 1 or 2
+                                arc=arc)  # yolo architecture
+
+            # Initialize preceding Conv2d() bias (https://arxiv.org/pdf/1708.02002.pdf section 3.3)
+            try:
+                if arc == 'default' or arc == 'Fdefault':  # default
+                    b = [-5.0, -5.0]  # obj, cls
+                elif arc == 'uBCE':  # unified BCE (80 classes)
+                    b = [0, -9.0]
+                elif arc == 'uCE':  # unified CE (1 background + 80 classes)
+                    b = [10, -0.1]
+                elif arc == 'uFBCE':  # unified FocalBCE (5120 obj, 80 classes)
+                    b = [0, -6.5]
+                elif arc == 'uFCE':  # unified FocalCE (64 cls, 1 background + 80 classes)
+                    b = [7.7, -1.1]
+
+                bias = module_list[-1][0].bias.view(len(mask), -1)  # 255 to 3x85
+                bias[:, 4] += b[0] - bias[:, 4].mean()  # obj
+                bias[:, 5:] += b[1] - bias[:, 5:].mean()  # cls
+                # bias = torch.load('weights/yolov3-spp.bias.pt')[yolo_index]  # list of tensors [3x85, 3x85, 3x85]
+                module_list[-1][0].bias = torch.nn.Parameter(bias.view(-1))
+                # utils.print_model_biases(model)
+            except:
+                print('WARNING: smart bias initialization failure.')
+
+        else:
+            print('Warning: Unrecognized Layer Type: ' + mdef['type'])
+
+        # Register module list and number of output filters
+        module_list.append(modules)
+        output_filters.append(filters)
+
+    return module_list, routs
+
+
+class Reduced_Darknet(nn.Module):
+    # YOLOv3 object detection model
+
+    def __init__(self, cfg, img_size=(416, 416), arc='default'):
+        super(Reduced_Darknet, self).__init__()
+
+        self.module_defs = parse_model_cfg(cfg)
+        self.module_list, self.routs = create_compact_modules(self.module_defs, img_size, arc)
+        self.yolo_layers = get_yolo_layers(self)
+
+        # Darknet Header https://github.com/AlexeyAB/darknet/issues/2914#issuecomment-496675346
+        self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
+        self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
+
+    def forward(self, x, var=None):
+        img_size = x.shape[-2:]
+        output, layer_outputs = [], []
+        verbose = False
+        if verbose:
+            print('0', x.shape)
+
+        for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
+            mtype = mdef['type']
+            if mtype in ['convolutional', 'upsample', 'maxpool']:
+                x = module(x)
+            elif mtype == 'route': # concat
+                layers = [int(x) for x in mdef['layers'].split(',')]
+                if verbose:
+                    print('route/concatenate %s' % ([layer_outputs[i].shape for i in layers]))
+                if len(layers) == 1:
+                    x = layer_outputs[layers[0]]
+                else:
+                    try:
+                        x = torch.cat([layer_outputs[i] for i in layers], 1)
+                    except:  # apply stride 2 for darknet reorg layer
+                        layer_outputs[layers[1]] = F.interpolate(layer_outputs[layers[1]], scale_factor=[0.5, 0.5])
+                        x = torch.cat([layer_outputs[i] for i in layers], 1)
+                    # print(''), [print(layer_outputs[i].shape) for i in layers], print(x.shape)
+            elif mtype == 'shortcut':  # sum
+                # x = module(x, layer_outputs)  # weightedFeatureFusion()
+                layers = [int(x) for x in mdef['from'].split(',')]
+                if verbose:
+                    print('shortcut/add %s' % ([layer_outputs[i].shape for i in layers]))
+                for j in layers:
+                    x = x + layer_outputs[j]
+            elif mtype == 'yolo':
+                output.append(module(x, img_size))
+            layer_outputs.append(x if i in self.routs else [])
+            if verbose:
+                print(i, x.shape)
+
+        if self.training:
+            return output
+        elif ONNX_EXPORT:
+            x = [torch.cat(x, 0) for x in zip(*output)]
+            return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4
+        else:
+            io, p = zip(*output)  # inference output, training output
+            return torch.cat(io, 1), p
+
+    def fuse(self):
+        # Fuse Conv2d + BatchNorm2d layers throughout model
+        fused_list = nn.ModuleList()
+        for a in list(self.children())[0]:
+            if isinstance(a, nn.Sequential):
+                for i, b in enumerate(a):
+                    if isinstance(b, nn.modules.batchnorm.BatchNorm2d):
+                        # fuse this bn layer with the previous conv2d layer
+                        conv = a[i - 1]
+                        fused = torch_utils.fuse_conv_and_bn(conv, b)
+                        a = nn.Sequential(fused, *list(a.children())[i + 1:])
+                        break
+            fused_list.append(a)
+        self.module_list = fused_list
+        # model_info(self)  # yolov3-spp reduced from 225 to 152 layers
+
+
 class YOLO_Teacher(nn.Module):
     # YOLOv3 object detection model
 

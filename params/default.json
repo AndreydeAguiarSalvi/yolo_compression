@@ -28,6 +28,7 @@
     "bucket" : "",
     "weights" : "weights/yolov3-spp-ultralytics.pt",
     "arc" : "default",
+    "darknet" : "default",
     "name" : "",
     "device" : "",
     "working_dir" : "/A/andrey/yolo_ultra/weights",

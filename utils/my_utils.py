@@ -19,6 +19,7 @@ def create_train_argparser():
     parser.add_argument('--cache_labels', action='store_true', help='cache labels for faster training')
     parser.add_argument('--weights', type=str, help='initial weights')
     parser.add_argument('--arc', type=str, help='yolo architecture')  # default, uCE, uBCE
+    parser.add_argument('--darknet', type=str, help='Darknet type (default, multibias)')
     parser.add_argument('--name', help='renames results.txt to results_name.txt if supplied')
     parser.add_argument('--device', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
@@ -84,6 +85,7 @@ def create_prune_argparser():
     parser.add_argument('--cache_labels', action='store_true', help='cache labels for faster training')
     parser.add_argument('--weights', type=str, help='initial weights')
     parser.add_argument('--arc', type=str, help='yolo architecture')  # default, uCE, uBCE
+    parser.add_argument('--darknet', type=str, help='Darknet type (default, multibias)')
     parser.add_argument('--name', help='renames results.txt to results_name.txt if supplied')
     parser.add_argument('--device', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')

@@ -41,7 +41,10 @@ def train():
     nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
 
     # Initialize model
-    model = Darknet(cfg, arc=config['arc']).to(device)
+    if config['darknet'] == 'default':
+        model = Darknet(cfg, arc=config['arc']).to(device)
+    elif config['darknet'] == 'multibias':
+        model = Reduced_Darknet(cfg, arc=config['arc']).to(device)
 
     optimizer = create_optimizer(model, config)
 
