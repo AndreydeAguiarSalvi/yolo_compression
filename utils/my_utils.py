@@ -25,6 +25,10 @@ def create_train_argparser():
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
     parser.add_argument('--single_cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--var', type=float, help='debug variable')
+    # hyp parameters
+    parser.add_argument('--lr0', type=float, help='initial learning rate')
+    parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
+    parser.add_argument('--weight_decay', type=float, help='weight decay for pg1 parameters')
     # My additioned parameters
     parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
     parser.add_argument('--decay_steps', type=str)
@@ -90,6 +94,10 @@ def create_prune_argparser():
     parser.add_argument('--name', help='renames results.txt to results_name.txt if supplied')
     parser.add_argument('--device', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
+    # hyp parameters
+    parser.add_argument('--lr0', type=float, help='initial learning rate')
+    parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
+    parser.add_argument('--weight_decay', type=float, help='weight decay for pg1 parameters')
     # My additioned parameters
     parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
     parser.add_argument('--decay_steps', type=str)
