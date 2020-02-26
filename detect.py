@@ -45,11 +45,12 @@ def detect(save_img=False):
     if ONNX_EXPORT:
         model.fuse()
         img = torch.zeros((1, 3) + img_size)  # (1, 3, 320, 192)
-        torch.onnx.export(model, img, 'weights/export.onnx', verbose=False, opset_version=10)
+        f = opt.weights.replace(opt.weights.split('.')[-1], 'onnx')  # *.onnx filename
+        torch.onnx.export(model, img, f, verbose=False, opset_version=11)
 
         # Validate exported model
         import onnx
-        model = onnx.load('weights/export.onnx')  # Load the ONNX model
+        model = onnx.load(f)  # Load the ONNX model
         onnx.checker.check_model(model)  # Check that the IR is well formed
         print(onnx.helper.printable_graph(model.graph))  # Print a human readable representation of the graph
         return
@@ -64,10 +65,10 @@ def detect(save_img=False):
     if webcam:
         view_img = True
         torch.backends.cudnn.benchmark = True  # set True to speed up constant image size inference
-        dataset = LoadStreams(source, img_size=img_size, half=half)
+        dataset = LoadStreams(source, img_size=img_size)
     else:
         save_img = True
-        dataset = LoadImages(source, img_size=img_size, half=half)
+        dataset = LoadImages(source, img_size=img_size)
 
     # Get names and colors
     names = load_classes(opt.names)
@@ -78,14 +79,14 @@ def detect(save_img=False):
     for path, img, im0s, vid_cap in dataset:
         t = time.time()
 
-        # Get detections
         img = torch.from_numpy(img).to(device)
+        img = img.half() if half else img.float()  # uint8 to fp16/32
+        img /= 255.0  # 0 - 255 to 0.0 - 1.0
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
-        pred = model(img)[0]
 
-        if opt.half:
-            pred = pred.float()
+        # Inference
+        pred = model(img)[0].float() if half else model(img)[0]
 
         # Apply NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)

@@ -402,7 +402,7 @@ def compute_loss(p, targets, model, giou_flag=True):  # predictions, targets, mo
             pbox = torch.cat((pxy, pwh), 1)  # predicted box
             giou = bbox_iou(pbox.t(), tbox[i], x1y1x2y2=False, GIoU=True)  # giou computation
             lbox += (1.0 - giou).sum() if red == 'sum' else (1.0 - giou).mean()  # giou loss
-            tobj[b, a, gj, gi] = giou.detach().type(tobj.dtype) if giou_flag else 1.0
+            tobj[b, a, gj, gi] = giou.detach().clamp(0).type(tobj.dtype) if giou_flag else 1.0
 
             if 'default' in arc and model.nc > 1:  # cls loss (only if multiple classes)
                 t = torch.zeros_like(ps[:, 5:])  # targets
@@ -1024,7 +1024,7 @@ def plot_results_overlay(start=0, stop=0):  # from utils.utils import *; plot_re
 
 def plot_results(start=0, stop=0, bucket='', id=(), folder =''):  # from utils.utils import *; plot_results()
     # Plot training results files 'results*.txt'
-    fig, ax = plt.subplots(2, 5, figsize=(14, 7))
+    fig, ax = plt.subplots(2, 5, figsize=(12, 6))
     ax = ax.ravel()
     s = ['GIoU', 'Objectness', 'Classification', 'Precision', 'Recall',
          'val GIoU', 'val Objectness', 'val Classification', 'mAP@0.5', 'F1']
@@ -1042,7 +1042,7 @@ def plot_results(start=0, stop=0, bucket='', id=(), folder =''):  # from utils.u
             if i in [0, 1, 2, 5, 6, 7]:
                 y[y == 0] = np.nan  # dont show zero loss values
                 # y /= y[0]  # normalize
-            ax[i].plot(x, y, marker='.', label=Path(f).stem)
+            ax[i].plot(x, y, marker='.', label=Path(f).stem, linewidth=2, markersize=8)
             ax[i].set_title(s[i])
             ax[i].grid(color='gray', linestyle=':', linewidth=1)
             if i in [5, 6, 7]:  # share train and val loss y axes

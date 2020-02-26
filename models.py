@@ -136,19 +136,19 @@ class weightedFeatureFusion(nn.Module):  # weighted sum of 2 or more layers http
             x = x * w[0]
 
         # Fusion
-        nc = x.shape[1]  # number of channels
+        nc = x.shape[1]  # input of channels
         for i in range(self.n - 1):
-            a = outputs[self.layers[i]]  # feature to add
-            dc = nc - a.shape[1]  # delta channels
+            a = outputs[self.layers[i]] * w[i + 1] if self.weight else outputs[self.layers[i]]  # feature to add
+            ac = a.shape[1] # feature channels
+            dc = nc - ac # delta channels
 
             # Adjust channels
-            if dc > 0:  # pad
-                a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a)
-            elif dc < 0:  # slice
-                a = a[:, :nc]
-
-            # Sum
-            x = x + a * w[i + 1] if self.weight else x + a
+            if dc > 0:  # slice input
+                x[:, :ac] = x[:, :ac] + a  # or a = nn.ZeroPad2d((0, 0, 0, 0, 0, dc))(a); x = x + a
+            elif dc < 0:  # slice feature
+                x = x + a[:, :nc]
+            else:  # same shape
+                x = x + a
         return x
 
 class SwishImplementation(torch.autograd.Function):
@@ -490,6 +490,7 @@ def attempt_download(weights):
 class MultiBiasConv(nn.Module):
     def __init__(self, in_channels, out_channels, n_bias, kernel_size=(3, 3), stride=1, pad=0):
         super(MultiBiasConv, self).__init__()
+        self.out_channels = out_channels
         self.conv = nn.Conv2d(in_channels=int(in_channels), out_channels=int(out_channels/n_bias), bias=False, kernel_size=kernel_size, padding=pad, stride=stride)
         nn.init.xavier_normal_(self.conv.weight)
         self.bias = torch.nn.Parameter( torch.Tensor(n_bias), requires_grad=True )
@@ -543,19 +544,19 @@ def create_compact_modules(module_defs, img_size, arc, conv_type='multi_bias'):
             filters = mdef['filters']
             size = mdef['size']
             stride = mdef['stride'] if 'stride' in mdef else (mdef['stride_y'], mdef['stride_x'])
-            if conv_type == 'multi_bias':
+            if conv_type == 'multibias':
                 modules.add_module(
                     'Conv2d', MultiBiasConv(
                         in_channels = output_filters[-1], out_channels = filters, 
-                        n_bias = 16 if filters % 16 == 0 else 15 if filters % 15 == 0 else 1,
+                        n_bias = 8 if filters % 8 == 0 else 15 if filters % 15 == 0 else 1,
                         kernel_size = size, stride = stride, pad = (size - 1) // 2 if mdef['pad'] else 0
                     )
                 )
-            elif conv_type == 'multi_conv_multi_bias':
+            elif conv_type == 'multiconv_multibias':
                 modules.add_module(
                     'Conv2d', MultiConvMultiBias(
                         in_channels = output_filters[-1], out_channels = filters, 
-                        n_bias = 16 if filters % 16 == 0 else 15 if filters % 15 == 0 else 1,
+                        n_bias = 8 if filters % 8 == 0 else 15 if filters % 15 == 0 else 1,
                         kernel_size = size, stride = stride, pad = (size - 1) // 2 if mdef['pad'] else 0
                     )
                 )
@@ -647,7 +648,7 @@ def create_compact_modules(module_defs, img_size, arc, conv_type='multi_bias'):
 class Reduced_Darknet(nn.Module):
     # YOLOv3 object detection model
 
-    def __init__(self, cfg, img_size=(416, 416), arc='default', conv_type='multi_bias'):
+    def __init__(self, cfg, img_size=(416, 416), arc='default', conv_type='multibias'):
         super(Reduced_Darknet, self).__init__()
 
         self.module_defs = parse_model_cfg(cfg)

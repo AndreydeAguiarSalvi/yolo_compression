@@ -45,6 +45,10 @@ def train():
         model = Darknet(cfg, arc=config['arc']).to(device)
     elif config['darknet'] == 'multibias':
         model = Reduced_Darknet(cfg, arc=config['arc']).to(device)
+        print('Creating a multibias Darknet')
+    elif config['darknet'] == 'multiconv_multibias':
+        model = Reduced_Darknet(cfg, arc=config['arc'], conv_type='multiconv_multibias').to(device)
+        print('Creating a multiconv_multibias Darknet')
 
     optimizer = create_optimizer(model, config)
 
@@ -93,7 +97,7 @@ def train():
     # for _ in range(epochs):
     #     scheduler.step()
     #     y.append(optimizer.param_groups[0]['lr'])
-    # plt.plot(y, label='LambdaLR')
+    # plt.plot(y, '.-', label='LambdaLR')
     # plt.xlabel('epoch')
     # plt.ylabel('LR')
     # plt.tight_layout()
@@ -137,7 +141,7 @@ def train():
         # Prebias
         if prebias:
             if epoch < 3:  # prebias
-                ps = 0.1, 0.9  # prebias settings (lr=0.1, momentum=0.9)
+                ps = np.interp(epoch, [0, 3], [0.1, config['hyp']['lr0']]), 0.0  # prebias settings (lr=0.1, momentum=0.0)
             else:  # normal training
                 ps = config['hyp']['lr0'], config['hyp']['momentum']  # normal training settings
                 print_model_biases(model)
@@ -161,6 +165,7 @@ def train():
         # Start mini-batch #
         ####################
         for i, (imgs, targets, paths, _) in pbar: 
+        # for i, (imgs, targets, paths, _) in enumerate(trainloader): 
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
             targets = targets.to(device)
@@ -200,7 +205,7 @@ def train():
             else:
                 loss.backward()
 
-            # Accumulate gradient for x batches before optimizing
+            # Optimize accumulated gradient
             if ni % accumulate == 0:
                 optimizer.step()
                 optimizer.zero_grad()
@@ -214,6 +219,9 @@ def train():
         # End mini-batch #
         ##################
 
+        # Update scheduler
+        scheduler.step()
+        
         final_epoch = epoch + 1 == epochs
         if not config['notest'] or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
@@ -224,9 +232,6 @@ def train():
                 iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
                 dataloader=validloader, folder = config['sub_working_dir']
             )    
-
-        # Update scheduler
-        scheduler.step()
 
         # Write epoch results
         with open(config['results_file'], 'a') as f:

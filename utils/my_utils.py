@@ -29,6 +29,7 @@ def create_train_argparser():
     parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
     parser.add_argument('--decay_steps', type=str)
     parser.add_argument('--exponential_ramp', action='store_true', help="changes inverse exponential learning rate decay to be exponential")
+    parser.add_argument('--cosine_ramp', action='store_true', help="changes inverse exponential learning rate decay to be cosine ramp")
     parser.add_argument('--xavier_uniform', action='store_true', help='initialize model with xavier uniform function')
     parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
@@ -93,6 +94,7 @@ def create_prune_argparser():
     parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
     parser.add_argument('--decay_steps', type=str)
     parser.add_argument('--exponential_ramp', action='store_true', help="changes inverse exponential learning rate decay to be exponential")
+    parser.add_argument('--cosine_ramp', action='store_true', help="changes inverse exponential learning rate decay to be cosine ramp")
     parser.add_argument('--xavier_uniform', action='store_true', help='initialize model with xavier uniform function')
     parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
@@ -153,6 +155,7 @@ def create_config(opt):
 
 
 def create_scheduler(opt, optimizer, start_epoch):
+    import math
     import torch.optim.lr_scheduler as lr_scheduler
 
     if opt['scheduler'] == 'multi-step':
@@ -166,10 +169,12 @@ def create_scheduler(opt, optimizer, start_epoch):
     elif opt['scheduler'] == 'lambda':
         if opt['exponential_ramp']:
             lf = lambda x: 10 ** (opt['hyp']['lrf'] * x / opt['epochs'])  # exp ramp
+        elif opt['cosine_ramp']:
+            lf = lambda x: 0.5 * (1 + math.cos(x * math.pi / opt['epochs']))  # cosine https://arxiv.org/pdf/1812.01187.pdf
         else:
             lf = lambda x: 1 - 10 ** (opt['hyp']['lrf'] * (1 - x / opt['epochs']))  # inverse exp ramp
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
-    scheduler.last_epoch = start_epoch - 1
+    scheduler.last_epoch = start_epoch
 
     return scheduler
 

@@ -90,7 +90,7 @@ def train():
             # Prebias
             if prebias:
                 if epoch < 3:  # prebias
-                    ps = 0.1, 0.9  # prebias settings (lr=0.1, momentum=0.9)
+                    ps = np.interp(epoch, [0, 3], [0.1, config['hyp']['lr0']]), 0.0  # prebias settings (lr=0.1, momentum=0.0)
                 else:  # normal training
                     ps = config['hyp']['lr0'], config['hyp']['momentum']  # normal training settings
                     print_model_biases(model)
@@ -166,7 +166,7 @@ def train():
                 # Compute gradient
                 loss.backward()
 
-                # Accumulate gradient for x batches before optimizing
+                # Optimize accumulated gradient
                 if ni % accumulate == 0:
                     optimizer.step()
                     optimizer.zero_grad()
@@ -180,6 +180,9 @@ def train():
             # End mini-batch #
             ##################
 
+            # Update scheduler
+            scheduler.step()
+            
             final_epoch = epoch + 1 == epochs
             if not config['notest'] or final_epoch:  # Calculate mAP
                 is_coco = any([x in config['data'] for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
@@ -192,9 +195,6 @@ def train():
                     iou_thres=0.6, save_json=final_epoch and is_coco,
                     dataloader=validloader, folder = config['sub_working_dir']
                 )    
-
-            # Update scheduler
-            scheduler.step()
 
             # Write epoch results
             with open(config['results_file'], 'a') as f:
