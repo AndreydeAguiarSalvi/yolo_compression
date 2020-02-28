@@ -43,5 +43,6 @@
     
     "mask_initial_value" : 0.0,
     "final_temperature" : 200.0,
-    "mask_lr" : 0.1
+    "mask_lr" : 0.1,
+    "mask_momentum" : 0.9
 }

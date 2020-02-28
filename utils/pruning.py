@@ -3,20 +3,9 @@ import torch
 import torch.nn as nn
 
 
-def create_mask(model, init_value=1):
-    from collections import OrderedDict
-    mask = OrderedDict()
-    for name, param in model.named_parameters():
-        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
-            name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
-            if init_value == 1:
-                mask[name_] = nn.Parameter( torch.ones_like(param), requires_grad = False )
-            else:
-                mask[name_] = nn.Parameter( param.new_full(param.shape, fill_value = init_value), requires_grad = True ) # Learned Mask in Contiguous Sparsification
-
-    return nn.ParameterDict(mask)
-
-
+####################
+# Generall Methods #
+####################
 def apply_mask(model, mask):
     with torch.no_grad():
         for name, param in mask.items():
@@ -48,6 +37,20 @@ def sum_of_the_weights(item):
         count += torch.sum(torch.abs(item.state_dict()[name].data))
     
     return count
+
+
+##############################
+# Lottery Tickets Hypothesis #
+##############################
+def create_mask_LTH(model): # Create mask as Lottery Tickets Hypothesis
+    from collections import OrderedDict
+    mask = OrderedDict()
+    for name, param in model.named_parameters():
+        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
+            name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
+            mask[name_] = nn.Parameter( torch.ones_like(param), requires_grad = False )
+
+    return nn.ParameterDict(mask)
 
 
 def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets Hypothesis locally
@@ -98,16 +101,38 @@ def IMP_GLOBAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets
                 )
 
 
-def CS(mask, initial_value, Beta): # Implements Continuous Sparcification
+#############################
+# Continuous Sparsification #
+#############################
+def create_mask_CS(model, init_value = .0): # Create mask as Continuous Sparsification
+    from collections import OrderedDict
+    mask = OrderedDict()
+    for name, param in model.named_parameters():
+        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
+            name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
+            mask[name_] = nn.Parameter( param.new_full(param.shape, fill_value = init_value), requires_grad = True ) 
+
+    return nn.ParameterDict(mask)
+
+
+def CS(mask, initial_value, Beta): # Implements prune() from Continuous Sparcification
     for key in mask.keys():
-        mask[key] = nn.Parameter( torch.clamp(Beta * mask[key], max = initial_value), requires_grad = True )
+        mask[key].data = torch.clamp(Beta * mask[key], max = initial_value)
 
 
-def compute_apply_mask(model, mask, Beta = 1., is_ticket = False): # apply_mask from CS
+def compute_mask(model, mask, Beta = 1., is_ticket = False): # Implements from apply_mask() from CS
     for key in mask.keys():
         scaling = 1. / torch.sigmoid(mask[key])
-        if is_ticket: mask[key] = (mask[key] > 0).float()
-        else: mask[key] = torch.sigmoid(Beta * mask[key])
-        mask[key] = scaling * mask[key]
+        if is_ticket: mask[key] = nn.Parameter( (mask[key] > 0).float() )
+        else: mask[key] = nn.Parameter( torch.sigmoid(Beta * mask[key]) )
+        mask[key] = nn.Parameter( scaling * mask[key] )
+
+
+def compute_masked_weights(model, mask): # Implements line from layers.py/SoftMaskedConv2.forward
+    from collections import OrderedDict
+    masked_weights = OrderedDict()
+    for name, param in mask.named_parameters():
+        name_ = name.replace('-', '.')
+        masked_weights[name] = model[name_] * mask[name]
     
-    apply_mask(model, mask)
+    return nn.ParameterDict(masked_weights)
