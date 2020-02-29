@@ -140,11 +140,11 @@ def train():
                 targets = targets.to(device)
 
                 # Plot images with bounding boxes
-                if ni == 0:
-                    fname = config['sub_working_dir'] + 'train_batch%g.png' % i
-                    plot_images(imgs=imgs, targets=targets, paths=paths, fname=fname)
+                if ni < 1:
+                    f = config['sub_working_dir'] + 'train_batch%g.png' % i  # filename
+                    plot_images(imgs=imgs, targets=targets, paths=paths, fname=f)
                     if tb_writer:
-                        tb_writer.add_image(fname, cv2.imread(fname)[:, :, ::-1], dataformats='HWC')
+                        tb_writer.add_image(f, cv2.imread(f)[:, :, ::-1], dataformats='HWC')
 
                 # Multi-Scale training
                 if config['multi_scale']:
@@ -209,6 +209,7 @@ def train():
             if not config['notest'] or final_epoch:  # Calculate mAP
                 is_coco = any([x in config['data'] for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
                 # Apply mask before test
+                compute_mask(model, mask, beta, ticket)
                 apply_mask(model, mask)
                 results, maps = test.test(
                     cfg = cfg, data = config['data'], batch_size=config['batch_size'] * 2,

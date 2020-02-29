@@ -92,6 +92,11 @@ def train():
 
     scheduler = create_scheduler(config, optimizer, start_epoch)
 
+    # Mixed precision training https://github.com/NVIDIA/apex
+    if mixed_precision:
+        model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
+
+
     # # Plot lr schedule
     # y = []
     # for _ in range(epochs):
@@ -102,10 +107,6 @@ def train():
     # plt.ylabel('LR')
     # plt.tight_layout()
     # plt.savefig('LR.png', dpi=300)
-
-    # Mixed precision training https://github.com/NVIDIA/apex
-    if mixed_precision:
-        model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
 
     # Initialize distributed training
     if device.type != 'cpu' and torch.cuda.device_count() > 1:
@@ -171,11 +172,11 @@ def train():
             targets = targets.to(device)
 
             # Plot images with bounding boxes
-            if ni == 0:
-                fname = config['sub_working_dir'] + 'train_batch%g.png' % i
-                plot_images(imgs=imgs, targets=targets, paths=paths, fname=fname)
+            if ni < 1:
+                f = config['sub_working_dir'] + 'train_batch%g.png' % i  # filename
+                plot_images(imgs=imgs, targets=targets, paths=paths, fname=f)
                 if tb_writer:
-                    tb_writer.add_image(fname, cv2.imread(fname)[:, :, ::-1], dataformats='HWC')
+                    tb_writer.add_image(f, cv2.imread(f)[:, :, ::-1], dataformats='HWC')
 
             # Multi-Scale training
             if config['multi_scale']:

@@ -14,7 +14,7 @@ def test(cfg,
          batch_size=16,
          img_size=416,
          conf_thres=0.001,
-         iou_thres=0.5,  # for nms
+         iou_thres=0.6,  # for nms
          save_json=False,
          single_cls=False,
          model=None,
@@ -26,7 +26,7 @@ def test(cfg,
         verbose = args['task'] == 'test' # BUG HERE
 
         # Remove previous
-        for f in glob.glob(folder + 'test_batch*.jpg'):
+        for f in glob.glob(folder + 'test_batch*.png'):
             os.remove(f)
 
         # Initialize model
@@ -77,8 +77,9 @@ def test(cfg,
         _, _, height, width = imgs.shape  # batch size, channels, height, width
 
         # Plot images with bounding boxes
-        if batch_i == 0 and not os.path.exists(folder + 'test_batch0.png'):
-            plot_images(imgs=imgs, targets=targets, paths=paths, fname=folder + 'test_batch0.png')
+        f = folder + 'test_batch%g.png' % batch_i  # filename
+        if batch_i < 1 and not os.path.exists(f):
+            plot_images(imgs=imgs, targets=targets, paths=paths, fname=f)
 
 
         # Disable gradients
