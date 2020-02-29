@@ -119,20 +119,70 @@ def create_prune_argparser():
     parser.add_argument('--final_temperature', type=float, help='final beta to binarize sigmoid function')
     parser.add_argument('--lambda', type=float, help='lambda for L1 mask regularization')
 
-    parser.add_argument('--params', type=str, default='params/test_prune.json', help='json config to load the hyperparameters')
+    parser.add_argument('--params', type=str, default='params/test_prune.yaml', help='json config to load the hyperparameters')
     args = vars(parser.parse_args())
 
     return args
 
+#############
+# From ONet #
+#############
+def load_config(path, default_path=None):
+    import yaml
+    ''' Loads config file.
+
+    Args:  
+        path (str): path to config file
+        default_path (bool): whether to use default path
+    '''
+    # Load configuration from file itself
+    with open(path, 'r') as f:
+        cfg_special = yaml.load(f)
+
+    # Check if we should inherit from a config
+    inherit_from = cfg_special.get('inherit_from')
+
+    # If yes, load this config first as default
+    # If no, use the default_path
+    if inherit_from is not None:
+        cfg = load_config(inherit_from, default_path)
+    elif default_path is not None:
+        with open(default_path, 'r') as f:
+            cfg = yaml.load(f)
+    else:
+        cfg = dict()
+
+    # Include main configuration
+    update_recursive(cfg, cfg_special)
+
+    return cfg
+
+
+def update_recursive(dict1, dict2):
+    ''' Update two config dictionaries recursively.
+
+    Args:
+        dict1 (dict): first dictionary to be updated
+        dict2 (dict): second dictionary which entries should be used
+
+    '''
+    for k, v in dict2.items():
+        if k not in dict1:
+            dict1[k] = dict()
+        if isinstance(v, dict):
+            update_recursive(dict1[k], v)
+        else:
+            dict1[k] = v
+#############
+# From ONet #
+#############
+
 
 def create_config(opt):
-    import json
     import time
     import os 
 
-    json_file = open(opt['params'])
-    json_str = json_file.read()
-    config = json.loads(json_str)
+    config = load_config(opt['params'])
 
     # Create sub_working_dir
     if opt['resume']:
