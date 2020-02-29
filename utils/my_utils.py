@@ -112,6 +112,12 @@ def create_prune_argparser():
     parser.add_argument('--pruning_time', type=int, help='Counter for the number of prunes')
     parser.add_argument('--pruning_rate', type=float, help='Percent of connections to remove')
     parser.add_argument('--prune_kind', type=str, help='Way to perform the prune')
+    # Specific Continuous Sparsification parameters
+    parser.add_argument('--mask_initial_value', type=float, help='initialization for pseudo-mask s')
+    parser.add_argument('--mask_lr', type=float, help='learing rate for pseudo-mask s')
+    parser.add_argument('--mask_momentum', type=float, help='momentum for pseudo-mask s')
+    parser.add_argument('--final_temperature', type=float, help='final beta to binarize sigmoid function')
+    parser.add_argument('--lambda', type=float, help='lambda for L1 mask regularization')
 
     parser.add_argument('--params', type=str, default='params/test_prune.json', help='json config to load the hyperparameters')
     args = vars(parser.parse_args())
@@ -157,7 +163,8 @@ def create_config(opt):
 
     for key, value in opt.items():
         if value is not None:
-            config[key] = value
+            if key in config['hyp']: config['hyp'][key] = value
+            else: config[key] = value
 
     return config
 
@@ -259,7 +266,7 @@ def create_dataloaders(config):
         LoadImagesAndLabels(
             valid_path, img_size_test, batch_size * 2,
             hyp = config['hyp'], rect = True, cache_labels = config['cache_labels'],
-            cache_images = config['cache_images']
+            cache_images = False
         ),
         batch_size = batch_size * 2, num_workers = nw, pin_memory = True, collate_fn = dataset.collate_fn
     )

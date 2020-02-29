@@ -108,7 +108,7 @@ def train():
                 trainloader.dataset.indices = random.choices(range(trainloader.dataset.n), weights=image_weights, k=trainloader.dataset.n)  # rand weighted idx
 
             mloss = torch.zeros(4).to(device)  # mean losses
-            print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
+            print(('\n' + '%10s' * 9) % ('Iter', 'Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
             pbar = tqdm(enumerate(trainloader), total=nb)  # progress bar
 
             # Backup for late reseting
@@ -174,7 +174,7 @@ def train():
                 # Print batch results
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
                 mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
-                s = ('%10s' * 2 + '%10.3g' * 6) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
+                s = ('%10s' * 3 + '%10.3g' * 6) % ('%g/%g' % (it, config['iterations']-1), '%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
                 pbar.set_description(s)
             ##################
             # End mini-batch #
@@ -250,7 +250,7 @@ def train():
         # Saving current model before prune
         torch.save(model.state_dict(), config['sub_working_dir'] + 'model_it_{}.pt'.format(it+1))
 
-        if it < config['iterations'] -1: # Train more one iteration without pruning
+        if it < config['iterations'] -2: # Train more one iteration without pruning
             if config['prune_kind'] == 'IMP_LOCAL':
                 print(f"Applying IMP Local with {config['pruning_rate'] * 100}%.")
                 IMP_LOCAL(model, mask, config['pruning_rate'])
