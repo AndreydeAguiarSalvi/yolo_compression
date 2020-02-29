@@ -21,7 +21,7 @@
     },
     "epochs" : 273,
     "batch_size" : 8,
-    "accumulate": 6,
+    "accumulate": 8,
     "cfg" : "cfg/yolov3-spp.cfg",
     "data" : "data/coco_mysplit.data",
     "img_size" : [416],
