@@ -6,13 +6,6 @@ import torch.nn as nn
 ####################
 # Generall Methods #
 ####################
-def apply_mask(model, mask):
-    with torch.no_grad():
-        for name, param in mask.items():
-            name_ = name.replace('-', '.') # Changing to the original key
-            model.state_dict()[name_].data.copy_( model.state_dict()[name_].data.mul(param.data) )
-
-
 def create_backup(model):
     from copy import deepcopy
     from collections import OrderedDict
@@ -42,6 +35,13 @@ def sum_of_the_weights(item):
 ##############################
 # Lottery Tickets Hypothesis #
 ##############################
+def apply_mask_LTH(model, mask):
+    with torch.no_grad():
+        for name, param in mask.items():
+            name_ = name.replace('-', '.') # Changing to the original key
+            model.state_dict()[name_].data.copy_( model.state_dict()[name_].data.mul(param.data) )
+
+
 def create_mask_LTH(model): # Create mask as Lottery Tickets Hypothesis
     from collections import OrderedDict
     mask = OrderedDict()
@@ -104,6 +104,12 @@ def IMP_GLOBAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets
 #############################
 # Continuous Sparsification #
 #############################
+def apply_mask_CS(model, mask):
+    for name, param in mask.items():
+        name_ = name.replace('-', '.') # Changing to the original key
+        model.state_dict()[name_] = model.state_dict()[name_] * param
+
+
 def create_mask_CS(model, init_value = .0): # Create mask as Continuous Sparsification
     from collections import OrderedDict
     mask = OrderedDict()
@@ -120,12 +126,16 @@ def CS(mask, initial_value, Beta): # Implements prune() from Continuous Sparcifi
         mask[key].data = torch.clamp(Beta * mask[key], max = initial_value)
 
 
-def compute_mask(model, mask, Beta = 1., is_ticket = False): # Implements from apply_mask() from CS
+def compute_mask(mask, mask_initial_value, Beta = 1., is_ticket = False): # Implements from apply_mask() from CS
+    from collections import OrderedDict
+    pseudo_mask = OrderedDict()
+    scaling = 1. / torch.sigmoid( torch.tensor(mask_initial_value) )
     for key in mask.keys():
-        scaling = 1. / torch.sigmoid(mask[key])
-        if is_ticket: mask[key] = nn.Parameter( (mask[key] > 0).float() )
-        else: mask[key] = nn.Parameter( torch.sigmoid(Beta * mask[key]) )
-        mask[key] = nn.Parameter( scaling * mask[key] )
+        if is_ticket: pseudo_mask[key] = nn.Parameter( (mask[key] > 0).float() )
+        else: pseudo_mask[key] = nn.Parameter( torch.sigmoid(Beta * mask[key]) )
+        pseudo_mask[key] = nn.Parameter( scaling * pseudo_mask[key] )
+    
+    return nn.ParameterDict(pseudo_mask)
 
 
 def compute_masked_weights(model, mask): # Implements line from layers.py/SoftMaskedConv2.forward

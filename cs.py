@@ -8,7 +8,7 @@ from models import *
 from utils.datasets import *
 from utils.utils import *
 from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints
-from utils.pruning import sum_of_the_weights, create_backup, rewind_weights, apply_mask, create_mask_CS, CS, compute_mask
+from utils.pruning import sum_of_the_weights, create_backup, rewind_weights, apply_mask_CS, create_mask_CS, CS, compute_mask
 
 
 def train():
@@ -90,6 +90,18 @@ def train():
     ###################
     for it in range(config['iterations']):
         
+        if it == config['iterations'] - 1: # In original code, this step is outter from outer_round loop
+            ticket = True
+            mask = mask.to('cpu')
+            print('Rewind weights.')
+            backup = backup.to(device)
+            rewind_weights(model, backup)
+            backup = backup.to('cpu')
+            mask = mask.to(device)
+
+            optimizer = create_optimizer(model, config)
+            start_epoch = 0
+            scheduler = create_scheduler(config, optimizer, start_epoch)
         ###############
         # Start epoch #
         ###############
@@ -123,6 +135,8 @@ def train():
             # CS #
             if epoch > 0:
                 beta *= temp_increase
+            if epoch == config['reseting'] - 1 and it == 0:
+                backup = create_backup(model).to('cpu')
 
             ####################
             # Start mini-batch #
@@ -133,8 +147,8 @@ def train():
                 ##############
                 # Apply mask #
                 ##############
-                compute_mask(model, mask, beta, ticket)
-                apply_mask(model, mask)
+                pseudo_mask = compute_mask(mask, config['mask_initial_value'], beta, ticket)
+                apply_mask_CS(model, pseudo_mask)
 
                 imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
                 targets = targets.to(device)
@@ -158,12 +172,15 @@ def train():
                 # Run model
                 pred = model(imgs)
 
+                if it == 0 and epoch == 0 and i == 0:
+                    tb_writer.add_graph( model, imgs)
+
                 # Compute loss
                 loss, loss_items = compute_loss(pred, targets, model, not prebias)
                 ######
                 # CS #
                 ######
-                entries_sum = sum_of_the_weights(mask)
+                entries_sum = sum_of_the_weights(pseudo_mask)
                 if not torch.isfinite(entries_sum):
                     print('WARNING: non-finite entries sum, ending training ')
                     return results
@@ -179,16 +196,21 @@ def train():
                 # Compute gradient
                 loss.backward()
 
+                if it != config['iterations'] - 1: # The last train is outer from outer_round loop, without mask optimizer and scheduler
+                    # Maybe we cannot accumulate loss in mask, 
+                    # because the loss mask is computed over
+                    # the last pseudo_mask, and probally we do
+                    # not have backward matrix in mask, once time
+                    # mask is updated just with L1 regularization 
+                    mask_optim.step()
+                    mask_optim.zero_grad()
+
                 # Optimize accumulated gradient
                 if ni % accumulate == 0:
+                    for key in mask:
+                        tb_writer.add_histogram( mask[key].grad, ni)
                     optimizer.step()
                     optimizer.zero_grad()
-                    ######
-                    # CS #
-                    ######
-                    if it != config['iterations'] - 1:
-                        mask_optim.step()
-                        mask_optim.zero_grad()
 
                 # Print batch results
                 mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
@@ -203,14 +225,15 @@ def train():
 
             # Update scheduler
             scheduler.step()
-            mask_scheduler.step()
+            if it != config['iterations'] - 1: # The last train is outer from outer_round loop, without mask optimizer and scheduler
+                mask_scheduler.step() 
             
             final_epoch = epoch + 1 == epochs
             if not config['notest'] or final_epoch:  # Calculate mAP
                 is_coco = any([x in config['data'] for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
                 # Apply mask before test
-                compute_mask(model, mask, beta, ticket)
-                apply_mask(model, mask)
+                compute_mask(mask, config['mask_initial_value'], beta, ticket)
+                apply_mask_CS(model, mask)
                 results, maps = test.test(
                     cfg = cfg, data = config['data'], batch_size=config['batch_size'] * 2,
                     img_size= img_size_test, model=model, 
@@ -273,24 +296,13 @@ def train():
         # Saving current model before prune
         torch.save(model.state_dict(), config['sub_working_dir'] + 'model_it_{}.pt'.format(it+1))
 
-        if it < config['iterations'] - 3: # In original code, it not prunes in iteration rounds-1, and train more one iteration after the for()
+        if it < config['iterations'] - 1:
             beta = 1
+        
+        if it < config['iterations'] - 2: # In original code, it not prunes in iteration rounds-1, and train more one iteration after the for()
             print('Applying Continuous Sparsification')
             CS(mask, config['mask_initial_value'], beta)
-            config['pruning_time'] += 1
-
-        elif it == config['iterations'] - 2:
-            mask = mask.to('cpu')
-            print('Rewind weights.')
-            backup = backup.to(device)
-            rewind_weights(model, backup)
-            backup = backup.to('cpu')
-            mask = mask.to(device)
-            ticket = True
-
-            optimizer = create_optimizer(model, config)
-            start_epoch = 0
-            scheduler = create_scheduler(config, optimizer, start_epoch)    
+            config['pruning_time'] += 1    
 
     
     #################

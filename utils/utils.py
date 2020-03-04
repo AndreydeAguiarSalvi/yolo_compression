@@ -1034,7 +1034,10 @@ def plot_results(start=0, stop=0, bucket='', id=(), folder =''):  # from utils.u
     else:
         files = glob.glob(folder + 'results*.txt') + glob.glob('../../Downloads/results*.txt')
     for f in sorted(files):
-        results = np.loadtxt(f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2).T
+        try:
+            results = np.loadtxt(f, usecols=[2, 3, 4, 8, 9, 12, 13, 14, 10, 11], ndmin=2).T
+        except:
+            results = np.loadtxt(f, usecols=[3, 4, 5, 9, 10, 13, 14, 15, 11, 12], ndmin=2).T
         n = results.shape[1]  # number of rows
         x = range(start, min(stop, n) if stop else n)
         for i in range(10):

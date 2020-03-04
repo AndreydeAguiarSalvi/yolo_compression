@@ -8,7 +8,7 @@ from models import *
 from utils.datasets import *
 from utils.utils import *
 from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints
-from utils.pruning import sum_of_the_weights, create_backup, rewind_weights, create_mask, apply_mask, IMP_LOCAL, IMP_GLOBAL
+from utils.pruning import sum_of_the_weights, create_backup, rewind_weights, create_mask, apply_mask_LTH, IMP_LOCAL, IMP_GLOBAL
 
 
 
@@ -128,7 +128,7 @@ def train():
                 ##############
                 # Apply mask #
                 ##############
-                apply_mask(model, mask)
+                apply_mask_LTH(model, mask)
 
                 imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
                 targets = targets.to(device)
@@ -187,7 +187,7 @@ def train():
             if not config['notest'] or final_epoch:  # Calculate mAP
                 is_coco = any([x in config['data'] for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
                 # Apply mask before test
-                apply_mask(model, mask)
+                apply_mask_LTH(model, mask)
                 results, maps = test.test(
                     cfg = cfg, data = config['data'], batch_size=config['batch_size'] * 2,
                     img_size= img_size_test, model=model, 
