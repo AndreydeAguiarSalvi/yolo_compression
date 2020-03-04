@@ -364,7 +364,7 @@ class FocalLoss(nn.Module):
             return loss
 
 
-def compute_loss(p, targets, model, giou_flag=True):  # predictions, targets, model
+def compute_loss(p, targets, model):  # predictions, targets, model
     ft = torch.cuda.FloatTensor if p[0].is_cuda else torch.Tensor
     lcls, lbox, lobj = ft([0]), ft([0]), ft([0])
     tcls, tbox, indices, anchor_vec = build_targets(model, targets)
@@ -402,7 +402,7 @@ def compute_loss(p, targets, model, giou_flag=True):  # predictions, targets, mo
             pbox = torch.cat((pxy, pwh), 1)  # predicted box
             giou = bbox_iou(pbox.t(), tbox[i], x1y1x2y2=False, GIoU=True)  # giou computation
             lbox += (1.0 - giou).sum() if red == 'sum' else (1.0 - giou).mean()  # giou loss
-            tobj[b, a, gj, gi] = giou.detach().clamp(0).type(tobj.dtype) if giou_flag else 1.0
+            tobj[b, a, gj, gi] = (1.0 - h['gr']) + h['gr'] * giou.detach().clamp(0).type(tobj.dtype)  # giou ratio
 
             if 'default' in arc and model.nc > 1:  # cls loss (only if multiple classes)
                 t = torch.zeros_like(ps[:, 5:])  # targets
@@ -502,7 +502,7 @@ def build_targets(model, targets):
     return tcls, tbox, indices, av
 
 
-def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.5, multi_cls=True, classes=None, agnostic=False):
+def non_max_suppression(prediction, conf_thres=0.1, iou_thres=0.6, multi_cls=True, classes=None, agnostic=False):
     """
     Removes detections with lower object confidence score than 'conf_thres'
     Non-Maximum Suppression to further filter detections.
@@ -514,7 +514,8 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.5, multi_cls=Tru
     # Box constraints
     min_wh, max_wh = 2, 4096  # (pixels) minimum and maximum box width and height
 
-    method = 'vision_batch'
+    method = 'fast_batch'
+    batched = 'batch' in method  # run once per image, all classes simultaneously
     nc = prediction[0].shape[1] - 5  # number of classes
     multi_cls = multi_cls and (nc > 1)  # allow multiple classes per anchor
     output = [None] * len(prediction)
@@ -523,11 +524,7 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.5, multi_cls=Tru
         pred = pred[pred[:, 4] > conf_thres]
 
         # Apply width-height constraint
-        pred = pred[(pred[:, 2:4] > min_wh).all(1) & (pred[:, 2:4] < max_wh).all(1)]
-
-        # If none remain process next image
-        if len(pred) == 0:
-            continue
+        pred = pred[((pred[:, 2:4] > min_wh) & (pred[:, 2:4] < max_wh)).all(1)]
 
         # Compute conf
         pred[..., 5:] *= pred[..., 4:5]  # conf = obj_conf * cls_conf
@@ -550,16 +547,29 @@ def non_max_suppression(prediction, conf_thres=0.5, iou_thres=0.5, multi_cls=Tru
         # Apply finite constraint
         if not torch.isfinite(pred).all():
             pred = pred[torch.isfinite(pred).all(1)]
-
-        # Batched NMS
-        if method == 'vision_batch':
-            c = pred[:, 5] * 0 if agnostic else pred[:, 5]  # class-agnostic NMS
-            output[image_i] = pred[torchvision.ops.boxes.batched_nms(pred[:, :4], pred[:, 4], c, iou_thres)]
+        
+        # If none remain process next image
+        if not pred.shape[0]:
             continue
+
 
         # Sort by confidence
         if not method.startswith('vision'):
             pred = pred[pred[:, 4].argsort(descending=True)]
+        
+        # Batched NMS
+        if batched:
+            c = pred[:, 5] * 0 if agnostic else pred[:, 5]  # class-agnostic NMS
+            boxes, scores = pred[:, :4].clone(), pred[:, 4]
+            if method == 'vision_batch':
+                i = torchvision.ops.boxes.batched_nms(boxes, scores, c, iou_thres)
+            elif method == 'fast_batch':  # FastNMS from https://github.com/dbolya/yolact
+                boxes += c.view(-1, 1) * max_wh
+                iou = box_iou(boxes, boxes).triu_(diagonal=1)  # upper triangular iou matrix
+                i = iou.max(dim=0)[0] < iou_thres
+
+            output[image_i] = pred[i]
+            continue
 
         # All other NMS methods
         det_max = []

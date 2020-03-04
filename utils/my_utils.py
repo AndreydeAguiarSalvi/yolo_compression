@@ -58,6 +58,7 @@ def create_test_argparser():
     parser.add_argument('--task', default='test', help="'test', 'study', 'benchmark'")
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
     parser.add_argument('--single_cls', action='store_true', help='train as single-class dataset')
+    parser.add_argument('--profile', action='store_true', help='profile inferenceand NMS times')
     args = vars(parser.parse_args())
 
     pieces = args['weights'].split('/')
@@ -235,7 +236,7 @@ def create_scheduler(opt, optimizer, start_epoch):
         if opt['exponential_ramp']:
             lf = lambda x: 10 ** (opt['hyp']['lrf'] * x / opt['epochs'])  # exp ramp
         elif opt['cosine_ramp']:
-            lf = lambda x: 0.5 * (1 + math.cos(x * math.pi / opt['epochs']))  # cosine https://arxiv.org/pdf/1812.01187.pdf
+            lf = lambda x: (1 + math.cos(x * math.pi / opt['epochs'])) / 2 * 0.99 + 0.01  # cosine https://arxiv.org/pdf/1812.01187.pdf
         else:
             lf = lambda x: 1 - 10 ** (opt['hyp']['lrf'] * (1 - x / opt['epochs']))  # inverse exp ramp
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)

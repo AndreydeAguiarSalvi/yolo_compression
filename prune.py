@@ -51,7 +51,7 @@ def train():
 
 
     # Initialize distributed training
-    if device.type != 'cpu' and torch.cuda.device_count() > 1:
+    if device.type != 'cpu' and torch.cuda.device_count() > 1 and torch.distributed.is_available():
         dist.init_process_group(backend='nccl',  # 'distributed backend'
                                 init_method='tcp://127.0.0.1:9999',  # distributed training init method
                                 world_size=1,  # number of nodes for distributed training
@@ -86,13 +86,14 @@ def train():
         ###############
         for epoch in range(start_epoch, epochs):  
             model.train()
+            model.hyp['gr'] = 1 - (1 + math.cos(min(epoch * 2, epochs) * math.pi / epochs)) / 2  # GIoU <-> 1.0 loss ratio
 
             # Prebias
             if prebias:
-                if epoch < 3:  # prebias
-                    ps = np.interp(epoch, [0, 3], [0.1, config['hyp']['lr0']]), 0.0  # prebias settings (lr=0.1, momentum=0.0)
-                else:  # normal training
-                    ps = config['hyp']['lr0'], config['hyp']['momentum']  # normal training settings
+                ne = 3  # number of prebias epochs
+                ps = np.interp(epoch, [0, ne], [0.1, config['hyp']['lr0'] * 2]), \
+                    np.interp(epoch, [0, ne], [0.9, config['hyp']['momentum']])  # prebias settings (lr=0.1, momentum=0.9)
+                if epoch == ne:
                     print_model_biases(model)
                     prebias = False
 
@@ -155,7 +156,7 @@ def train():
                 # imgs = imgs.to('cpu')
 
                 # Compute loss
-                loss, loss_items = compute_loss(pred, targets, model, not prebias)
+                loss, loss_items = compute_loss(pred, targets, model)
                 if not torch.isfinite(loss):
                     print('WARNING: non-finite loss, ending training ', loss_items)
                     return results
@@ -189,9 +190,9 @@ def train():
                 # Apply mask before test
                 apply_mask_LTH(model, mask)
                 results, maps = test.test(
-                    cfg = cfg, data = config['data'], batch_size=config['batch_size'] * 2,
+                    cfg = cfg, data = config['data'], batch_size=config['batch_size'],
                     img_size= img_size_test, model=model, 
-                    conf_thres=1E-3 if config['evolve'] or (final_epoch and is_coco) else 0.1,  # 0.1 faster
+                    conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
                     iou_thres=0.6, save_json=final_epoch and is_coco,
                     dataloader=validloader, folder = config['sub_working_dir']
                 )    
