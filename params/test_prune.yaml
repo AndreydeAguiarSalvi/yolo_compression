@@ -1,5 +1,5 @@
 inherit_from: params/default.yaml
-epochs : 50
+epochs : 150
 iterations : 13
 batch_size : 8
 accumulate: 8
@@ -9,7 +9,7 @@ decay_steps : 30 40
 prune_kind : IMP_LOCAL
 pruning_rate : 0.2
 pruning_time : 0
-reseting : 3
+reseting : 10
 mask_initial_value : 0.0
 final_temperature : 200.0
 mask_lr : 0.1

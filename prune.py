@@ -8,7 +8,7 @@ from models import *
 from utils.datasets import *
 from utils.utils import *
 from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints
-from utils.pruning import sum_of_the_weights, create_backup, rewind_weights, create_mask, apply_mask_LTH, IMP_LOCAL, IMP_GLOBAL
+from utils.pruning import sum_of_the_weights, create_backup, rewind_weights, create_mask_LTH, apply_mask_LTH, IMP_LOCAL, IMP_GLOBAL
 
 
 
@@ -33,7 +33,7 @@ def train():
 
     # Initialize model
     model = Darknet(cfg, arc=config['arc']).to(device)
-    mask = create_mask(model)
+    mask = create_mask_LTH(model)
 
     optimizer = create_optimizer(model, config)
     start_epoch, best_fitness, model, weights, optimizer = load_checkpoints(
@@ -90,7 +90,7 @@ def train():
 
             # Prebias
             if prebias:
-                ne = 3  # number of prebias epochs
+                ne = max(round(30 / nb), 3)  # number of prebias epochs
                 ps = np.interp(epoch, [0, ne], [0.1, config['hyp']['lr0'] * 2]), \
                     np.interp(epoch, [0, ne], [0.9, config['hyp']['momentum']])  # prebias settings (lr=0.1, momentum=0.9)
                 if epoch == ne:
@@ -251,7 +251,7 @@ def train():
         # Saving current model before prune
         torch.save(model.state_dict(), config['sub_working_dir'] + 'model_it_{}.pt'.format(it+1))
 
-        if it < config['iterations'] -2: # Train more one iteration without pruning
+        if it < config['iterations'] -1: # Train more one iteration without pruning
             if config['prune_kind'] == 'IMP_LOCAL':
                 print(f"Applying IMP Local with {config['pruning_rate'] * 100}%.")
                 IMP_LOCAL(model, mask, config['pruning_rate'])
