@@ -189,13 +189,15 @@ def train():
                 is_coco = any([x in config['data'] for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
                 # Apply mask before test
                 apply_mask_LTH(model, mask)
+                # model = model.to('cpu')
                 results, maps = test.test(
-                    cfg = cfg, data = config['data'], batch_size=config['batch_size'],
+                    cfg = cfg, data = config['data'], batch_size=config['batch_size'] / 2,
                     img_size= img_size_test, model=model, 
                     conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
                     iou_thres=0.6, save_json=final_epoch and is_coco,
                     dataloader=validloader, folder = config['sub_working_dir']
-                )    
+                )
+                # model = model.to(device)
 
             # Write epoch results
             with open(config['results_file'], 'a') as f:

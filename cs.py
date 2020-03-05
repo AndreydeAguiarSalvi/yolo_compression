@@ -236,7 +236,7 @@ def train():
                 compute_mask(mask, config['mask_initial_value'], beta, ticket)
                 apply_mask_CS(model, mask)
                 results, maps = test.test(
-                    cfg = cfg, data = config['data'], batch_size=config['batch_size'],
+                    cfg = cfg, data = config['data'], batch_size=config['batch_size'] / 2,
                     img_size= img_size_test, model=model, 
                     conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
                     iou_thres=0.6, save_json=final_epoch and is_coco,
