@@ -1,8 +1,8 @@
 inherit_from: params/default.yaml
 epochs : 150
 iterations : 13
-batch_size : 8
-accumulate: 8
+batch_size : 10
+accumulate: 6
 cfg : cfg/yolov3.cfg
 weights : ''
 decay_steps : 30 40

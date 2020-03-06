@@ -107,7 +107,7 @@ def train():
         ###############
         for epoch in range(start_epoch, epochs):  
             model.train()
-            model.hyp['gr'] = 1 - (1 + math.cos(min(epoch * 2, epochs) * math.pi / epochs)) / 2  # GIoU <-> 1.0 loss ratio
+            model.gr = 1 - (1 + math.cos(min(epoch * 2, epochs) * math.pi / epochs)) / 2  # GIoU <-> 1.0 loss ratio
 
             # Prebias
             if prebias:

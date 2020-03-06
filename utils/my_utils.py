@@ -75,7 +75,7 @@ def create_prune_argparser():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epochs', type=int)  # 500200 batches at bs 16, 117263 COCO images = 273 epochs
+    parser.add_argument('--epochs', type=int)  # 500200 batches at bs 16, 117263 COCO images = 300 epochs
     parser.add_argument('--batch_size', type=int)  # effective bs = batch_size * accumulate = 16 * 4 = 64
     parser.add_argument('--accumulate', type=int, help='batches to accumulate before optimizing')
     parser.add_argument('--cfg', type=str, help='*.cfg path')
