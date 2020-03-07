@@ -1,0 +1,4 @@
+classes=20
+train=../VOC2012/trainval_no3k.txt
+valid=../VOC2012/3k.txt
+names=data/voc.names

@@ -97,9 +97,7 @@ def test(cfg,
 
             # Run NMS
             t = torch_utils.time_synchronized()
-            inf_out = inf_out.to('cpu') # Pushin to CPU becaus NMS function explodes GPU memory
             output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres)
-            for i in range(len(output)): output[i] = output[i].to(device)
             t1 += torch_utils.time_synchronized() - t
 
         # Statistics per image
