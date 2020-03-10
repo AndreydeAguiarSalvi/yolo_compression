@@ -191,13 +191,13 @@ class YOLOLayer(nn.Module):
         self.ny = 0  # initialize number of y gridpoints
         self.arc = arc
 
-        if ONNX_EXPORT:  # grids must be computed in __init__
+        if ONNX_EXPORT:
             stride = [32, 16, 8][yolo_index]  # stride of this layer
-            nx = int(img_size[1] / stride)  # number x grid points
-            ny = int(img_size[0] / stride)  # number y grid points
+            nx = img_size[1] // stride  # number x grid points
+            ny = img_size[0] // stride  # number y grid points
             create_grids(self, img_size, (nx, ny))
 
-    def forward(self, p, img_size, var=None):
+    def forward(self, p, img_size):
         if ONNX_EXPORT:
             bs = 1  # batch size
         else:
@@ -263,7 +263,7 @@ class Darknet(nn.Module):
         self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
 
-    def forward(self, x, var=None):
+    def forward(self, x, verbose=False):
         img_size = x.shape[-2:]
         yolo_out, out = [], []
         verbose = False
@@ -661,7 +661,7 @@ class Reduced_Darknet(nn.Module):
         self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
 
-    def forward(self, x, var=None):
+    def forward(self, x, verbose=False):
         img_size = x.shape[-2:]
         yolo_out, out = [], []
         verbose = False
@@ -741,7 +741,7 @@ class YOLO_Teacher(nn.Module):
         self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
 
-    def forward(self, x, var=None):
+    def forward(self, x, verbose=False):
         img_size = x.shape[-2:]
         output, layer_outputs = [], []
         verbose = False
