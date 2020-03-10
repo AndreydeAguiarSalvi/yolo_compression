@@ -17,7 +17,6 @@ def test(cfg,
          iou_thres=0.6,  # for nms
          save_json=False,
          single_cls=False,
-         profile=False,
          model=None,
          dataloader=None,
          folder=''):
@@ -192,14 +191,10 @@ def test(cfg,
     if verbose and nc > 1 and len(stats):
         for i, c in enumerate(ap_class):
             print(pf % (names[c], seen, nt[c], p[i], r[i], ap[i], f1[i]))
-    
-    # Print profile results
-    if profile:
-        t = tuple(x / seen * 1E3 for x in (t0, t1, t0 + t1))
-        print('Profile results: %.1f/%.1f/%.1f ms inference/NMS/total per image' % t)
 
     # Save JSON
     if save_json and map and len(jdict):
+        print('\nCOCO mAP with pycocotools...')
         imgIds = [int(Path(x).stem.split('_')[-1]) for x in dataloader.dataset.img_files]
         with open(folder + 'results.json', 'w') as file:
             json.dump(jdict, file)
@@ -221,6 +216,11 @@ def test(cfg,
         cocoEval.summarize()
         mf1, map = cocoEval.stats[:2]  # update to pycocotools results (mAP@0.5:0.95, mAP@0.5)
 
+    # Print speeds
+    if verbose:
+        t = tuple(x / seen * 1E3 for x in (t0, t1, t0 + t1)) + (img_size, img_size, batch_size)  # tuple
+        print('Speed: %.1f/%.1f/%.1f ms inference/NMS/total per %gx%g image at batch-size %g' % t)
+
     # Return results
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
@@ -237,8 +237,7 @@ if __name__ == '__main__':
         test(
                 cfg = args['cfg'], data = args['data'], weights = args['weights'],
                 batch_size = args['batch_size'], img_size = args['img_size'], conf_thres = args['conf_thres'],
-                iou_thres = args['iou_thres'], save_json = args['save_json'], single_cls = args['single_cls'],
-                profile = args['profile'], folder = args['working_dir']
+                iou_thres = args['iou_thres'], save_json = args['save_json'], folder = args['working_dir']
             )
 
     elif args['task'] == 'benchmark': # mAPs at 320-608 at conf 0.5 and 0.7
