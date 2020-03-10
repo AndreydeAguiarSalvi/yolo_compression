@@ -37,7 +37,7 @@ def create_train_argparser():
     parser.add_argument('--xavier_uniform', action='store_true', help='initialize model with xavier uniform function')
     parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
-    parser.add_argument('--params', type=str, default='params/default.json', help='json config to load the hyperparameters')
+    parser.add_argument('--params', type=str, default='params/default.yaml', help='json config to load the hyperparameters')
     args = vars(parser.parse_args())
 
     return args
