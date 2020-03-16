@@ -20,7 +20,7 @@ def train():
     weights = config['weights']  # initial training weights
 
     # Initialize
-    init_seeds()
+    init_seeds(config['seed'])
     if config['multi_scale']:
         img_sz_min = round(img_size / 32 / 1.5)
         img_sz_max = round(img_size / 32 * 1.5)

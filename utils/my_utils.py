@@ -38,6 +38,7 @@ def create_train_argparser():
     parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
     parser.add_argument('--params', type=str, default='params/default.yaml', help='json config to load the hyperparameters')
+    parser.add_argument('--seed', type=int, default=0, help='seed to function init_seeds')
     args = vars(parser.parse_args())
 
     return args
@@ -106,6 +107,7 @@ def create_prune_argparser():
     parser.add_argument('--xavier_uniform', action='store_true', help='initialize model with xavier uniform function')
     parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
+    parser.add_argument('--seed', type=int, default=0, help='seed to function init_seeds')
     # Pruning parameters
     parser.add_argument('--iterations', type=int, help='One iteration have X epochs. Prune and reseting at the final of each iteration, except the last')
     parser.add_argument('--reseting', type=int, help='Save backup in each iteration on epoch X for reseting')
