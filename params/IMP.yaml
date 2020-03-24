@@ -1,0 +1,11 @@
+inherit_from: params/default.yaml
+epochs : 300
+iterations : 13
+batch_size : 8
+accumulate: 8
+cfg : cfg/yolov3.cfg
+weights : ''
+prune_kind : IMP_LOCAL
+pruning_rate : 0.2
+pruning_time : 0
+reseting : 10
