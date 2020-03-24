@@ -303,7 +303,7 @@ def train():
         if it < config['iterations'] - 2: # In original code, it not prunes in iteration rounds-1, and train more one iteration after the for()
             print('Applying Continuous Sparsification')
             CS(mask, config['mask_initial_value'], beta)
-            config['pruning_time'] += 1    
+        config['pruning_time'] += 1    
 
     
     #################
