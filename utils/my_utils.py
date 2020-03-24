@@ -59,6 +59,7 @@ def create_test_argparser():
     parser.add_argument('--task', default='test', help="'test', 'study', 'benchmark'")
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
     parser.add_argument('--single_cls', action='store_true', help='train as single-class dataset')
+    parser.add_argument('--mask', type=str, default=None, help='mask to apply in the model')
     args = vars(parser.parse_args())
 
     pieces = args['weights'].split('/')

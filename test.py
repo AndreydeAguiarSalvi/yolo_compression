@@ -19,7 +19,8 @@ def test(cfg,
          single_cls=False,
          model=None,
          dataloader=None,
-         folder=''):
+         folder='',
+         mask=None):
     # Initialize/load model and set device
     if model is None:
         device = torch_utils.select_device(args['device'], batch_size=batch_size) # BUG HERE
@@ -44,6 +45,16 @@ def test(cfg,
     else:  # called by train.py
         device = next(model.parameters()).device  # get model device
         verbose = False
+
+    # To pruned models
+    if mask is not None:
+        from utils.pruning import sum_of_the_weights, apply_mask_LTH, create_mask_LTH
+        msk = create_mask_LTH(model)
+        initial_weights = sum_of_the_weights(msk)
+        msk.load_state_dict(torch.load(mask))
+        final_weights = sum_of_the_weights(msk)
+        print(f'Evaluating model with initial weights number of {initial_weights} and final of {final_weights}. \nReduction of {final_weights * 100. / initial_weights}%.')
+        apply_mask_LTH(model, msk)
 
     # Configure run
     data = parse_data_cfg(data)
@@ -237,7 +248,8 @@ if __name__ == '__main__':
         test(
                 cfg = args['cfg'], data = args['data'], weights = args['weights'],
                 batch_size = args['batch_size'], img_size = args['img_size'], conf_thres = args['conf_thres'],
-                iou_thres = args['iou_thres'], save_json = args['save_json'], folder = args['working_dir']
+                iou_thres = args['iou_thres'], save_json = args['save_json'], folder = args['working_dir'],
+                mask = args['mask']
             )
 
     elif args['task'] == 'benchmark': # mAPs at 320-608 at conf 0.5 and 0.7
@@ -248,7 +260,8 @@ if __name__ == '__main__':
                 r = test(
                         cfg = args['cfg'], data = args['data'], weights = args['weights'], 
                         batch_size = args['batch_size'], img_size = i, conf_thres = args['conf_thres'], 
-                        iou_thres = j, save_json = args['save_json'], folder = args['working_dir']
+                        iou_thres = j, save_json = args['save_json'], folder = args['working_dir'],
+                        mask = args['mask']
                     )[0]
                 y.append(r + (time.time() - t,))
         np.savetxt(args['working_dir'] + 'benchmark.txt', y, fmt='%10.4g')  # y = np.loadtxt('study.txt')
@@ -261,7 +274,8 @@ if __name__ == '__main__':
             r = test(
                 cfg = args['cfg'], data = args['data'], weights = args['weights'], 
                 batch_size = args['batch_size'], img_size = args['img_size'], conf_thres = args['conf_thres'], 
-                iou_thres = i, save_json = args['save_json'], folder = args['working_dir']
+                iou_thres = i, save_json = args['save_json'], folder = args['working_dir'],
+                mask = args['mask']
             )[0]
             y.append(r + (time.time() - t,))
         np.savetxt(args['working_dir'] + 'study.txt', y, fmt='%10.4g')  # y = np.loadtxt('study.txt')
