@@ -36,7 +36,10 @@ def test(cfg,
         # Load weights
         attempt_download(weights)
         if weights.endswith('.pt'):  # pytorch format
-            model.load_state_dict(torch.load(weights, map_location=device)['model'])
+            try:
+                model.load_state_dict(torch.load(weights, map_location=device)['model'])
+            except:
+                model.load_state_dict(torch.load(weights, map_location=device))
         else:  # darknet format
             load_darknet_weights(model, weights)
 
