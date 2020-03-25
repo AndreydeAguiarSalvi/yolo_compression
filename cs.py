@@ -102,6 +102,8 @@ def train():
             optimizer = create_optimizer(model, config)
             start_epoch = 0
             scheduler = create_scheduler(config, optimizer, start_epoch)
+
+            mask_optim = None
         ###############
         # Start epoch #
         ###############
@@ -181,11 +183,12 @@ def train():
                 ######
                 # CS #
                 ######
-                entries_sum = sum_of_the_weights(pseudo_mask)
-                if not torch.isfinite(entries_sum):
-                    print('WARNING: non-finite entries sum, ending training ')
-                    return results
-                loss += config['lambda'] * entries_sum
+                if it != config['iterations'] - 1: # The last train is outer from outer_round loop, without mask optimizer and scheduler
+                    entries_sum = sum_of_the_weights(pseudo_mask)
+                    if not torch.isfinite(entries_sum):
+                        print('WARNING: non-finite entries sum, ending training ')
+                        return results
+                    loss += config['lambda'] * entries_sum
 
                 if not torch.isfinite(loss):
                     print('WARNING: non-finite loss, ending training ', loss_items)
