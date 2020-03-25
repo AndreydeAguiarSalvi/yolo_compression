@@ -54,7 +54,7 @@ def test(cfg,
         from utils.pruning import sum_of_the_weights, apply_mask_LTH, create_mask_LTH
         msk = create_mask_LTH(model)
         initial_weights = sum_of_the_weights(msk)
-        msk.load_state_dict(torch.load(mask))
+        msk.load_state_dict(torch.load(mask, map_location=device))
         final_weights = sum_of_the_weights(msk)
         print(f'Evaluating model with initial weights number of {initial_weights} and final of {final_weights}. \nReduction of {final_weights * 100. / initial_weights}%.')
         apply_mask_LTH(model, msk)
