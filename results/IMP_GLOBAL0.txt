@@ -1,0 +1,3 @@
+{'cfg': 'cfg/voc_yolov3.cfg', 'data': 'data/voc2012.data', 'weights': 'weights/voc_yolov3/size-multi_scale/2020_03_22/15_54_35/model_it_2.pt', 'batch_size': 32, 'img_size': 416, 'conf_thres': 0.001, 'iou_thres': 0.6, 'save_json': False, 'task': 'test', 'device': '2', 'single_cls': False, 'mask': 'weights/voc_yolov3/size-multi_scale/2020_03_22/15_54_35/mask_1_prune.pt', 'working_dir': 'weights/voc_yolov3/size-multi_scale/2020_03_22/15_54_35/'}
+Using CUDA device0 _CudaDeviceProperties(name='GeForce GTX 1080 Ti', total_memory=11178MB)
+
