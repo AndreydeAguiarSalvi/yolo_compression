@@ -43,13 +43,10 @@ def train():
     # Initialize model
     if config['darknet'] == 'default':
         model = Darknet(cfg, arc=config['arc']).to(device)
-    elif config['darknet'] == 'multibias':
-        model = Reduced_Darknet(cfg, arc=config['arc']).to(device)
-        print('Creating a multibias Darknet')
-    elif config['darknet'] == 'multiconv_multibias':
-        model = Reduced_Darknet(cfg, arc=config['arc'], conv_type='multiconv_multibias').to(device)
-        print('Creating a multiconv_multibias Darknet')
-
+    elif config['darknet'] == 'nano':
+        model = YOLO_Nano().to('device')
+    elif config['darknet'] == 'soft':
+        model = Soft_Darknet(cfg, arc=config['arc']).to(device)
     optimizer = create_optimizer(model, config)
 
     start_epoch = 0
