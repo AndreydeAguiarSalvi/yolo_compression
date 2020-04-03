@@ -1,0 +1,26 @@
+{'cfg': 'cfg/voc_yolov3.cfg', 'data': 'data/voc2012.data', 'weights': 'weights/voc_yolov3/size-multi_scale/2020_03_26/11_04_40/best.pt', 'batch_size': 32, 'img_size': 416, 'conf_thres': 0.001, 'iou_thres': 0.6, 'save_json': False, 'task': 'test', 'device': 'cpu', 'single_cls': False, 'mask': None, 'working_dir': 'weights/voc_yolov3/size-multi_scale/2020_03_26/11_04_40/'}
+Using CPU
+
+                 all  5.82e+03  1.58e+04     0.909      0.23      0.53     0.352
+               Class    Images   Targets         P         R   mAP@0.5        F1
+           aeroplane  5.82e+03       484     0.966     0.413     0.677     0.578
+             bicycle  5.82e+03       380     0.968     0.241     0.609     0.386
+                bird  5.82e+03       629     0.862     0.149     0.441     0.254
+                boat  5.82e+03       491     0.879     0.133     0.323     0.231
+              bottle  5.82e+03       733     0.869    0.0635     0.236     0.118
+                 bus  5.82e+03       320     0.987     0.493      0.74     0.657
+                 car  5.82e+03  1.17e+03     0.972     0.207      0.55     0.341
+                 cat  5.82e+03       618     0.912     0.418     0.743     0.573
+               chair  5.82e+03  1.45e+03     0.848    0.0518     0.284    0.0976
+                 cow  5.82e+03       347     0.716     0.175     0.419     0.281
+         diningtable  5.82e+03       374     0.898     0.117     0.473     0.208
+                 dog  5.82e+03       773     0.902     0.343      0.64     0.497
+               horse  5.82e+03       373     0.943      0.15     0.617     0.259
+           motorbike  5.82e+03       376     0.961     0.197     0.635     0.328
+              person  5.82e+03  5.11e+03     0.971     0.276      0.69      0.43
+         pottedplant  5.82e+03       542     0.912    0.0769     0.308     0.142
+               sheep  5.82e+03       485     0.871     0.299     0.525     0.445
+                sofa  5.82e+03       387     0.875     0.158     0.458     0.267
+               train  5.82e+03       329     0.988     0.416     0.711     0.586
+           tvmonitor  5.82e+03       414     0.881     0.231     0.524     0.367
+Speed: 1074.6/52.0/1126.5 ms inference/NMS/total per 416x416 image at batch-size 32
