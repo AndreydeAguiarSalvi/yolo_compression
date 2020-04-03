@@ -1089,6 +1089,7 @@ class YOLO_Nano(nn.Module):
         self.image_size = image_size
         self.num_anchors = 3
         self.yolo_channels = (self.num_classes + 5) * self.num_anchors
+        self.yolo_layers = [13, 26, 52]
         
         if anchor_type == 'PASCAL':
             self.anchors = [ [26,31],  [43,84],  [81,171],   [103,68],  [145,267],  [180,135],  [247,325],  [362,178],  [412,346] ]
