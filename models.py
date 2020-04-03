@@ -1163,12 +1163,16 @@ class YOLO_Nano(nn.Module):
             img_size=(image_size, image_size), yolo_index=2, arc='default'
         )
 
+        self.module_list = []
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 m.weight = nn.init.xavier_normal_(m.weight, gain=0.02)
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.normal_(m.weight.data, 1.0, 0.02)
                 m.bias.data.zero_()
+            self.module_list.append(m)
+    
+        self.create_modules()
 
     def forward(self, x):
         loss = 0
@@ -1237,3 +1241,60 @@ class YOLO_Nano(nn.Module):
         else: # test
             io, p = zip(*yolo_outputs)  # inference output, training output
             return torch.cat(io, 1), p
+    
+
+    def create_modules(self):
+        self.module_list = []
+
+        self.module_list.append(self.conv1)
+        self.module_list.append(self.conv2)
+        self.module_list.append(self.pep1)
+        self.module_list.append(self.ep1)
+        self.module_list.append(self.pep2)
+        self.module_list.append(self.pep3)
+        self.module_list.append(self.ep2)
+        self.module_list.append(self.pep4)
+        self.module_list.append(self.conv3)
+        self.module_list.append(self.fca1)
+        self.module_list.append(self.pep5)
+        self.module_list.append(self.pep6)
+        
+        self.module_list.append(self.pep7)
+        self.module_list.append(self.ep3)
+        self.module_list.append(self.pep8)
+        self.module_list.append(self.pep9)
+        self.module_list.append(self.pep10)
+        self.module_list.append(self.pep11)
+        self.module_list.append(self.pep12)
+        self.module_list.append(self.pep13)
+        self.module_list.append(self.pep14)
+
+        self.module_list.append(self.pep15)
+        self.module_list.append(self.ep4)
+        self.module_list.append(self.pep16)
+        self.module_list.append(self.conv4)
+        self.module_list.append(self.ep5)
+        self.module_list.append(self.pep17)
+        
+        self.module_list.append(self.conv5)
+        self.module_list.append(self.conv6)
+        
+        self.module_list.append(self.pep18)
+        self.module_list.append(self.pep19)
+
+        self.module_list.append(self.conv7)
+        self.module_list.append(self.conv8)
+        
+        self.module_list.append(self.pep20)
+        self.module_list.append(self.pep21)
+        self.module_list.append(self.pep22)
+        self.module_list.append(self.conv9)
+        self.module_list.append(self.yolo_layer52()
+        
+        self.module_list.append(self.ep6)
+        self.module_list.append(self.conv10)
+        self.module_list.append(self.yolo_layer26)
+
+        self.module_list.append(self.ep7)
+        self.module_list.append(self.conv11)
+        self.module_list.append(self.yolo_layer13)
