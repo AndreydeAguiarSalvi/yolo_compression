@@ -1089,7 +1089,6 @@ class YOLO_Nano(nn.Module):
         self.image_size = image_size
         self.num_anchors = 3
         self.yolo_channels = (self.num_classes + 5) * self.num_anchors
-        self.yolo_layers = [13, 26, 52]
         
         if anchor_type == 'PASCAL':
             self.anchors = [ [26,31],  [43,84],  [81,171],   [103,68],  [145,267],  [180,135],  [247,325],  [362,178],  [412,346] ]
@@ -1173,6 +1172,7 @@ class YOLO_Nano(nn.Module):
             self.module_list.append(m)
     
         self.create_modules()
+        self.yolo_layers = [37, 40, 43]
 
     def forward(self, x):
         loss = 0
@@ -1289,7 +1289,7 @@ class YOLO_Nano(nn.Module):
         self.module_list.append(self.pep21)
         self.module_list.append(self.pep22)
         self.module_list.append(self.conv9)
-        self.module_list.append(self.yolo_layer52()
+        self.module_list.append(self.yolo_layer52)
         
         self.module_list.append(self.ep6)
         self.module_list.append(self.conv10)
