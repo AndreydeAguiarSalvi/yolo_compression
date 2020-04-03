@@ -44,7 +44,7 @@ def train():
     if config['darknet'] == 'default':
         model = Darknet(cfg, arc=config['arc']).to(device)
     elif config['darknet'] == 'nano':
-        model = YOLO_Nano().to('device')
+        model = YOLO_Nano().to(device)
     elif config['darknet'] == 'soft':
         model = Soft_Darknet(cfg, arc=config['arc']).to(device)
     optimizer = create_optimizer(model, config)
