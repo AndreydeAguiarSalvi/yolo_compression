@@ -1,0 +1,6 @@
+cfg : ''
+teacher_cfg : cfg/voc_yolov3.cfg
+student_cfg : cfg/voc_yolov3-tiny3.cfg
+data : data/voc2012.data
+weights : ''
+working_dir : /A/andrey/yolo_ultra/weights

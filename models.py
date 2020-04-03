@@ -1,3 +1,9 @@
+# TODO
+# concluir função de Loss para KD
+# refatorar cs.py
+# fazer kd.py
+# 
+
 # Maybe help to understand this fucking code:
 # https://www.cyberailab.com/home/a-closer-look-at-yolov3
 # https://towardsdatascience.com/yolo-v3-object-detection-53fb7d3bfe6b
@@ -24,23 +30,61 @@ def create_modules(module_defs, img_size, arc):
         # if i == 0:
         #     modules.add_module('BatchNorm2d_0', nn.BatchNorm2d(output_filters[-1], momentum=0.1))
 
-        if mdef['type'] == 'convolutional':
+        if mdef['type'] in ['convolutional', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'softconv']:
             bn = mdef['batch_normalize']
             filters = mdef['filters']
             size = mdef['size']
             stride = mdef['stride'] if 'stride' in mdef else (mdef['stride_y'], mdef['stride_x'])
-            modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
-                                                   out_channels=filters,
-                                                   kernel_size=size,
-                                                   stride=stride,
-                                                   padding=(size - 1) // 2 if mdef['pad'] else 0,
-                                                   groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                   bias=not bn))
+            if mdef['type'] == 'convolutional':
+                modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
+                                                    out_channels=filters,
+                                                    kernel_size=size,
+                                                    stride=stride,
+                                                    padding=(size - 1) // 2 if mdef['pad'] else 0,
+                                                    groups=mdef['groups'] if 'groups' in mdef else 1,
+                                                    bias=not bn))
+            elif mdef['type'] == 'multibias':
+                n_bias = mdef['n_bias']
+                modules.add_module('Conv2d', MultiBiasConv(
+                        in_channels = output_filters[-1], out_channels = filters, 
+                        n_bias = n_bias,
+                        kernel_size = size, stride = stride, pad = (size - 1) // 2 if mdef['pad'] else 0
+                    )
+                )
+            elif mdef['type'] == 'multiconv_multibias':
+                n_bias = mdef['n_bias']
+                modules.add_module('Conv2d', MultiConvMultiBias(
+                        in_channels = output_filters[-1], out_channels = filters, 
+                        n_bias = n_bias,
+                        kernel_size = size, stride = stride, pad = (size - 1) // 2 if mdef['pad'] else 0
+                    )
+                )
+            elif mdef['type'] == 'halfconv':
+                modules.add_module('Conv2d', HalfConv(
+                        in_channels=output_filters[-1], out_channels=filters,
+                        kernel_size=size, stride=stride, pad=(size - 1) // 2 if mdef['pad'] else 0,
+                        have_bias=not bn
+                    )
+                )
+            elif mdef['type'] == 'inception':
+                modules.add_module('Conv2d', MyInception(
+                        n_in=output_filters[-1],
+                        n_out=filters
+                    )
+                )
+            elif mdef['type'] == 'softconv':
+                modules.append('Conv2d', SoftMaskedConv2d(
+                    in_channels=output_filters[-1], out_channels=filters,
+                    kernel_size=size, padding=(size-1) // 2 if mdef['pad'] else 0,
+                    stride=stride, mask_initial_value=hyperparams['mask_initial_value']
+                ))
             if bn:
                 modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
             if mdef['activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
                 modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
                 # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
+            elif mdef['activation'] == 'relu':
+                modules.add_module('activation', nn.ReLU(inplace=True))
             elif mdef['activation'] == 'swish':
                 modules.add_module('activation', Swish())
 
@@ -273,7 +317,7 @@ class Darknet(nn.Module):
 
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
-            if mtype in ['convolutional', 'upsample', 'maxpool']:
+            if mtype in ['convolutional', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'upsample', 'maxpool']:
                 x = module(x)
             elif mtype == 'shortcut':  # sum
                 if verbose:
@@ -526,142 +570,237 @@ class MultiConvMultiBias(nn.Module):
         return x
 
 
-def create_compact_modules(module_defs, img_size, arc, conv_type='multi_bias'):
-    # Constructs module list of layer blocks from module configuration in module_defs
+class HalfConv(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, pad, have_bias):
+        super(HalfConv, self).__init__()
+        self.conv = nn.Conv2d(
+            in_channels=in_channels, out_channels=int(out_channels/2),
+            kernel_size=kernel_size, stride = stride, padding=pad, bias=have_bias
+        )
+        
 
-    hyperparams = module_defs.pop(0)
-    output_filters = [int(hyperparams['channels'])]
-    module_list = nn.ModuleList()
-    routs = []  # list of layers which rout to deeper layers
-    yolo_index = -1
+    def forward(self, x):
+        x = self.conv(x)
+        x = torch.cat((x, -x), 1)
 
-    for i, mdef in enumerate(module_defs):
-        modules = nn.Sequential()
-        # if i == 0:
-        #     modules.add_module('BatchNorm2d_0', nn.BatchNorm2d(output_filters[-1], momentum=0.1))
+        return x
 
-        if mdef['type'] == 'convolutional':
-            bn = mdef['batch_normalize']
-            filters = mdef['filters']
-            size = mdef['size']
-            stride = mdef['stride'] if 'stride' in mdef else (mdef['stride_y'], mdef['stride_x'])
-            if conv_type == 'multibias':
-                modules.add_module(
-                    'Conv2d', MultiBiasConv(
-                        in_channels = output_filters[-1], out_channels = filters, 
-                        n_bias = 8 if filters % 8 == 0 else 15 if filters % 15 == 0 else 1,
-                        kernel_size = size, stride = stride, pad = (size - 1) // 2 if mdef['pad'] else 0
-                    )
-                )
-            elif conv_type == 'multiconv_multibias':
-                modules.add_module(
-                    'Conv2d', MultiConvMultiBias(
-                        in_channels = output_filters[-1], out_channels = filters, 
-                        n_bias = 8 if filters % 8 == 0 else 15 if filters % 15 == 0 else 1,
-                        kernel_size = size, stride = stride, pad = (size - 1) // 2 if mdef['pad'] else 0
-                    )
-                )
 
-            if bn:
-                modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-            if mdef['activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
-                modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
-                # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
-            elif mdef['activation'] == 'swish':
-                modules.add_module('activation', Swish())
+class Inception(nn.Module):
+    # from https://github.com/sanghoon/pytorch_imagenet/blob/master/models/pvanet.py
+    def __init__(self, n_in, n_out, in_stride=1, preAct=False, lastAct=True, proj=False):
+        super(Inception, self).__init__()
 
-        elif mdef['type'] == 'maxpool':
-            size = mdef['size']
-            stride = mdef['stride']
-            maxpool = nn.MaxPool2d(kernel_size=size, stride=stride, padding=(size - 1) // 2)
-            if size == 2 and stride == 1:  # yolov3-tiny
-                modules.add_module('ZeroPad2d', nn.ZeroPad2d((0, 1, 0, 1)))
-                modules.add_module('MaxPool2d', maxpool)
+        # Config
+        self._preAct = preAct
+        self._lastAct = lastAct
+        self.n_in = n_in
+        self.n_out = n_out
+        self.act_func = nn.ReLU
+        self.act = F.relu
+        self.in_stride = in_stride
+
+        self.n_branches = 0
+        self.n_outs = []        # number of output feature for each branch
+
+        self.proj = nn.Conv2d(n_in, n_out, 1, stride=in_stride) if proj else None
+
+    def add_branch(self, module, n_out):
+        # Create branch
+        br_name = 'branch_{}'.format(self.n_branches)
+        setattr(self, br_name, module)
+
+        # Last output chns.
+        self.n_outs.append(n_out)
+
+        self.n_branches += 1
+
+    def branch(self, idx):
+        br_name = 'branch_{}'.format(idx)
+        return getattr(self, br_name, None)
+
+    def add_convs(self, n_kernels, n_chns):
+        assert(len(n_kernels) == len(n_chns))
+
+        n_last = self.n_in
+        layers = []
+
+        stride = -1
+        for k, n_out in zip(n_kernels, n_chns):
+            if stride == -1:
+                stride = self.in_stride
             else:
-                modules = maxpool
+                stride = 1
 
-        elif mdef['type'] == 'upsample':
-            if ONNX_EXPORT:  # explicitly state size, avoid scale_factor
-                g = (yolo_index + 1) * 2 / 32  # gain
-                modules = nn.Upsample(size=tuple(int(x * g) for x in img_size))  # img_size = (320, 192)
-            else:
-                modules = nn.Upsample(scale_factor=mdef['stride'])
+            # Initialize params
+            conv = nn.Conv2d(n_last, n_out, kernel_size=k, bias=False, padding=int(k / 2), stride=stride)
+            bn = nn.BatchNorm2d(n_out)
 
-        elif mdef['type'] == 'route':  # nn.Sequential() placeholder for 'route' layer
-            layers = mdef['layers']
-            filters = sum([output_filters[i + 1 if i > 0 else i] for i in layers])
-            routs.extend([l if l > 0 else l + i for l in layers])
-            # if mdef[i+1]['type'] == 'reorg3d':
-            #     modules = nn.Upsample(scale_factor=1/float(mdef[i+1]['stride']), mode='nearest')  # reorg3d
+            # Instantiate network
+            layers.append(conv)
+            layers.append(bn)
+            layers.append(self.act_func())
 
-        elif mdef['type'] == 'shortcut':  # nn.Sequential() placeholder for 'shortcut' layer
-            layers = mdef['from']
-            filters = output_filters[-1]
-            routs.extend([i + l if l < 0 else l for l in layers])
-            modules = weightedFeatureFusion(layers=layers)
+            n_last = n_out
 
-        elif mdef['type'] == 'reorg3d':  # yolov3-spp-pan-scale
-            # torch.Size([16, 128, 104, 104])
-            # torch.Size([16, 64, 208, 208]) <-- # stride 2 interpolate dimensions 2 and 3 to cat with prior layer
-            pass
+        self.add_branch(nn.Sequential(*layers), n_last)
 
-        elif mdef['type'] == 'yolo':
-            yolo_index += 1
-            mask = mdef['mask']  # anchor mask
-            modules = YOLOLayer(anchors=mdef['anchors'][mask],  # anchor list
-                                nc=mdef['classes'],  # number of classes
-                                img_size=img_size,  # (416, 416)
-                                yolo_index=yolo_index,  # 0, 1 or 2
-                                arc=arc)  # yolo architecture
+        return self
 
-            # Initialize preceding Conv2d() bias (https://arxiv.org/pdf/1708.02002.pdf section 3.3)
-            try:
-                p = math.log(1 / (modules.nc - 0.99))  # class probability  ->  sigmoid(p) = 1/nc
-                if arc == 'default' or arc == 'Fdefault':  # default
-                    b = [-4.5, p]  # obj, cls
-                elif arc == 'uBCE':  # unified BCE (80 classes)
-                    b = [0, -9.0]
-                elif arc == 'uCE':  # unified CE (1 background + 80 classes)
-                    b = [10, -0.1]
-                elif arc == 'uFBCE':  # unified FocalBCE (5120 obj, 80 classes)
-                    b = [0, -6.5]
-                elif arc == 'uFCE':  # unified FocalCE (64 cls, 1 background + 80 classes)
-                    b = [7.7, -1.1]
+    def add_poolconv(self, kernel, n_out, type='MAX'):
 
-                bias = module_list[-1][0].bias.view(len(mask), -1)  # 255 to 3x85
-                bias[:, 4] += b[0] - bias[:, 4].mean()  # obj
-                bias[:, 5:] += b[1] - bias[:, 5:].mean()  # cls
-                # bias = torch.load('weights/yolov3-spp.bias.pt')[yolo_index]  # list of tensors [3x85, 3x85, 3x85]
-                module_list[-1][0].bias = torch.nn.Parameter(bias.view(-1))
-                # utils.print_model_biases(model)
-            except:
-                print('WARNING: smart bias initialization failure.')
+        assert(type in ['AVE', 'MAX'])
 
-        else:
-            print('Warning: Unrecognized Layer Type: ' + mdef['type'])
+        n_last = self.n_in
+        layers = []
 
-        # Register module list and number of output filters
-        module_list.append(modules)
-        output_filters.append(filters)
+        # Pooling
+        if type == 'MAX':
+            layers.append(nn.MaxPool2d(kernel, padding=int(kernel/2), stride=self.in_stride))
+        elif type == 'AVE':
+            layers.append(nn.AvgPool2d(kernel, padding=int(kernel/2), stride=self.in_stride))
 
-    return module_list, routs
+        # Conv - BN - Act
+        layers.append(nn.Conv2d(n_last, n_out, kernel_size=1))
+        layers.append(nn.BatchNorm2d(n_out))
+        layers.append(self.act_func())
+
+        self.add_branch(nn.Sequential(*layers), n_out)
+
+        return self
 
 
-class Reduced_Darknet(nn.Module):
+    def finalize(self):
+        # Add 1x1 convolution
+        total_outs = sum(self.n_outs)
+
+        self.last_conv = nn.Conv2d(total_outs, self.n_out, kernel_size=1)
+        self.last_bn = nn.BatchNorm2d(self.n_out)
+
+        return self
+
+    def forward(self, x):
+        x_sc = x
+
+        if (self._preAct):
+            x = self.act(x)
+
+        # Compute branches
+        h = []
+        for i in range(self.n_branches):
+            module = self.branch(i)
+            assert(module != None)
+
+            h.append(module(x))
+
+        x = torch.cat(h, dim=1)
+
+        x = self.last_conv(x)
+        x = self.last_bn(x)
+
+        if (self._lastAct):
+            x = self.act(x)
+
+        if (x_sc.get_device() != x.get_device()):
+            print("Something's wrong")
+
+        # Projection
+        if self.proj:
+            x_sc = self.proj(x_sc)
+
+        x = x + x_sc
+
+        return x
+
+
+class MyInception(nn.Module):
+
+    def __init__(self, n_in, n_out):
+        super(MyInception, self).__init__()
+
+        self.conv1x1 = nn.Conv2d(in_channels=n_in, out_channels=int(n_out/2), kernel_size=1, stride=1, padding=0)
+        self.conv1x1_3x3 = nn.Sequential(
+            nn.Conv2d(in_channels=n_in, out_channels=int(n_out/4), kernel_size=1, stride=1, padding=0),
+            nn.Conv2d(in_channels=int(n_out/4), out_channels=int(n_out/4), kernel_size=3, stride=1, padding=1)
+        )
+        self.conv1x1_3x3_3x3 = nn.Sequential(
+            nn.Conv2d(in_channels=n_in, out_channels=int(n_out/4), kernel_size=1, stride=1, padding=0),
+            nn.Conv2d(in_channels=int(n_out/4), out_channels=int(n_out/4), kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(in_channels=int(n_out/4), out_channels=int(n_out/4), kernel_size=3, stride=1, padding=1)
+        )
+    
+    def forward(self, x):
+        x1 = self.conv1x1(x)
+        x2 = self.conv1x1_3x3(x)
+        x3 = self.conv1x1_3x3_3x3(x)
+
+        return torch.cat((x1, x2, x3), 1)
+
+
+class SoftMaskedConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, padding=1, stride=1, mask_initial_value=0.):
+        super(SoftMaskedConv2d, self).__init__()
+        self.mask_initial_value = mask_initial_value
+        
+        self.in_channels = in_channels
+        self.out_channels = out_channels    
+        self.kernel_size = kernel_size
+        self.padding = padding
+        self.stride = stride
+        
+        self.weight = nn.Parameter(torch.Tensor(out_channels, in_channels, kernel_size, kernel_size))
+        nn.init.xavier_normal_(self.weight)
+        self.init_weight = nn.Parameter(torch.zeros_like(self.weight), requires_grad=False)
+        self.init_mask()
+        
+    def init_mask(self):
+        self.mask_weight = nn.Parameter(torch.Tensor(self.out_channels, self.in_channels, self.kernel_size, self.kernel_size))
+        nn.init.constant_(self.mask_weight, self.mask_initial_value)
+
+    def compute_mask(self, temp, ticket):
+        scaling = 1. / F.sigmoid(self.mask_initial_value)
+        if ticket: mask = (self.mask_weight > 0).float()
+        else: mask = F.sigmoid(temp * self.mask_weight)
+        return scaling * mask      
+        
+    def prune(self, temp):
+        self.mask_weight.data = torch.clamp(temp * self.mask_weight.data, max=self.mask_initial_value)   
+
+    def forward(self, x, temp=1, ticket=False):
+        self.mask = self.compute_mask(temp, ticket)
+        masked_weight = self.weight * self.mask
+        out = F.conv2d(x, masked_weight, stride=self.stride, padding=self.padding)        
+        return out
+        
+    def checkpoint(self):
+        self.init_weight.data = self.weight.clone()       
+        
+    def rewind_weights(self):
+        self.weight.data = self.init_weight.clone()
+
+    def extra_repr(self):
+        return '{}, {}, kernel_size={}, stride={}, padding={}'.format(
+            self.in_channels, self.out_channels, self.kernel_size, self.stride, self.padding)
+
+
+class SoftDarknet(SoftMaskedConv2d):
     # YOLOv3 object detection model
 
-    def __init__(self, cfg, img_size=(416, 416), arc='default', conv_type='multibias'):
-        super(Reduced_Darknet, self).__init__()
+    def __init__(self, cfg, img_size=(416, 416), arc='default'):
+        super(SoftDarknet, self).__init__()
 
         self.module_defs = parse_model_cfg(cfg)
-        self.module_list, self.routs = create_compact_modules(self.module_defs, img_size, arc, conv_type)
+        self.module_list, self.routs = create_modules(self.module_defs, img_size, arc)
         self.yolo_layers = get_yolo_layers(self)
 
         # Darknet Header https://github.com/AlexeyAB/darknet/issues/2914#issuecomment-496675346
         self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
 
-    def forward(self, x, verbose=False):
+        self.temp = 1
+        self.mask_modules = [m for m in self.modules() if type(m) == SoftMaskedConv2d]
+
+    def forward(self, verbose=False):
         img_size = x.shape[-2:]
         yolo_out, out = [], []
         verbose = False
@@ -671,8 +810,9 @@ class Reduced_Darknet(nn.Module):
 
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
-            if mtype in ['convolutional', 'upsample', 'maxpool']:
-                x = module(x)
+            if mtype in ['convolutional', 'softconv', 'upsample', 'maxpool']:
+                if mtype == 'softconv': x = module(x, self.temp, self.ticket)
+                else: x = module(x)
             elif mtype == 'shortcut':  # sum
                 if verbose:
                     l = [i - 1] + module.layers  # layers
@@ -727,11 +867,29 @@ class Reduced_Darknet(nn.Module):
         # model_info(self)  # yolov3-spp reduced from 225 to 152 layers
 
 
-class YOLO_Teacher(nn.Module):
+    def checkpoint(self):
+        for m in self.mask_modules: m.checkpoint()
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
+                m.checkpoint = copy.deepcopy(m.state_dict())
+
+
+    def rewind_weights(self):
+        for m in self.mask_modules: m.rewind_weights()
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
+                m.load_state_dict(m.checkpoint)
+
+
+    def prune(self):
+        for m in self.mask_modules: m.prune(self.temp)
+
+
+class YOLO_Teacher_Student(nn.Module):
     # YOLOv3 object detection model
 
     def __init__(self, cfg, img_size=(416, 416), arc='default'):
-        super(YOLO_Teacher, self).__init__()
+        super(YOLO_Teacher_Student, fts_index, self).__init__()
 
         self.module_defs = parse_model_cfg(cfg)
         self.module_list, self.routs = create_modules(self.module_defs, img_size, arc)
@@ -743,52 +901,54 @@ class YOLO_Teacher(nn.Module):
 
     def forward(self, x, verbose=False):
         img_size = x.shape[-2:]
-        output, layer_outputs = [], []
+        yolo_out, out = [], []
         verbose = False
         if verbose:
+            str = ''
             print('0', x.shape)
 
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
-            if mtype in ['convolutional', 'upsample', 'maxpool']:
+            if mtype in ['convolutional', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'upsample', 'maxpool']:
                 x = module(x)
-                if self.module_defs[i+1]['type'] == 'yolo': # Input features from YOLO layer
-                    output.append(x)
-            elif mtype == 'route': # concat
-                layers = [int(x) for x in mdef['layers'].split(',')]
+            elif mtype == 'shortcut':  # sum
                 if verbose:
-                    print('route/concatenate %s' % ([layer_outputs[i].shape for i in layers]))
+                    l = [i - 1] + module.layers  # layers
+                    s = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes
+                    str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
+                x = module(x, out)  # weightedFeatureFusion()
+            elif mtype == 'route': # concat
+                layers = mdef['layers']
+                if verbose:
+                    l = [i - 1] + layers  # layers
+                    s = [list(x.shape)] + [list(out[i].shape) for i in layers]  # shapes
+                    str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
                 if len(layers) == 1:
-                    x = layer_outputs[layers[0]]
+                    x = out[layers[0]]
                 else:
                     try:
-                        x = torch.cat([layer_outputs[i] for i in layers], 1)
+                        x = torch.cat([out[i] for i in layers], 1)
                     except:  # apply stride 2 for darknet reorg layer
-                        layer_outputs[layers[1]] = F.interpolate(layer_outputs[layers[1]], scale_factor=[0.5, 0.5])
-                        x = torch.cat([layer_outputs[i] for i in layers], 1)
-                    # print(''), [print(layer_outputs[i].shape) for i in layers], print(x.shape)
-            elif mtype == 'shortcut':  # sum
-                # x = module(x, layer_outputs)  # weightedFeatureFusion()
-                layers = [int(x) for x in mdef['from'].split(',')]
-                if verbose:
-                    print('shortcut/add %s' % ([layer_outputs[i].shape for i in layers]))
-                for j in layers:
-                    x = x + layer_outputs[j]
+                        out[layers[1]] = F.interpolate(out[layers[1]], scale_factor=[0.5, 0.5])
+                        x = torch.cat([out[i] for i in layers], 1)
+                    # print(''), [print(out[i].shape) for i in layers], print(x.shape)
             elif mtype == 'yolo':
-                output.append(module(x, img_size))
-            layer_outputs.append(x if i in self.routs else [])
+                yolo_out.append(module(x, img_size))
+            out.append(x if i in self.routs else [])
             if verbose:
-                print(i, x.shape)
+                print('%g/%g %s -' % (i, len(self.module_list), mtype), list(x.shape), str)
+                str = ''
+            
+            if i == fts_index: yolo_out.append(x)
 
-        # if self.training:
-        #     return output
-        # elif ONNX_EXPORT:
-        #     x = [torch.cat(x, 0) for x in zip(*output)]
-        #     return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4
-        # else:
-        #     io, p = zip(*output)  # inference output, training output
-        #     return torch.cat(io, 1), p
-        return output
+        if self.training: # train
+            return yolo_out
+        elif ONNX_EXPORT: # export
+            x = [torch.cat(x, 0) for x in zip(*yolo_out)]
+            return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4
+        else: # test
+            io, p = zip(*yolo_out)  # inference output, training output
+            return torch.cat(io, 1), p
 
     def fuse(self):
         # Fuse Conv2d + BatchNorm2d layers throughout model
@@ -805,3 +965,274 @@ class YOLO_Teacher(nn.Module):
             fused_list.append(a)
         self.module_list = fused_list
         # model_info(self)  # yolov3-spp reduced from 225 to 152 layers
+
+
+# Adapted from https://github.com/liux0614/yolo_nano/blob/master/models/yolo_nano.py
+def conv1x1(input_channels, output_channels, stride=1, bn=True):
+    # 1x1 convolution without padding
+    if bn == True:
+        return nn.Sequential(
+            nn.Conv2d(
+                input_channels, output_channels, kernel_size=1,
+                stride=stride, bias=False),
+            nn.BatchNorm2d(output_channels),
+            nn.ReLU6(inplace=True)
+        )
+    else:
+        return nn.Conv2d(
+                input_channels, output_channels, kernel_size=1,
+                stride=stride, bias=False)
+
+
+def conv3x3(input_channels, output_channels, stride=1, bn=True):
+    # 3x3 convolution with padding=1
+    if bn == True:
+        return nn.Sequential(
+            nn.Conv2d(
+                input_channels, output_channels, kernel_size=3,
+                stride=stride, padding=1, bias=False),
+            nn.BatchNorm2d(output_channels),
+            nn.ReLU6(inplace=True)
+        )
+    else:
+        nn.Conv2d(
+                input_channels, output_channels, kernel_size=3,
+                stride=stride, padding=1, bias=False)
+
+
+def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1):
+    return nn.Sequential(
+        # pw
+        nn.Conv2d(
+            input_channels, input_channels * expand_ratio,
+            kernel_size=1, stride=1, bias=False),
+        nn.BatchNorm2d(input_channels * expand_ratio),
+        nn.ReLU6(inplace=True),
+        # dw
+        nn.Conv2d(
+            input_channels * expand_ratio, input_channels * expand_ratio, kernel_size=3, 
+            stride=stride, padding=1, groups=input_channels * expand_ratio, bias=False),
+        nn.BatchNorm2d(input_channels * expand_ratio),
+        nn.ReLU6(inplace=True),
+        # pw-linear
+        nn.Conv2d(
+            input_channels * expand_ratio, output_channels,
+            kernel_size=1, stride=1, bias=False),
+        nn.BatchNorm2d(output_channels)
+    )
+
+
+class EP(nn.Module):
+    def __init__(self, input_channels, output_channels, stride=1):
+        super(EP, self).__init__()
+        self.input_channels = input_channels
+        self.output_channels = output_channels
+        self.stride = stride
+        self.use_res_connect = self.stride == 1 and input_channels == output_channels
+
+        self.sepconv = sepconv3x3(input_channels, output_channels, stride=stride)
+        
+    def forward(self, x):
+        if self.use_res_connect:
+            return x + self.sepconv(x)
+        
+        return self.sepconv(x)
+
+
+class PEP(nn.Module):
+    def __init__(self, input_channels, output_channels, x, stride=1):
+        super(PEP, self).__init__()
+        self.input_channels = input_channels
+        self.output_channels = output_channels
+        self.stride = stride
+        self.use_res_connect = self.stride == 1 and input_channels == output_channels
+
+        self.conv = conv1x1(input_channels, x)
+        self.sepconv = sepconv3x3(x, output_channels, stride=stride)
+        
+    def forward(self, x):        
+        out = self.conv(x)
+        out = self.sepconv(out)
+        if self.use_res_connect:
+            return out + x
+
+        return out
+
+
+class FCA(nn.Module):
+    def __init__(self, channels, reduction_ratio):
+        super(FCA, self).__init__()
+        self.channels = channels
+        self.reduction_ratio = reduction_ratio
+
+        hidden_channels = channels // reduction_ratio
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channels, hidden_channels, bias=False),
+            nn.ReLU6(inplace=True),
+            nn.Linear(hidden_channels, channels, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        out = self.avg_pool(x).view(b, c)
+        out = self.fc(out).view(b, c, 1, 1)
+        out = x * out.expand_as(x)
+        return out
+
+
+class YOLO_Nano(nn.Module):
+    def __init__(self, num_classes=20, image_size=416, anchor_type='PASCAL'):
+        super(YOLO_Nano, self).__init__()
+        self.num_classes = num_classes
+        self.image_size = image_size
+        self.num_anchors = 3
+        self.yolo_channels = (self.num_classes + 5) * self.num_anchors
+        
+        if anchor_type == 'PASCAL':
+            self.anchors = [ [26,31],  [43,84],  [81,171],   [103,68],  [145,267],  [180,135],  [247,325],  [362,178],  [412,346] ]
+        elif anchor_type == 'COCO':
+            self.anchors = [ [10,13],  [16,30],  [33,23],  [30,61],  [62,45],  [59,119],  [116,90],  [156,198],  [373,326] ]
+
+        # image:  416x416x3
+        self.conv1 = conv3x3(3, 12, stride=1) # output: 416x416x12
+        self.conv2 = conv3x3(12, 24, stride=2) # output: 208x208x24
+        self.pep1 = PEP(24, 24, 7, stride=1) # output: 208x208x24
+        self.ep1 = EP(24, 70, stride=2) # output: 104x104x70
+        self.pep2 = PEP(70, 70, 25, stride=1) # output: 104x104x70
+        self.pep3 = PEP(70, 70, 24, stride=1) # output: 104x104x70
+        self.ep2 = EP(70, 150, stride=2) # output: 52x52x150
+        self.pep4 = PEP(150, 150, 56, stride=1) # output: 52x52x150
+        self.conv3 = conv1x1(150, 150, stride=1) # output: 52x52x150
+        self.fca1 = FCA(150, 8) # output: 52x52x150
+        self.pep5 = PEP(150, 150, 73, stride=1) # output: 52x52x150
+        self.pep6 = PEP(150, 150, 71, stride=1) # output: 52x52x150
+        
+        self.pep7 = PEP(150, 150, 75, stride=1) # output: 52x52x150
+        self.ep3 = EP(150, 325, stride=2) # output: 26x26x325
+        self.pep8 = PEP(325, 325, 132, stride=1) # output: 26x26x325
+        self.pep9 = PEP(325, 325, 124, stride=1) # output: 26x26x325
+        self.pep10 = PEP(325, 325, 141, stride=1) # output: 26x26x325
+        self.pep11 = PEP(325, 325, 140, stride=1) # output: 26x26x325
+        self.pep12 = PEP(325, 325, 137, stride=1) # output: 26x26x325
+        self.pep13 = PEP(325, 325, 135, stride=1) # output: 26x26x325
+        self.pep14 = PEP(325, 325, 133, stride=1) # output: 26x26x325
+        
+        self.pep15 = PEP(325, 325, 140, stride=1) # output: 26x26x325
+        self.ep4 = EP(325, 545, stride=2) # output: 13x13x545
+        self.pep16 = PEP(545, 545, 276, stride=1) # output: 13x13x545
+        self.conv4 = conv1x1(545, 230, stride=1) # output: 13x13x230
+        self.ep5 = EP(230, 489, stride=1) # output: 13x13x489
+        self.pep17 = PEP(489, 469, 213, stride=1) # output: 13x13x469
+        
+        self.conv5 = conv1x1(469, 189, stride=1) # output: 13x13x189
+        self.conv6 = conv1x1(189, 105, stride=1) # output: 13x13x105
+        # upsampling conv6 to 26x26x105
+        # concatenating [conv6, pep15] -> pep18 (26x26x430)
+        self.pep18 = PEP(430, 325, 113, stride=1) # output: 26x26x325
+        self.pep19 = PEP(325, 207, 99, stride=1) # output: 26x26x325
+        
+        self.conv7 = conv1x1(207, 98, stride=1) # output: 26x26x98
+        self.conv8 = conv1x1(98, 47, stride=1) # output: 26x26x47
+        # upsampling conv8 to 52x52x47
+        # concatenating [conv8, pep7] -> pep20 (52x52x197)
+        self.pep20 = PEP(197, 122, 58, stride=1) # output: 52x52x122
+        self.pep21 = PEP(122, 87, 52, stride=1) # output: 52x52x87
+        self.pep22 = PEP(87, 93, 47, stride=1) # output: 52x52x93
+        self.conv9 = conv1x1(93, self.yolo_channels, stride=1, bn=False) # output: 52x52x yolo_channels
+        self.yolo_layer52 = YOLOLayer(
+            anchors=self.anchors[0:3], nc=self.num_classes,
+            img_size=(image_size, image_size), yolo_index=0, arc='default'
+        )
+
+        # conv7 -> ep6
+        self.ep6 = EP(98, 183, stride=1) # output: 26x26x183
+        self.conv10 = conv1x1(183, self.yolo_channels, stride=1, bn=False) # output: 26x26x yolo_channels
+        self.yolo_layer26 = YOLOLayer(
+            anchors=self.anchors[3:6], nc=self.num_classes,
+            img_size=(image_size, image_size), yolo_index=1, arc='default'
+        )
+
+        # conv5 -> ep7
+        self.ep7 = EP(189, 462, stride=1) # output: 13x13x462
+        self.conv11 = conv1x1(462, self.yolo_channels, stride=1, bn=False) # output: 13x13x yolo_channels
+        self.yolo_layer13 = YOLOLayer(
+            anchors=self.anchors[6:], nc=self.num_classes,
+            img_size=(image_size, image_size), yolo_index=2, arc='default'
+        )
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                m.weight = nn.init.xavier_normal_(m.weight, gain=0.02)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.normal_(m.weight.data, 1.0, 0.02)
+                m.bias.data.zero_()
+
+    def forward(self, x):
+        loss = 0
+        yolo_outputs = []
+        image_size = x.size(2)
+        current_size = x.shape[-2:]
+
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = self.pep1(out)
+        out = self.ep1(out)
+        out = self.pep2(out)
+        out = self.pep3(out)
+        out = self.ep2(out)
+        out = self.pep4(out)
+        out = self.conv3(out)
+        out = self.fca1(out)
+        out = self.pep5(out)
+        out = self.pep6(out)
+        
+        out_pep7 = self.pep7(out)
+        out = self.ep3(out_pep7)
+        out = self.pep8(out)
+        out = self.pep9(out)
+        out = self.pep10(out)
+        out = self.pep11(out)
+        out = self.pep12(out)
+        out = self.pep13(out)
+        out = self.pep14(out)
+
+        out_pep15 = self.pep15(out)
+        out = self.ep4(out_pep15)
+        out = self.pep16(out)
+        out = self.conv4(out)
+        out = self.ep5(out)
+        out = self.pep17(out)
+
+        out_conv5 = self.conv5(out)
+        out = F.interpolate(self.conv6(out_conv5), scale_factor=2)
+        out = torch.cat([out, out_pep15], dim=1)
+        out = self.pep18(out)
+        out = self.pep19(out)
+        
+        out_conv7 = self.conv7(out)
+        out = F.interpolate(self.conv8(out_conv7), scale_factor=2)
+        out = torch.cat([out, out_pep7], dim=1)
+        out = self.pep20(out)
+        out = self.pep21(out)
+        out = self.pep22(out)
+        out_conv9 = self.conv9(out)
+        yolo_outputs.append(self.yolo_layer52(out_conv9, current_size))
+
+        out = self.ep6(out_conv7)
+        out_conv10 = self.conv10(out)
+        yolo_outputs.append(self.yolo_layer26(out_conv10, current_size))
+
+        out = self.ep7(out_conv5)
+        out_conv11 = self.conv11(out)
+        yolo_outputs.append(self.yolo_layer13(out_conv11, current_size))
+
+        if self.training: # train
+            return yolo_outputs
+        elif ONNX_EXPORT: # export
+            x = [torch.cat(x, 0) for x in zip(*yolo_outputs)]
+            return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4
+        else: # test
+            io, p = zip(*yolo_outputs)  # inference output, training output
+            return torch.cat(io, 1), p
