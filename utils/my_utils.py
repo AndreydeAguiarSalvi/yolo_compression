@@ -122,7 +122,6 @@ def create_prune_argparser():
     parser.add_argument('--mask_momentum', type=float, help='momentum for pseudo-mask s')
     parser.add_argument('--final_temperature', type=float, help='final beta to binarize sigmoid function')
     parser.add_argument('--lambda', type=float, help='lambda for L1 mask regularization')
-    parser.add_argument('--mask', default=None, help='path to load mask')
 
     parser.add_argument('--params', type=str, default='params/test_prune.yaml', help='json config to load the hyperparameters')
     args = vars(parser.parse_args())
@@ -366,3 +365,49 @@ def load_checkpoints(config, model, weights, optimizer, device, try_download_fun
         darknet_load_function(model, weights)
 
     return start_epoch, best_fitness, model, weights, optimizer
+
+
+def load_checkpoints_mask(config, model, mask, weights, optimizer, device, try_download_function, darknet_load_function):
+    import torch
+    
+    start_epoch = 0
+    start_iteration = 0
+    best_fitness = 0.0
+    try_download_function(weights)
+    if weights.endswith('.pt'):  # pytorch format
+        # possible weights are '*.pt', 'yolov3-spp.pt', 'yolov3-tiny.pt' etc.
+        chkpt = torch.load(weights, map_location=device)
+
+        # load model
+        try:
+            chkpt['model'] = {k: v for k, v in chkpt['model'].items() if model.state_dict()[k].numel() == v.numel()}
+            model.load_state_dict(chkpt['model'], strict=False)
+        except KeyError as e:
+            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
+            raise KeyError(s) from e
+
+        try:
+            mask.load_state_dict(chkpt['mask'])
+        except:
+            print('Mask not found')
+
+        # load optimizer
+        if chkpt['optimizer'] is not None:
+            optimizer.load_state_dict(chkpt['optimizer'])
+            best_fitness = chkpt['best_fitness']
+
+        # load results
+        if chkpt.get('training_results') is not None:
+            with open(config['results_file'], 'w') as file:
+                file.write(chkpt['training_results'])  # write results.txt
+
+        start_iteration = chkpt['iteration']
+        start_epoch = chkpt['epoch'] + 1
+        del chkpt
+
+    elif len(weights) > 0:  # darknet format
+        # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
+        darknet_load_function(model, weights)
+
+    return start_iteration, start_epoch, best_fitness, model, mask, weights, optimizer

@@ -34,14 +34,10 @@ def train():
     # Initialize model
     model = Darknet(cfg, arc=config['arc']).to(device)
     mask = create_mask_LTH(model)
-    if config['mask'] is not None:
-        mask.load_state_dict(torch.load(config['mask'], map_location=device))
-        print(f'Loading mask with {sum_of_the_weights(mask)} weights')
         
-
     optimizer = create_optimizer(model, config)
-    start_epoch, best_fitness, model, weights, optimizer = load_checkpoints(
-        config, model, weights, 
+    start_iteration, start_epoch, best_fitness, model, mask, weights, optimizer = load_checkpoints_mask(
+        config, model, mask, weights, 
         optimizer, device, 
         attempt_download, load_darknet_weights
     )
@@ -83,7 +79,7 @@ def train():
     ###################
     # Start Iteration #
     ###################
-    for it in range(config['iterations']):
+    for it in range(start_iteration, config['iterations']):
         
         ###############
         # Start epoch #
@@ -229,11 +225,13 @@ def train():
             if save:
                 with open(config['results_file'], 'r') as f:
                     # Create checkpoint
-                    chkpt = {'epoch': epoch,
+                    chkpt = {'iteration' : it,
+                            'epoch': epoch,
                             'best_fitness': best_fitness,
                             'training_results': f.read(),
                             'model': model.module.state_dict() if type(
                                 model) is nn.parallel.DistributedDataParallel else model.state_dict(),
+                            'mask' : mask.state_dict(),
                             'optimizer': None if final_epoch else optimizer.state_dict()}
 
                 # Save last checkpoint
