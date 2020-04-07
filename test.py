@@ -20,7 +20,8 @@ def test(cfg,
          model=None,
          dataloader=None,
          folder='',
-         mask=None):
+         mask=None,
+         architecture='default'):
     # Initialize/load model and set device
     if model is None:
         device = torch_utils.select_device(args['device'], batch_size=batch_size) # BUG HERE
@@ -31,7 +32,12 @@ def test(cfg,
             os.remove(f)
 
         # Initialize model
-        model = Darknet(cfg, img_size).to(device)
+        if architecture == 'default':
+            model = Darknet(cfg, arc=config['arc']).to(device)
+        elif architecture == 'nano':
+            model = YOLO_Nano().to(device)
+        elif architecture == 'soft':
+            model = Soft_Darknet(cfg, arc=config['arc']).to(device)
 
         # Load weights
         attempt_download(weights)
