@@ -258,7 +258,7 @@ if __name__ == '__main__':
                 cfg = args['cfg'], data = args['data'], weights = args['weights'],
                 batch_size = args['batch_size'], img_size = args['img_size'], conf_thres = args['conf_thres'],
                 iou_thres = args['iou_thres'], save_json = args['save_json'], folder = args['working_dir'],
-                mask = args['mask']
+                mask = args['mask'], architecture = args['architecture']
             )
 
     elif args['task'] == 'benchmark': # mAPs at 320-608 at conf 0.5 and 0.7
@@ -270,7 +270,7 @@ if __name__ == '__main__':
                         cfg = args['cfg'], data = args['data'], weights = args['weights'], 
                         batch_size = args['batch_size'], img_size = i, conf_thres = args['conf_thres'], 
                         iou_thres = j, save_json = args['save_json'], folder = args['working_dir'],
-                        mask = args['mask']
+                        mask = args['mask'], architecture = args['architecture']
                     )[0]
                 y.append(r + (time.time() - t,))
         np.savetxt(args['working_dir'] + 'benchmark.txt', y, fmt='%10.4g')  # y = np.loadtxt('study.txt')
@@ -284,7 +284,7 @@ if __name__ == '__main__':
                 cfg = args['cfg'], data = args['data'], weights = args['weights'], 
                 batch_size = args['batch_size'], img_size = args['img_size'], conf_thres = args['conf_thres'], 
                 iou_thres = i, save_json = args['save_json'], folder = args['working_dir'],
-                mask = args['mask']
+                mask = args['mask'], architecture = args['architecture']
             )[0]
             y.append(r + (time.time() - t,))
         np.savetxt(args['working_dir'] + 'study.txt', y, fmt='%10.4g')  # y = np.loadtxt('study.txt')
