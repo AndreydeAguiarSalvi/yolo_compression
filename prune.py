@@ -34,6 +34,10 @@ def train():
     # Initialize model
     model = Darknet(cfg, arc=config['arc']).to(device)
     mask = create_mask_LTH(model)
+    if config['mask'] is not None:
+        mask.load_state_dict(torch.load(config['mask'], map_location=device))
+        print(f'Loading mask with {sum_of_the_weights(mask)} weights')
+        
 
     optimizer = create_optimizer(model, config)
     start_epoch, best_fitness, model, weights, optimizer = load_checkpoints(

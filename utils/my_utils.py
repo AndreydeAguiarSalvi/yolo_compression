@@ -122,6 +122,7 @@ def create_prune_argparser():
     parser.add_argument('--mask_momentum', type=float, help='momentum for pseudo-mask s')
     parser.add_argument('--final_temperature', type=float, help='final beta to binarize sigmoid function')
     parser.add_argument('--lambda', type=float, help='lambda for L1 mask regularization')
+    parser.add_argument('--mask', default=None, help='path to load mask')
 
     parser.add_argument('--params', type=str, default='params/test_prune.yaml', help='json config to load the hyperparameters')
     args = vars(parser.parse_args())
