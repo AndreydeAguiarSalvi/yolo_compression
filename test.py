@@ -33,11 +33,11 @@ def test(cfg,
 
         # Initialize model
         if architecture == 'default':
-            model = Darknet(cfg, arc=config['arc']).to(device)
+            model = Darknet(cfg, arc=architecture).to(device)
         elif architecture == 'nano':
             model = YOLO_Nano().to(device)
         elif architecture == 'soft':
-            model = Soft_Darknet(cfg, arc=config['arc']).to(device)
+            model = Soft_Darknet(cfg, arc=architecture).to(device)
 
         # Load weights
         attempt_download(weights)
