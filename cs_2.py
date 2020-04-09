@@ -294,7 +294,7 @@ if __name__ == '__main__':
     model.ticket = False
 
     for it in range(start_iteration, config['iterations']):
-        train(iteration, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
+        train(it, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
         model.temp = 1
         if it != config['iterations']-1: model.prune()
     
@@ -303,7 +303,7 @@ if __name__ == '__main__':
     model.rewind_weights()
     optimizer = create_optimizer(model, config)
     scheduler = create_scheduler(config, optimizer, start_epoch)
-    train(iteration, prebias, trainloader, validloader, config, scheduler, None, optimizer, None, tb_writer)
+    train(it, prebias, trainloader, validloader, config, scheduler, None, optimizer, None, tb_writer)
 
     #####################
     # Start Old Train 2 #
