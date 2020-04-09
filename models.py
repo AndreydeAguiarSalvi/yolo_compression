@@ -832,7 +832,11 @@ class SoftDarknet(MaskedNet):
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
             if mtype in ['convolutional', 'softconv', 'upsample', 'maxpool']:
-                if mtype == 'softconv': x = module(x, self.temp, self.ticket)
+                if mtype == 'softconv': 
+                    try:
+                        x = module(x, self.temp, self.ticket)
+                    except:
+                        print(f'Module {type(module)} receive x {x.shape}, temp {self.temp} and ticket {self.ticket}')
                 else: x = module(x)
             elif mtype == 'shortcut':  # sum
                 if verbose:
