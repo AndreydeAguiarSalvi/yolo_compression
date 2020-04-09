@@ -4,6 +4,7 @@ iterations : 13
 batch_size : 8
 accumulate: 8
 cfg : cfg/yolov3.cfg
+data : data/voc2012.data
 weights : ''
 prune_kind : IMP_LOCAL
 pruning_rate : 0.2

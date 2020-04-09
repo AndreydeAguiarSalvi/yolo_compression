@@ -388,7 +388,8 @@ def load_checkpoints_mask(config, model, mask, weights, optimizer, device, try_d
             raise KeyError(s) from e
 
         try:
-            mask.load_state_dict(chkpt['mask'])
+            if chkpt['mask'] is not None:
+                mask.load_state_dict(chkpt['mask'])
         except:
             print('Mask not found')
 
