@@ -149,6 +149,7 @@ def train(iteration, prebias, trainloader, validloader, config, scheduler, mask_
 
         # Update best mAP
         fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
+        global best_fitness
         if fi > best_fitness:
             best_fitness = fi
 
@@ -294,7 +295,7 @@ if __name__ == '__main__':
     model.ticket = False
 
     for it in range(start_iteration, config['iterations']):
-        train(it, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
+        train(it, prebias, best_fitness, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
         model.temp = 1
         if it != config['iterations']-1: model.prune()
     
