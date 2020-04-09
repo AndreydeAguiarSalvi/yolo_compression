@@ -11,6 +11,7 @@ import torch.nn.functional as F
 
 from utils.google_utils import *
 from utils.parse_config import *
+from copy import deepcopy
 from utils.utils import *
 
 ONNX_EXPORT = False
@@ -797,7 +798,7 @@ class MaskedNet(nn.Module):
         for m in self.mask_modules: m.checkpoint()
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
-                m.checkpoint = copy.deepcopy(m.state_dict())
+                m.checkpoint = deepcopy(m.state_dict())
 
     def rewind_weights(self):
         for m in self.mask_modules: m.rewind_weights()
