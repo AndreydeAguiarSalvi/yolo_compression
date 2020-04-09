@@ -7,7 +7,7 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints
+from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints_mask
 from utils.pruning import sum_of_the_weights, create_backup, rewind_weights, create_mask_LTH, apply_mask_LTH, IMP_LOCAL, IMP_GLOBAL
 
 

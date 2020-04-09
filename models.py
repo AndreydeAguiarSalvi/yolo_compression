@@ -13,8 +13,6 @@ from utils.google_utils import *
 from utils.parse_config import *
 from utils.utils import *
 
-import functools
-
 ONNX_EXPORT = False
 
 
@@ -26,12 +24,6 @@ def create_modules(module_defs, img_size, arc):
     module_list = nn.ModuleList()
     routs = []  # list of layers which rout to deeper layers
     yolo_index = -1
-
-
-    try:
-        SoftConv = functools.partial(SoftMaskedConv2d, mask_initial_value=float(hyperparams['mask_initial_value']))
-    except:
-        print('Not using soft convs')
 
     for i, mdef in enumerate(module_defs):
         modules = nn.Sequential()
@@ -81,10 +73,10 @@ def create_modules(module_defs, img_size, arc):
                     )
                 )
             elif mdef['type'] == 'softconv':
-                modules.add_module('Conv2d', SoftConv(
+                modules.add_module('Conv2d', SoftMaskedConv2d(
                     in_channels=output_filters[-1], out_channels=filters,
                     kernel_size=size, padding=(size-1) // 2 if mdef['pad'] else 0,
-                    stride=stride
+                    stride=stride, mask_initial_value=float(hyperparams['mask_initial_value'])
                     )
                 )
             if bn:
@@ -746,6 +738,10 @@ class MyInception(nn.Module):
         return torch.cat((x1, x2, x3), 1)
 
 
+def sigmoid(x):
+    return float(1./(1.+np.exp(-x)))
+
+
 class SoftMaskedConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, padding=1, stride=1, mask_initial_value=0.):
         super(SoftMaskedConv2d, self).__init__()
@@ -767,7 +763,7 @@ class SoftMaskedConv2d(nn.Module):
         nn.init.constant_(self.mask_weight, self.mask_initial_value)
 
     def compute_mask(self, temp, ticket):
-        scaling = 1. / F.sigmoid(self.mask_initial_value)
+        scaling = 1. / sigmoid(self.mask_initial_value)
         if ticket: mask = (self.mask_weight > 0).float()
         else: mask = F.sigmoid(temp * self.mask_weight)
         return scaling * mask      
@@ -841,7 +837,9 @@ class SoftDarknet(MaskedNet):
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
             if mtype in ['convolutional', 'softconv', 'upsample', 'maxpool']:
-                if mtype == 'softconv': x = module(x, self.temp, self.ticket)
+                if mtype == 'softconv': 
+                    x1 = module[0](x, self.temp, self.ticket)
+                    x = module[1:](x1)
                 else: x = module(x)
             elif mtype == 'shortcut':  # sum
                 if verbose:
