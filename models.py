@@ -837,6 +837,7 @@ class SoftDarknet(MaskedNet):
                         x = module(x, self.temp, self.ticket)
                     except:
                         print(f'Module {type(module)} receive x {x.shape}, temp {self.temp} and ticket {self.ticket}')
+                        exit()
                 else: x = module(x)
             elif mtype == 'shortcut':  # sum
                 if verbose:
