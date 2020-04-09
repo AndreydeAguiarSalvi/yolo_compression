@@ -13,6 +13,8 @@ from utils.google_utils import *
 from utils.parse_config import *
 from utils.utils import *
 
+import functools
+
 ONNX_EXPORT = False
 
 
@@ -24,6 +26,12 @@ def create_modules(module_defs, img_size, arc):
     module_list = nn.ModuleList()
     routs = []  # list of layers which rout to deeper layers
     yolo_index = -1
+
+
+    try:
+        SoftConv = functools.partial(SoftMaskedConv2d, mask_initial_value=hyperparams['mask_initial_value'])
+    except:
+        print('Not using soft convs')
 
     for i, mdef in enumerate(module_defs):
         modules = nn.Sequential()
@@ -73,11 +81,12 @@ def create_modules(module_defs, img_size, arc):
                     )
                 )
             elif mdef['type'] == 'softconv':
-                modules.add_module('Conv2d', SoftMaskedConv2d(
+                modules.add_module('Conv2d', SoftConv(
                     in_channels=output_filters[-1], out_channels=filters,
                     kernel_size=size, padding=(size-1) // 2 if mdef['pad'] else 0,
-                    stride=stride, mask_initial_value=float(hyperparams['mask_initial_value'])
-                ))
+                    stride=stride
+                    )
+                )
             if bn:
                 modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
             if mdef['activation'] == 'leaky':  # TODO: activation study https://github.com/ultralytics/yolov3/issues/441
@@ -832,12 +841,7 @@ class SoftDarknet(MaskedNet):
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
             if mtype in ['convolutional', 'softconv', 'upsample', 'maxpool']:
-                if mtype == 'softconv': 
-                    try:
-                        x = module(x, self.temp, self.ticket)
-                    except:
-                        print(f'Module {type(module)} receive x {x.shape}, temp {self.temp} and ticket {self.ticket}')
-                        exit()
+                if mtype == 'softconv': x = module(x, self.temp, self.ticket)
                 else: x = module(x)
             elif mtype == 'shortcut':  # sum
                 if verbose:
