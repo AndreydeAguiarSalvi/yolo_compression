@@ -286,7 +286,7 @@ if __name__ == '__main__':
     ###################
 
     iters_per_reset = config['epochs']-1
-    temp_increase = config['final_temp']**(1./iters_per_reset)
+    temp_increase = config['final_temperature']**(1./iters_per_reset)
     mask_params = map(lambda a: a[1], filter(lambda p: p[1].requires_grad and 'mask' not in p[0], model.named_parameters()))
     mask_optim = torch.optim.SGD(mask_params, lr=config['mask_lr'], momentum=config['mask_momentum'], nesterov=True)
     mask_scheduler = create_scheduler(config, mask_optim, start_epoch)
