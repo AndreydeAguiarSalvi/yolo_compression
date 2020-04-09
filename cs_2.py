@@ -234,7 +234,7 @@ if __name__ == '__main__':
     nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
 
     # Initialize model
-    model = Soft_Darknet(cfg, arc=config['arc']).to(device)
+    model = SoftDarknet(cfg, arc=config['arc']).to(device)
     optimizer = create_optimizer(model, config)
 
     start_epoch = 0
