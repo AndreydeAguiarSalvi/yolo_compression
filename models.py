@@ -783,11 +783,32 @@ class SoftMaskedConv2d(nn.Module):
             self.in_channels, self.out_channels, self.kernel_size, self.stride, self.padding)
 
 
-class SoftDarknet(SoftMaskedConv2d):
+class MaskedNet(nn.Module):
+    def __init__(self):
+        super(MaskedNet, self).__init__()
+        self.ticket = False
+
+    def checkpoint(self):
+        for m in self.mask_modules: m.checkpoint()
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
+                m.checkpoint = copy.deepcopy(m.state_dict())
+
+    def rewind_weights(self):
+        for m in self.mask_modules: m.rewind_weights()
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
+                m.load_state_dict(m.checkpoint)
+                
+    def prune(self):
+        for m in self.mask_modules: m.prune(self.temp)
+
+
+class SoftDarknet(MaskedNet):
     # YOLOv3 object detection model
 
     def __init__(self, cfg, img_size=(416, 416), arc='default'):
-        super(SoftDarknet, self).__init__()
+        super(MaskedNet, self).__init__()
 
         self.module_defs = parse_model_cfg(cfg)
         self.module_list, self.routs = create_modules(self.module_defs, img_size, arc)
@@ -865,24 +886,6 @@ class SoftDarknet(SoftMaskedConv2d):
             fused_list.append(a)
         self.module_list = fused_list
         # model_info(self)  # yolov3-spp reduced from 225 to 152 layers
-
-
-    def checkpoint(self):
-        for m in self.mask_modules: m.checkpoint()
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
-                m.checkpoint = copy.deepcopy(m.state_dict())
-
-
-    def rewind_weights(self):
-        for m in self.mask_modules: m.rewind_weights()
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
-                m.load_state_dict(m.checkpoint)
-
-
-    def prune(self):
-        for m in self.mask_modules: m.prune(self.temp)
 
 
 class YOLO_Teacher_Student(nn.Module):
