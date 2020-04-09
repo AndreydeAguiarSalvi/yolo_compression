@@ -821,7 +821,7 @@ class SoftDarknet(MaskedNet):
         self.temp = 1
         self.mask_modules = [m for m in self.modules() if type(m) == SoftMaskedConv2d]
 
-    def forward(self, verbose=False):
+    def forward(self, x, verbose=False):
         img_size = x.shape[-2:]
         yolo_out, out = [], []
         verbose = False
