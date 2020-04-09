@@ -295,7 +295,7 @@ if __name__ == '__main__':
     model.ticket = False
 
     for it in range(start_iteration, config['iterations']):
-        train(it, prebias, best_fitness, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
+        train(it, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
         model.temp = 1
         if it != config['iterations']-1: model.prune()
     
