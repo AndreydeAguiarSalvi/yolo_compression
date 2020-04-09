@@ -29,7 +29,7 @@ def create_modules(module_defs, img_size, arc):
 
 
     try:
-        SoftConv = functools.partial(SoftMaskedConv2d, mask_initial_value=hyperparams['mask_initial_value'])
+        SoftConv = functools.partial(SoftMaskedConv2d, mask_initial_value=float(hyperparams['mask_initial_value']))
     except:
         print('Not using soft convs')
 
