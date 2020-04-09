@@ -17,7 +17,7 @@ except:
     mixed_precision = False  # not installed
 
 
-def train(iteration):
+def train(iteration, prebias, trainloader, validloader, config):
     ###############
     # Start epoch #
     ###############
@@ -294,14 +294,14 @@ if __name__ == '__main__':
     model.ticket = False
 
     for it in range(start_iteration, config['iterations']):
-        train(it) 
+        train(it, prebias, trainloader, validloader, config) 
         model.temp = 1
         if it != config['iterations']-1: model.prune()
     
     mask_optim = None
     model.ticket = True
     model.rewind_weights()
-    train(it)
+    train(it, prebias, trainloader, validloader, config)
 
     #####################
     # Start Old Train 2 #
