@@ -17,7 +17,7 @@ except:
     mixed_precision = False  # not installed
 
 
-def train(iteration, prebias, trainloader, validloader, config):
+def train(iteration, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer):
     ###############
     # Start epoch #
     ###############
@@ -120,7 +120,7 @@ def train(iteration, prebias, trainloader, validloader, config):
 
         # Update scheduler
         scheduler.step()
-        mask_scheduler.step()
+        if mask_scheduler is not None: mask_scheduler.step()
 
         final_epoch = epoch + 1 == epochs
         if not config['notest'] or final_epoch:  # Calculate mAP
@@ -294,14 +294,16 @@ if __name__ == '__main__':
     model.ticket = False
 
     for it in range(start_iteration, config['iterations']):
-        train(it, prebias, trainloader, validloader, config) 
+        train(iteration, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
         model.temp = 1
         if it != config['iterations']-1: model.prune()
     
     mask_optim = None
     model.ticket = True
     model.rewind_weights()
-    train(it, prebias, trainloader, validloader, config)
+    optimizer = create_optimizer(model, config)
+    scheduler = create_scheduler(config, optimizer, start_epoch)
+    train(iteration, prebias, trainloader, validloader, config, scheduler, None, optimizer, None, tb_writer)
 
     #####################
     # Start Old Train 2 #

@@ -254,12 +254,13 @@ def create_optimizer(model, opt):
     # Optimizer
     pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
     for k, v in dict(model.named_parameters()).items():
-        if '.bias' in k:
-            pg2 += [v]  # biases
-        elif 'Conv2d.weight' in k:
-            pg1 += [v]  # apply weight_decay
-        else:
-            pg0 += [v]  # all else
+        if 'mask' not in k:
+            if '.bias' in k:
+                pg2 += [v]  # biases
+            elif 'Conv2d.weight' in k:
+                pg1 += [v]  # apply weight_decay
+            else:
+                pg0 += [v]  # all else
 
     if opt['adam']:
         # opt['hyp']['lr0'] *= 0.1  # reduce lr (i.e. SGD=5E-3, Adam=5E-4)
