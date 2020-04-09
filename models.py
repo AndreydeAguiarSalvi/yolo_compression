@@ -76,7 +76,7 @@ def create_modules(module_defs, img_size, arc):
                 modules.add_module('Conv2d', SoftMaskedConv2d(
                     in_channels=output_filters[-1], out_channels=filters,
                     kernel_size=size, padding=(size-1) // 2 if mdef['pad'] else 0,
-                    stride=stride, mask_initial_value=hyperparams['mask_initial_value']
+                    stride=stride, mask_initial_value=int(hyperparams['mask_initial_value'])
                 ))
             if bn:
                 modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
