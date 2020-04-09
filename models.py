@@ -73,7 +73,7 @@ def create_modules(module_defs, img_size, arc):
                     )
                 )
             elif mdef['type'] == 'softconv':
-                modules.append('Conv2d', SoftMaskedConv2d(
+                modules.add_module('Conv2d', SoftMaskedConv2d(
                     in_channels=output_filters[-1], out_channels=filters,
                     kernel_size=size, padding=(size-1) // 2 if mdef['pad'] else 0,
                     stride=stride, mask_initial_value=hyperparams['mask_initial_value']
