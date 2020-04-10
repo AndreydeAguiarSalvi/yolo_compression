@@ -27,6 +27,7 @@ def create_train_argparser():
     parser.add_argument('--var', type=float, help='debug variable')
     # hyp parameters
     parser.add_argument('--lr0', type=float, help='initial learning rate')
+    parser.add_argument('--lrf', type=float, help='final learning rate')
     parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
     parser.add_argument('--weight_decay', type=float, help='weight decay for pg1 parameters')
     # My additioned parameters
@@ -99,6 +100,7 @@ def create_prune_argparser():
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
     # hyp parameters
     parser.add_argument('--lr0', type=float, help='initial learning rate')
+    parser.add_argument('--lrf', type=float, help='final learning rate')
     parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
     parser.add_argument('--weight_decay', type=float, help='weight decay for pg1 parameters')
     # My additioned parameters
