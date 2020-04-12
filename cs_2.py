@@ -17,7 +17,10 @@ except:
     mixed_precision = False  # not installed
 
 
-def train(iteration, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer):
+def train(iteration, best_fitness, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer):
+    config['last'] = config['sub_working_dir'] + 'last_it_{}.pt'.format(iteration)
+    config['best'] = config['sub_working_dir'] + 'best_it_{}.pt'.format(iteration)
+    
     ###############
     # Start epoch #
     ###############
@@ -149,7 +152,6 @@ def train(iteration, prebias, trainloader, validloader, config, scheduler, mask_
 
         # Update best mAP
         fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
-        global best_fitness
         if fi > best_fitness:
             best_fitness = fi
 
@@ -295,16 +297,18 @@ if __name__ == '__main__':
     model.ticket = False
 
     for it in range(start_iteration, config['iterations']):
-        train(it, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
+        train(it, best_fitness, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
         model.temp = 1
         if it != config['iterations']-1: model.prune()
+        best_fitness = .0
     
     mask_optim = None
     model.ticket = True
     model.rewind_weights()
     optimizer = create_optimizer(model, config)
     scheduler = create_scheduler(config, optimizer, start_epoch)
-    train(it, prebias, trainloader, validloader, config, scheduler, None, optimizer, None, tb_writer)
+    best_fitness = .0
+    train(it, best_fitness, prebias, trainloader, validloader, config, scheduler, None, optimizer, None, tb_writer)
 
     #####################
     # Start Old Train 2 #
