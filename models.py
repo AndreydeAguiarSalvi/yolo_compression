@@ -824,8 +824,8 @@ class SoftDarknet(MaskedNet):
         self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
 
-        self.temp = 1
         self.mask_modules = [m for m in self.modules() if type(m) == SoftMaskedConv2d]
+        self.temp = 1
 
     def forward(self, x, verbose=False):
         img_size = x.shape[-2:]
