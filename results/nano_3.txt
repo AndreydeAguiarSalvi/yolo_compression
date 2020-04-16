@@ -1,0 +1,26 @@
+{'cfg': 'cfg/voc_yolov3-nano.cfg', 'data': 'data/voc2012.data', 'weights': 'weights/voc_yolov3_nano/size-multi_scale/2020_04_07/23_22_59/best.pt', 'batch_size': 32, 'img_size': 416, 'conf_thres': 0.001, 'iou_thres': 0.6, 'save_json': False, 'task': 'test', 'device': '2', 'single_cls': False, 'mask': None, 'architecture': 'nano', 'working_dir': 'weights/voc_yolov3_nano/size-multi_scale/2020_04_07/23_22_59/'}
+Using CUDA device0 _CudaDeviceProperties(name='GeForce GTX 1080 Ti', total_memory=11178MB)
+
+                 all  5.82e+03  1.58e+04     0.918    0.0341      0.38    0.0628
+               Class    Images   Targets         P         R   mAP@0.5        F1
+           aeroplane  5.82e+03       484     0.991    0.0372     0.497    0.0717
+             bicycle  5.82e+03       380         1     0.013     0.473    0.0256
+                bird  5.82e+03       629         1   0.00697      0.22    0.0138
+                boat  5.82e+03       491         1    0.0064      0.15    0.0127
+              bottle  5.82e+03       733         1   0.00136     0.101   0.00272
+                 bus  5.82e+03       320         1     0.194     0.598     0.325
+                 car  5.82e+03  1.17e+03     0.972    0.0591     0.356     0.111
+                 cat  5.82e+03       618     0.946    0.0453     0.597    0.0865
+               chair  5.82e+03  1.45e+03     0.815   0.00138     0.149   0.00276
+                 cow  5.82e+03       347         1   0.00661     0.269    0.0131
+         diningtable  5.82e+03       374         1    0.0138     0.365    0.0272
+                 dog  5.82e+03       773     0.842    0.0346     0.509    0.0664
+               horse  5.82e+03       373         1   0.00421     0.518   0.00838
+           motorbike  5.82e+03       376         1   0.00781     0.534    0.0155
+              person  5.82e+03  5.11e+03         1    0.0656     0.561     0.123
+         pottedplant  5.82e+03       542         0         0    0.0942         0
+               sheep  5.82e+03       485     0.865    0.0661     0.335     0.123
+                sofa  5.82e+03       387         1    0.0213     0.294    0.0417
+               train  5.82e+03       329         1    0.0656     0.586     0.123
+           tvmonitor  5.82e+03       414     0.929    0.0319     0.396    0.0616
+Speed: 2.1/4.1/6.2 ms inference/NMS/total per 416x416 image at batch-size 32

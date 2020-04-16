@@ -755,15 +755,18 @@ def print_model_biases(model):
     print('\nModel Bias Summary: %8s%18s%18s%18s' % ('layer', 'regression', 'objectness', 'classification'))
     multi_gpu = type(model) in (nn.parallel.DataParallel, nn.parallel.DistributedDataParallel)
     for l in model.yolo_layers:  # print pretrained biases
-        if multi_gpu:
-            na = model.module.module_list[l].na  # number of anchors
-            b = model.module.module_list[l - 1][0].bias.view(na, -1)  # bias 3x85
-        else:
-            na = model.module_list[l].na
-            b = model.module_list[l - 1][0].bias.view(na, -1)  # bias 3x85
-        print(' ' * 20 + '%8g %18s%18s%18s' % (l, '%5.2f+/-%-5.2f' % (b[:, :4].mean(), b[:, :4].std()),
+        try:
+            if multi_gpu:
+                na = model.module.module_list[l].na  # number of anchors
+                b = model.module.module_list[l - 1][0].bias.view(na, -1)  # bias 3x85
+            else:
+                na = model.module_list[l].na
+                b = model.module_list[l - 1][0].bias.view(na, -1)  # bias 3x85
+            print(' ' * 20 + '%8g %18s%18s%18s' % (l, '%5.2f+/-%-5.2f' % (b[:, :4].mean(), b[:, :4].std()),
                                                '%5.2f+/-%-5.2f' % (b[:, 4].mean(), b[:, 4].std()),
                                                '%5.2f+/-%-5.2f' % (b[:, 5:].mean(), b[:, 5:].std())))
+        except:
+            print('Model bias not printable')
 
 
 def strip_optimizer(f='weights/last.pt'):  # from utils.utils import *; strip_optimizer()

@@ -1,0 +1,3 @@
+{'cfg': 'cfg/voc_yolov3-tiny.pt', 'data': 'data/voc_test.data', 'weights': 'weights/voc_yolov3-tiny/size-multi_scale/2020_03_30/10_14_23/best.pt', 'batch_size': 32, 'img_size': 416, 'conf_thres': 0.001, 'iou_thres': 0.6, 'save_json': False, 'task': 'test', 'device': '2', 'single_cls': False, 'mask': None, 'working_dir': 'weights/voc_yolov3-tiny/size-multi_scale/2020_03_30/10_14_23/'}
+Using CUDA device0 _CudaDeviceProperties(name='GeForce GTX 1080 Ti', total_memory=11178MB)
+
