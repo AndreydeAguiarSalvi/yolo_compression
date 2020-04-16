@@ -200,8 +200,8 @@ if __name__ == '__main__':
         json.dump(config, f)
     f.close()
 
-    config['last'] = config['sub_working_dir'] + 'last.pt'
-    config['best'] = config['sub_working_dir'] + 'best.pt'
+    config['last'] = config['weights'] if 'last' in config['weights'] else config['sub_working_dir'] + 'last.pt'
+    config['best'] = config['weights'].replace('last', 'best') if 'last' in config['weights'] else config['sub_working_dir'] + 'best.pt'
     config['results_file'] = config['sub_working_dir'] + 'results.txt'
     config['weights'] = config['last'] if config['resume'] else config['weights']
 
