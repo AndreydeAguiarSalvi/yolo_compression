@@ -194,7 +194,8 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
         y = model(x)
         masks = [m.mask for m in model.mask_modules]
         print(f'Iteration {iteration} finished with {compute_remaining_weights(masks)} remaining weights.')
-        del x, del y
+        del x 
+        del y
 
 
 
