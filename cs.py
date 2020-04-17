@@ -187,7 +187,15 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
     #############
     # End epoch #
     #############
-    print(f'Iteration {iteration} finished with {compute_remaining_weights(masks)} remaining weights.')
+    try: 
+        print(f'Iteration {iteration} finished with {compute_remaining_weights(masks)} remaining weights.')
+    except:
+        x = torch.Tensor(1, 3, 416, 416).to(device)
+        y = model(x)
+        masks = [m.mask for m in model.mask_modules]
+        print(f'Iteration {iteration} finished with {compute_remaining_weights(masks)} remaining weights.')
+        del x, del y
+
 
 
 if __name__ == '__main__':
