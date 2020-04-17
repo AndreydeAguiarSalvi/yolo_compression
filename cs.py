@@ -167,7 +167,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
         if save:
             with open(config['results_file'], 'r') as f:
                 # Create checkpoint
-                chkpt = {'iteration': iteration
+                chkpt = {'iteration': iteration,
                         'epoch': epoch,
                          'best_fitness': best_fitness,
                          'training_results': f.read(),
@@ -307,6 +307,7 @@ if __name__ == '__main__':
 
     for it in range(start_iteration, config['iterations']):
         train(it, best_fitness, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
+        start_epoch = 0
         model.temp = 1
         if it != config['iterations']-1: model.prune()
         best_fitness = .0
