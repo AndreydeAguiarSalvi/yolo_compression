@@ -186,7 +186,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
     #############
     # End epoch #
     #############
-    print(f'Iteration {iteration} finished with {compute_remaining_weights(model)} remaining weights.')
+    print(f'Iteration {iteration} finished with {compute_remaining_weights(masks)} remaining weights.')
 
 
 if __name__ == '__main__':
