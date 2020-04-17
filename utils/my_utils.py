@@ -406,7 +406,11 @@ def load_checkpoints_mask(config, model, mask, weights, optimizer, device, try_d
             with open(config['results_file'], 'w') as file:
                 file.write(chkpt['training_results'])  # write results.txt
 
-        start_iteration = chkpt['iteration']
+        try:
+            start_iteration = chkpt['iteration']
+        except:
+            print('Iteration not found. initializin on 0')
+            start_iteration = 0
         start_epoch = chkpt['epoch'] + 1
         del chkpt
 

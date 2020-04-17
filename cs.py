@@ -167,7 +167,8 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
         if save:
             with open(config['results_file'], 'r') as f:
                 # Create checkpoint
-                chkpt = {'epoch': epoch,
+                chkpt = {'iteration': iteration
+                        'epoch': epoch,
                          'best_fitness': best_fitness,
                          'training_results': f.read(),
                          'model': model.module.state_dict() if type(
