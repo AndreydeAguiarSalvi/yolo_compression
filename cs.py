@@ -7,7 +7,7 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_train_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints_mask
+from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints_mask
 from utils.pruning import sum_of_the_weights
 
 mixed_precision = True
