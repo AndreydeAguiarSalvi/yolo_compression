@@ -40,9 +40,9 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
         if mask_optim is not None: 
             if epoch == 0:
                 adjust_learning_rate(mask_optim, config['mask_lr'])
-            elif epoch == 98:
+            elif epoch == int(.65 * config['epochs']):
                 adjust_learning_rate(mask_optim, config['mask_lr'] * .1) # 65% and 84% of 150, respectivelly, as in the paper (56/85 and 71/85)
-            elif epoch == 126: 
+            elif epoch == int(.84 * config['epochs']): 
                 adjust_learning_rate(mask_optim, config['mask_lr'] * .01) # 65% and 84% of 150, respectivelly, as in the paper (56/85 and 71/85)
 
         # Prebias
@@ -323,7 +323,7 @@ if __name__ == '__main__':
     # mask_scheduler = create_scheduler(config, mask_optim, start_epoch)
     
     model.ticket = False
-    config['epochs'] = int(config['epochs'] / 3)
+    config['epochs'] = int(config['epochs'] / config['iterations'])
     for it in range(start_iteration, config['iterations']):
         train(it, best_fitness, prebias, trainloader, validloader, config, scheduler, None, optimizer, mask_optim, tb_writer) 
         start_epoch = 0
@@ -337,7 +337,7 @@ if __name__ == '__main__':
     optimizer = create_optimizer(model, config)
     scheduler = create_scheduler(config, optimizer, start_epoch)
     best_fitness = .0
-    config['epochs'] = int(config['epochs'] * 3)
+    config['epochs'] = int(config['epochs'] * config['iterations'])
     train(it+1, best_fitness, prebias, trainloader, validloader, config, scheduler, None, optimizer, None, tb_writer)
 
     #####################

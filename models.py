@@ -814,7 +814,7 @@ class SoftDarknet(MaskedNet):
     # YOLOv3 object detection model
 
     def __init__(self, cfg, img_size=(416, 416), arc='default'):
-        super(MaskedNet, self).__init__()
+        super(SoftDarknet, self).__init__()
 
         self.module_defs = parse_model_cfg(cfg)
         self.module_list, self.routs = create_modules(self.module_defs, img_size, arc)
