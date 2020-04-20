@@ -20,9 +20,8 @@ except:
 def compute_remaining_weights(masks):
     return 1 - sum(float((m == 0).sum()) for m in masks) / sum(m.numel() for m in masks)
 
-def adjust_learning_rate(optimizer, config):
-    config['mask_lr'] *= .1
-    for param_group in optimizer.param_groups: param_group['lr'] = config['mask_lr']
+def adjust_learning_rate(optimizer, value):
+    for param_group in optimizer.param_groups: param_group['lr'] = value
 
 counter = 0
 
@@ -36,6 +35,15 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
     for epoch in range(start_epoch, config['epochs']):  
         model.train()
         model.gr = 1 - (1 + math.cos(min(epoch * 2, config['epochs']) * math.pi / config['epochs'])) / 2  # GIoU <-> 1.0 loss ratio
+        
+        # if mask_scheduler is not None: mask_scheduler.step()
+        if mask_optim is not None: 
+            if epoch == 0:
+                adjust_learning_rate(mask_optim, config['mask_lr'])
+            elif epoch == 98:
+                adjust_learning_rate(mask_optim, config['mask_lr'] * .1) # 65% and 84% of 150, respectivelly, as in the paper (56/85 and 71/85)
+            elif epoch == 126: 
+                adjust_learning_rate(mask_optim, config['mask_lr'] * .01) # 65% and 84% of 150, respectivelly, as in the paper (56/85 and 71/85)
 
         # Prebias
         if prebias:
@@ -132,9 +140,6 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
 
         # Update scheduler
         scheduler.step()
-        # if mask_scheduler is not None: mask_scheduler.step()
-        if mask_optim is not None: 
-            if epoch == 98 or epoch == 126: adjust_learning_rate(mask_optim, config) # 65% and 84% of 150, respectivelly, as in the paper (56/85 and 71/85)
 
         final_epoch = epoch + 1 == config['epochs']
         if not config['notest'] or final_epoch:  # Calculate mAP
