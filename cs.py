@@ -211,7 +211,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
 
 
 if __name__ == '__main__':
-    args = create_train_argparser()
+    args = create_prune_argparser()
     config = create_config(args)
     print("sub working dir: %s" % config['sub_working_dir'])
 
