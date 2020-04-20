@@ -1,5 +1,5 @@
 inherit_from: params/default.yaml
-epochs : 150
+epochs : 300
 iterations : 3
 batch_size : 8
 accumulate: 8
@@ -12,4 +12,4 @@ reseting : 10
 final_temperature : 200.0
 mask_lr : 0.1
 mask_momentum : 0.9
-lambda : 0.00000001
+lambda : 0.00001

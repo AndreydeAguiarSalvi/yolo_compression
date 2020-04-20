@@ -29,7 +29,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
     ###############
     # Start epoch #
     ###############
-    for epoch in range(start_epoch, epochs):  
+    for epoch in range(start_epoch, epochs/3):  
         model.train()
         model.gr = 1 - (1 + math.cos(min(epoch * 2, epochs) * math.pi / epochs)) / 2  # GIoU <-> 1.0 loss ratio
 
