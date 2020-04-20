@@ -20,6 +20,10 @@ except:
 def compute_remaining_weights(masks):
     return 1 - sum(float((m == 0).sum()) for m in masks) / sum(m.numel() for m in masks)
 
+def adjust_learning_rate(optimizer, config):
+    config['mask_lr'] *= .1
+    for param_group in optimizer.param_groups: param_group['lr'] = config['mask_lr']
+
 counter = 0
 
 def train(iteration, best_fitness, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer):
@@ -29,9 +33,9 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
     ###############
     # Start epoch #
     ###############
-    for epoch in range(start_epoch, int(epochs/3)):  
+    for epoch in range(start_epoch, config['epochs']):  
         model.train()
-        model.gr = 1 - (1 + math.cos(min(epoch * 2, epochs) * math.pi / epochs)) / 2  # GIoU <-> 1.0 loss ratio
+        model.gr = 1 - (1 + math.cos(min(epoch * 2, config['epochs']) * math.pi / config['epochs'])) / 2  # GIoU <-> 1.0 loss ratio
 
         # Prebias
         if prebias:
@@ -120,7 +124,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
             # Print batch results
             mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
             mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
-            s = ('%10s' * 3 + '%10.3g' * 6) % ('%g/%g' % (iteration, config['iterations']-1), '%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
+            s = ('%10s' * 3 + '%10.3g' * 6) % ('%g/%g' % (iteration, config['iterations']-1), '%g/%g' % (epoch, config['epochs'] - 1), mem, *mloss, len(targets), img_size)
             pbar.set_description(s)
         ##################
         # End mini-batch #
@@ -128,9 +132,11 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
 
         # Update scheduler
         scheduler.step()
-        if mask_scheduler is not None: mask_scheduler.step()
+        # if mask_scheduler is not None: mask_scheduler.step()
+        if mask_optim is not None: 
+            if epoch == 98 or epoch == 126: adjust_learning_rate(mask_optim, config) # 65% and 84% of 150, respectivelly, as in the paper (56/85 and 71/85)
 
-        final_epoch = epoch + 1 == epochs
+        final_epoch = epoch + 1 == config['epochs']
         if not config['notest'] or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
             results, maps = test.test(
@@ -235,7 +241,6 @@ if __name__ == '__main__':
     cfg = config['cfg']
     data = config['data']
     img_size, img_size_test = config['img_size'] if len(config['img_size']) == 2 else config['img_size'] * 2  # train, test sizes
-    epochs = config['epochs']  # 500200 batches at bs 64, 117263 images = 273 epochs
     batch_size = config['batch_size']
     accumulate = config['accumulate']  # effective bs = batch_size * accumulate = 16 * 4 = 64
     weights = config['weights']  # initial training weights
@@ -301,7 +306,7 @@ if __name__ == '__main__':
     results = (0, 0, 0, 0, 0, 0, 0)  # 'P', 'R', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification'
     t0 = time.time()
     torch_utils.model_info(model, report='summary')  # 'full' or 'summary'
-    print('Starting training for %g epochs...' % epochs)
+    print('Starting training for %g epochs...' % config['epochs'])
     ###################
     # End Old Train 1 #
     ###################
@@ -310,12 +315,12 @@ if __name__ == '__main__':
     temp_increase = config['final_temperature']**(1./iters_per_reset)
     mask_params = map(lambda a: a[1], filter(lambda p: p[1].requires_grad and 'mask' in p[0], model.named_parameters()))
     mask_optim = torch.optim.SGD(mask_params, lr=config['mask_lr'], momentum=config['mask_momentum'], nesterov=True)
-    mask_scheduler = create_scheduler(config, mask_optim, start_epoch)
+    # mask_scheduler = create_scheduler(config, mask_optim, start_epoch)
     
     model.ticket = False
-
+    config['epochs'] = int(config['epochs'] / 3)
     for it in range(start_iteration, config['iterations']):
-        train(it, best_fitness, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
+        train(it, best_fitness, prebias, trainloader, validloader, config, scheduler, None, optimizer, mask_optim, tb_writer) 
         start_epoch = 0
         model.temp = 1
         if it != config['iterations']-1: model.prune()
@@ -327,6 +332,7 @@ if __name__ == '__main__':
     optimizer = create_optimizer(model, config)
     scheduler = create_scheduler(config, optimizer, start_epoch)
     best_fitness = .0
+    config['epochs'] = int(config['epochs'] * 3)
     train(it+1, best_fitness, prebias, trainloader, validloader, config, scheduler, None, optimizer, None, tb_writer)
 
     #####################
