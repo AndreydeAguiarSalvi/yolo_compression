@@ -148,7 +148,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
                 cfg = cfg, data = data, batch_size=batch_size,
                 img_size=img_size_test, model=model, 
                 conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
-                iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
+                iou_thres=0.6, save_json=final_epoch and is_coco,
                 dataloader=validloader, folder = config['sub_working_dir']
             )    
 
@@ -262,7 +262,7 @@ if __name__ == '__main__':
     data_dict = parse_data_cfg(data)
     train_path = data_dict['train']
     test_path = data_dict['valid']
-    nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
+    nc = int(data_dict['classes'])  # number of classes
 
     # Initialize model
     model = SoftDarknet(cfg, arc=config['arc']).to(device)
