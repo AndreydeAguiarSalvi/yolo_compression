@@ -30,12 +30,23 @@ def detect(save_img=False):
         files.append(result_file)
 
     # Initialize model
-    model = Darknet(opt.cfg, img_size)
+    if 'nano' in opt.cfg:
+        model = YOLO_Nano(cfg=opt.cfg).to(device)
+    elif 'soft' in opt.cfg:
+        model = SoftDarknet(cfg=opt.cfg).to(device)
+        model.ticket = True
+    else:
+        model = Darknet(cfg=opt.cfg).to(device)
 
     # Load weights
     attempt_download(weights)
     if weights.endswith('.pt'):  # pytorch format
         model.load_state_dict(torch.load(weights, map_location=device)['model'])
+        if opt.mask or opt.mask_weight:
+            mask = create_mask_LTH(model)
+            mask.load_state_dict(torch.load(weights if opt.mask else opt.mask_weight, map_location=device)['mask'])
+            apply_mask_LTH(model, mask)
+            del mask
     else:  # darknet format
         load_darknet_weights(model, weights)
 
@@ -45,10 +56,6 @@ def detect(save_img=False):
         modelc = torch_utils.load_classifier(name='resnet101', n=2)  # initialize
         modelc.load_state_dict(torch.load('weights/resnet101.pt', map_location=device)['model'])  # load weights
         modelc.to(device).eval()
-
-    # Fuse Conv2d + BatchNorm2d layers
-    # model.fuse()
-    # torch_utils.model_info(model, report='summary')  # 'full' or 'summary'
 
     # Eval mode
     model.to(device).eval()
@@ -73,7 +80,7 @@ def detect(save_img=False):
     # Run inference
     t0 = time.time()
     for path, img, im0s, _ in dataset:
-        ID = path.split(os.sep)[-1]
+        ID = path.split(os.sep)[-1].split('.')[0]
         t = time.time()
 
         img = torch.from_numpy(img).to(device)
@@ -109,16 +116,11 @@ def detect(save_img=False):
 
                 # Write results
                 for *xyxy, conf, cls in det:
-                    print(ID, conf, *xyxy, sep=' ')
-                    # print(ID, conf, *xyxy, sep=' ', file=result_file[int(cls)])
-                    # if save_txt:  # Write to file
-                    #     with open(save_path + '.txt', 'a') as file:
-                    #         file.write(('%g ' * 6 + '\n') % (*xyxy, cls, conf))
+                    print(ID, conf.item(), int(xyxy[0].item()), int(xyxy[1].item()), int(xyxy[2].item()), int(xyxy[3].item()), sep=' ', file=files[int(cls)])
 
                     if save_img or view_img:  # Add bbox to image
                         label = '%s %.2f' % (names[int(cls)], conf)
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)])
-                exit()
 
             # Print time (inference + NMS)
             print('%sDone. (%.3fs)' % (s, time.time() - t))
@@ -140,16 +142,16 @@ def detect(save_img=False):
             os.system('open ' + out + ' ' + save_path)
 
     print('Done. (%.3fs)' % (time.time() - t0))
-
+    for f in files: f.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--cfg', type=str, default='cfg/voc_yolov3.cfg', help='*.cfg path')
     parser.add_argument('--names', type=str, default='data/voc.names', help='*.names path')
-    parser.add_argument('--weights', type=str, default='weights/voc_yolov3/2020_04_05/10_02_02/best.pt', help='path to weights file')
+    parser.add_argument('--weights', type=str, default='weights/voc_yolov3/size-multi_scale/2020_04_05/10_02_02/best.pt', help='path to weights file')
     parser.add_argument('--mask', action='store_true', help='wheter has a mask inside the checkpoint')
     parser.add_argument('--mask_weight', type=str, default=None, help='wheter mask is another checkpoint')
-    parser.add_argument('--source', type=str, default='./PASCALVOC2012/images/test/', help='source')  # input file/folder, 0 for webcam
+    parser.add_argument('--source', type=str, default='../PASCALVOC2012/images/test/', help='source')  # input file/folder, 0 for webcam
     parser.add_argument('--output', type=str, default=None, required=True, help='output folder')  # output folder
     parser.add_argument('--img-size', type=int, default=416, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.3, help='object confidence threshold')
