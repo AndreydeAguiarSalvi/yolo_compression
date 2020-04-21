@@ -31,7 +31,7 @@ def detect(save_img=False):
 
     # Initialize model
     if 'nano' in opt.cfg:
-        model = YOLO_Nano(cfg=opt.cfg).to(device)
+        model = YOLO_Nano().to(device)
     elif 'soft' in opt.cfg:
         model = SoftDarknet(cfg=opt.cfg).to(device)
         model.ticket = True
