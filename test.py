@@ -36,10 +36,10 @@ def test(cfg,
         if 'nano' in cfg:
             model = YOLO_Nano().to(device)
         elif 'soft' in cfg:
-            model = SoftDarknet(cfg=opt.cfg).to(device)
+            model = SoftDarknet(cfg=cfg).to(device)
             model.ticket = True
         else:
-            model = Darknet(cfg=opt.cfg).to(device)
+            model = Darknet(cfg=cfg).to(device)
 
         if mask or mask_weight:
             from utils.pruning import sum_of_the_weights, apply_mask_LTH, create_mask_LTH
