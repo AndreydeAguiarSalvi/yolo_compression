@@ -33,12 +33,13 @@ def test(cfg,
             os.remove(f)
 
         # Initialize model
-        if architecture == 'default':
-            model = Darknet(cfg, arc=architecture).to(device)
-        elif architecture == 'nano':
+        if 'nano' in cfg:
             model = YOLO_Nano().to(device)
-        elif architecture == 'soft':
-            model = SoftDarknet(cfg, arc=architecture).to(device)
+        elif 'soft' in cfg:
+            model = SoftDarknet(cfg=opt.cfg).to(device)
+            model.ticket = True
+        else:
+            model = Darknet(cfg=opt.cfg).to(device)
 
         if mask or mask_weight:
             from utils.pruning import sum_of_the_weights, apply_mask_LTH, create_mask_LTH
