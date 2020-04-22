@@ -44,7 +44,8 @@ def detect(save_img=False):
         model.load_state_dict(torch.load(weights, map_location=device)['model'])
         if opt.mask or opt.mask_weight:
             mask = create_mask_LTH(model)
-            mask.load_state_dict(torch.load(weights if opt.mask else opt.mask_weight, map_location=device)['mask'])
+            if opt.mask: mask.load_state_dict(torch.load(weights, map_location=device)['mask'])
+            else: mask.load_state_dict(torch.load(opt.mask_weight, map_location=device))
             apply_mask_LTH(model, mask)
             del mask
     else:  # darknet format
