@@ -21,6 +21,7 @@ def test(cfg,
          dataloader=None,
          folder='',
          mask=None,
+         mask_weight=None,
          architecture='default'):
     # Initialize/load model and set device
     if model is None:
@@ -37,7 +38,18 @@ def test(cfg,
         elif architecture == 'nano':
             model = YOLO_Nano().to(device)
         elif architecture == 'soft':
-            model = Soft_Darknet(cfg, arc=architecture).to(device)
+            model = SoftDarknet(cfg, arc=architecture).to(device)
+
+        if mask or mask_weight:
+            from utils.pruning import sum_of_the_weights, apply_mask_LTH, create_mask_LTH
+            msk = create_mask_LTH(model)
+            initial_weights = sum_of_the_weights(msk)
+            if mask: msk.load_state_dict(torch.load(weights, map_location=device)['mask'])
+            else: msk.load_state_dict(torch.load(mask_weight, map_location=device))
+            final_weights = sum_of_the_weights(msk)
+            apply_mask_LTH(model, msk)
+            print(f'Evaluating model with initial weights number of {initial_weights} and final of {final_weights}. \nReduction of {final_weights * 100. / initial_weights}%.')
+            del msk
 
         # Load weights
         attempt_download(weights)
@@ -54,19 +66,6 @@ def test(cfg,
     else:  # called by train.py
         device = next(model.parameters()).device  # get model device
         verbose = False
-
-    # To pruned models
-    if mask is not None:
-        from utils.pruning import sum_of_the_weights, apply_mask_LTH, create_mask_LTH
-        msk = create_mask_LTH(model)
-        initial_weights = sum_of_the_weights(msk)
-        all_weights = torch.load(weights, map_location='cpu')
-        if 'mask' in all_weights.keys(): msk.load_state_dict(torch.load(weights, map_location=device)['mask'])
-        else: msk.load_state_dict(torch.load(mask, map_location=device))
-        final_weights = sum_of_the_weights(msk)
-        print(f'Evaluating model with initial weights number of {initial_weights} and final of {final_weights}. \nReduction of {final_weights * 100. / initial_weights}%.')
-        apply_mask_LTH(model, msk)
-        del all_weights
 
     # Configure run
     data = parse_data_cfg(data)
@@ -261,7 +260,7 @@ if __name__ == '__main__':
                 cfg = args['cfg'], data = args['data'], weights = args['weights'],
                 batch_size = args['batch_size'], img_size = args['img_size'], conf_thres = args['conf_thres'],
                 iou_thres = args['iou_thres'], save_json = args['save_json'], folder = args['working_dir'],
-                mask = args['mask'], architecture = args['architecture']
+                mask = args['mask'], mask_weight = args['mask_weight'], architecture = args['architecture']
             )
 
     elif args['task'] == 'benchmark': # mAPs at 320-608 at conf 0.5 and 0.7
@@ -273,7 +272,7 @@ if __name__ == '__main__':
                         cfg = args['cfg'], data = args['data'], weights = args['weights'], 
                         batch_size = args['batch_size'], img_size = i, conf_thres = args['conf_thres'], 
                         iou_thres = j, save_json = args['save_json'], folder = args['working_dir'],
-                        mask = args['mask'], architecture = args['architecture']
+                        mask = args['mask'], mask_weight = args['mask_weight'], architecture = args['architecture']
                     )[0]
                 y.append(r + (time.time() - t,))
         np.savetxt(args['working_dir'] + 'benchmark.txt', y, fmt='%10.4g')  # y = np.loadtxt('study.txt')
@@ -287,7 +286,7 @@ if __name__ == '__main__':
                 cfg = args['cfg'], data = args['data'], weights = args['weights'], 
                 batch_size = args['batch_size'], img_size = args['img_size'], conf_thres = args['conf_thres'], 
                 iou_thres = i, save_json = args['save_json'], folder = args['working_dir'],
-                mask = args['mask'], architecture = args['architecture']
+                mask = args['mask'], mask_weight = args['mask_weight'], architecture = args['architecture']
             )[0]
             y.append(r + (time.time() - t,))
         np.savetxt(args['working_dir'] + 'study.txt', y, fmt='%10.4g')  # y = np.loadtxt('study.txt')
