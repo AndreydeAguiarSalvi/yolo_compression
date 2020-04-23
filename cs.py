@@ -282,8 +282,6 @@ if __name__ == '__main__':
     elif config['xavier_uniform']:
         initialize_model(model, torch.nn.init.xavier_uniform_)
 
-    scheduler = create_scheduler(config, optimizer, start_epoch)
-
     # Mixed precision training https://github.com/NVIDIA/apex
     if mixed_precision:
         model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
@@ -324,6 +322,7 @@ if __name__ == '__main__':
     
     model.ticket = False
     config['epochs'] = int(config['epochs'] / config['iterations'])
+    scheduler = create_scheduler(config, optimizer, start_epoch)
     for it in range(start_iteration, config['iterations']):
         train(it, best_fitness, prebias, trainloader, validloader, config, scheduler, None, optimizer, mask_optim, tb_writer) 
         start_epoch = 0
@@ -335,9 +334,9 @@ if __name__ == '__main__':
     model.ticket = True
     model.rewind_weights()
     optimizer = create_optimizer(model, config)
+    config['epochs'] = int(config['epochs'] * config['iterations'])
     scheduler = create_scheduler(config, optimizer, start_epoch)
     best_fitness = .0
-    config['epochs'] = int(config['epochs'] * config['iterations'])
     train(it+1, best_fitness, prebias, trainloader, validloader, config, scheduler, None, optimizer, None, tb_writer)
 
     #####################
