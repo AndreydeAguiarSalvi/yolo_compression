@@ -322,8 +322,8 @@ if __name__ == '__main__':
     
     model.ticket = False
     config['epochs'] = int(config['epochs'] / config['iterations'])
-    scheduler = create_scheduler(config, optimizer, start_epoch)
     for it in range(start_iteration, config['iterations']):
+        scheduler = create_scheduler(config, optimizer, start_epoch)
         train(it, best_fitness, prebias, trainloader, validloader, config, scheduler, None, optimizer, mask_optim, tb_writer) 
         start_epoch = 0
         model.temp = 1
