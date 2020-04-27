@@ -3,7 +3,7 @@ epochs : 300
 iterations : 13
 batch_size : 8
 accumulate: 8
-cfg : cfg/yolov3.cfg
+cfg : cfg/voc_yolov3.cfg
 data : data/voc2012.data
 weights : ''
 prune_kind : IMP_LOCAL
