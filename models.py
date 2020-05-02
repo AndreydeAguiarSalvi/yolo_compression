@@ -807,7 +807,7 @@ class MaskedNet(nn.Module):
                 try:
                     m.load_state_dict(m.checkpoint)
                 except:
-                    print(f'cannot rewind weight from {'Conv2d' if isinstance(m, nn.Conv2d) else 'BatchNorm2d' if isinstance(m, nn.BatchNorm2d) else 'Linear'}')
+                    print(f"cannot rewind weight from {'Conv2d' if isinstance(m, nn.Conv2d) else 'BatchNorm2d' if isinstance(m, nn.BatchNorm2d) else 'Linear'}")
                 
     def prune(self):
         for m in self.mask_modules: m.prune(self.temp)
