@@ -804,7 +804,10 @@ class MaskedNet(nn.Module):
         for m in self.mask_modules: m.rewind_weights()
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.Linear):
-                m.load_state_dict(m.checkpoint)
+                try:
+                    m.load_state_dict(m.checkpoint)
+                except:
+                    print(f'cannot rewind weight from {'Conv2d' if isinstance(m, nn.Conv2d) else 'BatchNorm2d' if isinstance(m, nn.BatchNorm2d) else 'Linear'}')
                 
     def prune(self):
         for m in self.mask_modules: m.prune(self.temp)
