@@ -315,14 +315,14 @@ if __name__ == '__main__':
     # End Old Train 1 #
     ###################
 
-    iters_per_reset = config['epochs']-1
-    temp_increase = config['final_temperature']**(1./iters_per_reset)
     mask_params = map(lambda a: a[1], filter(lambda p: p[1].requires_grad and 'mask' in p[0], model.named_parameters()))
     mask_optim = torch.optim.SGD(mask_params, lr=config['mask_lr'], momentum=config['mask_momentum'], nesterov=True)
     # mask_scheduler = create_scheduler(config, mask_optim, start_epoch)
     
     model.ticket = False
     config['epochs'] = int(config['epochs'] / config['iterations'])
+    iters_per_reset = config['epochs']-1
+    temp_increase = config['final_temperature']**(1./iters_per_reset)
     for it in range(start_iteration, config['iterations']):
         scheduler = create_scheduler(config, optimizer, start_epoch)
         mask_scheduler = create_scheduler(config, mask_optim, start_epoch)
