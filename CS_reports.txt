@@ -1,0 +1,8 @@
+3 de 100 + 1 de 300 com LRDecay=step (step original) -> o modelo aprendia bem nas 2 primeiras e depois caía
+1 de 300 + 1 de 300 com LRDecay=step (step  ñlembro)-> o modelo não aguenta mais q 100
+1 de 300 + 1 de 300 com LRDecay=step (step 1/3, 2/3)-> o modelo não aguenta mais q 100
+
+1 de 300 + 1 de 300 com LRDecay=cosine -> o modelo não aguenta até 100
+3 de 100 + 1 de 300 com LRDecay=cosine -> o modelo não aguenta até 60
+
+3 de 75 + 1 de 300 com LRDecay=step (step original) -> rodando
