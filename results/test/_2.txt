@@ -1,9 +1,0 @@
-{'cfg': 'cfg/voc_yolov3.cfg', 'data': 'data/voc_test.data', 'weights': 'weights/voc_yolov3/size-multi_scale/2020_03_24/11_28_50/best.pt', 'batch_size': 32, 'img_size': 416, 'conf_thres': 0.001, 'iou_thres': 0.6, 'save_json': False, 'task': 'test', 'device': '2', 'single_cls': False, 'mask': None, 'working_dir': 'weights/voc_yolov3/size-multi_scale/2020_03_24/11_28_50/'}
-Using CUDA device0 _CudaDeviceProperties(name='GeForce GTX 1080 Ti', total_memory=11178MB)
-
-                 all  5.14e+03  7.33e+03     0.282     0.154      0.26     0.199
-               Class    Images   Targets         P         R   mAP@0.5        F1
-               chair  5.14e+03         2         0         0         0         0
-         diningtable  5.14e+03         2         0         0    0.0142         0
-              person  5.14e+03  7.33e+03     0.845     0.462     0.764     0.597
-Speed: 6.1/4.1/10.2 ms inference/NMS/total per 416x416 image at batch-size 32

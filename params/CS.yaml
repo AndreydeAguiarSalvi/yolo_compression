@@ -12,4 +12,4 @@ reseting : 10
 final_temperature : 200.0
 mask_lr : 0.1
 mask_momentum : 0.9
-lambda : 0.00001
+lambda : 0.00000001

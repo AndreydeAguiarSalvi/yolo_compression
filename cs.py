@@ -37,13 +37,13 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
         model.gr = 1 - (1 + math.cos(min(epoch * 2, config['epochs']) * math.pi / config['epochs'])) / 2  # GIoU <-> 1.0 loss ratio
         
         # if mask_scheduler is not None: mask_scheduler.step()
-        if mask_optim is not None: 
-            if epoch == 0:
-                adjust_learning_rate(mask_optim, config['mask_lr'])
-            elif epoch == int(.65 * config['epochs']):
-                adjust_learning_rate(mask_optim, config['mask_lr'] * .1) # 65% and 84% of 150, respectivelly, as in the paper (56/85 and 71/85)
-            elif epoch == int(.84 * config['epochs']): 
-                adjust_learning_rate(mask_optim, config['mask_lr'] * .01) # 65% and 84% of 150, respectivelly, as in the paper (56/85 and 71/85)
+        # if mask_optim is not None: 
+        #     if epoch == 0:
+        #         adjust_learning_rate(mask_optim, config['mask_lr'])
+        #     elif epoch == int(.65 * config['epochs']):
+        #         adjust_learning_rate(mask_optim, config['mask_lr'] * .1) # 65% and 84% of 150, respectivelly, as in the paper (56/85 and 71/85)
+        #     elif epoch == int(.84 * config['epochs']): 
+        #         adjust_learning_rate(mask_optim, config['mask_lr'] * .01) # 65% and 84% of 150, respectivelly, as in the paper (56/85 and 71/85)
 
         # Prebias
         if prebias:
@@ -140,7 +140,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
 
         # Update scheduler
         scheduler.step()
-        # if mask_scheduler is not None: mask_scheduler.step()
+        if mask_scheduler is not None: mask_scheduler.step()
 
         final_epoch = epoch + 1 == config['epochs']
         if not config['notest'] or final_epoch:  # Calculate mAP
@@ -325,8 +325,8 @@ if __name__ == '__main__':
     temp_increase = config['final_temperature']**(1./iters_per_reset)
     for it in range(start_iteration, config['iterations']):
         scheduler = create_scheduler(config, optimizer, start_epoch)
-        # mask_scheduler = create_scheduler(config, mask_optim, start_epoch)
-        train(it, best_fitness, prebias, trainloader, validloader, config, scheduler, None, optimizer, mask_optim, tb_writer) 
+        mask_scheduler = create_scheduler(config, mask_optim, start_epoch)
+        train(it, best_fitness, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer) 
         start_epoch = 0
         best_fitness = .0
         model.temp = 1
