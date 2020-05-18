@@ -196,6 +196,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
 
             # Delete checkpoint
             del chkpt
+            torch.cuda.empty_cache()
     #############
     # End epoch #
     #############

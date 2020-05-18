@@ -243,6 +243,7 @@ def train():
 
                 # Delete checkpoint
                 del chkpt
+                torch.cuda.empty_cache()
         #############
         # End epoch #
         #############
