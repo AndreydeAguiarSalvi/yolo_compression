@@ -8,6 +8,10 @@ from utils.utils import *
 from utils.my_utils import create_test_argparser
 
 
+def compute_removed_weights(masks):
+    return sum(float((m == 0).sum()) for m in masks)
+
+
 def test(cfg,
          data,
          weights=None,
@@ -38,6 +42,11 @@ def test(cfg,
         elif 'soft' in cfg:
             model = SoftDarknet(cfg=cfg).to(device)
             model.ticket = True
+
+            x = torch.Tensor(1, 3, 416, 416)
+            y = model(x)
+            masks = [m.mask for m in model.mask_modules]
+            print(f"Evaluating model with {compute_removed_weights(masks)} parameters removed.")
         else:
             model = Darknet(cfg=cfg).to(device)
 
