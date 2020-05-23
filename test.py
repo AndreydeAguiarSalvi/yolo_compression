@@ -43,7 +43,7 @@ def test(cfg,
             model = SoftDarknet(cfg=cfg).to(device)
             model.ticket = True
 
-            x = torch.Tensor(1, 3, 416, 416)
+            x = torch.Tensor(1, 3, 416, 416).to(device)
             y = model(x)
             masks = [m.mask for m in model.mask_modules]
             print(f"Evaluating model with {compute_removed_weights(masks)} parameters removed.")
