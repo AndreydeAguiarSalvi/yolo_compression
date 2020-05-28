@@ -1312,3 +1312,188 @@ class YOLO_Nano(nn.Module):
         self.module_list.append(self.ep7)
         self.module_list.append(self.conv11)
         self.module_list.append(self.yolo_layer13)
+
+
+class SparseConv(nn.Module):
+
+    def __init__(self, original_conv):
+        super(SparseConv, self).__init__()
+        
+        self.find_non_null_filters(original_conv)
+        dict = self.create_splited_convs(original_conv)
+        self.fractional_convs = nn.ModuleDict(dict)
+    
+
+    def forward(self, x):
+        y = []
+        # y2 = []
+        for (key, value) in self.fractional_convs.items():
+            y.append(value(x))
+        # for i in reversed(y): y2.append(i)
+
+        return torch.cat(y, dim=1)
+        
+
+    def find_non_null_filters(self, conv): # conv.shape is out_channels, in_channels, x, y
+        onehot_parameters = torch.sum(torch.abs(conv.weight), dim=(1, 2, 3))
+        self.convs_list = torch.where( onehot_parameters > 0, torch.tensor(1), torch.tensor(0) )
+        
+
+    def create_splited_convs(self, original_conv):
+        sequential_ones = []
+        sequential_zeros = []
+        result = OrderedDict()
+        count_ones = 1
+        count_zeros = 1
+
+        for i in range(self.convs_list.shape[0]):
+            if self.convs_list[i] == torch.tensor(1): 
+                if len(sequential_zeros ) > 0:
+                    new_conv = ZeroConv(sequential_zeros, original_conv.kernel_size, original_conv.padding, original_conv.stride)
+                    result['zero' + str(count_zeros)] = new_conv
+                    count_zeros += 1
+                    sequential_zeros = []
+
+                sequential_ones.append(i)
+            else:
+                if len(sequential_ones) > 0:
+                    new_conv = self.create_miniconv_from(original_conv, sequential_ones)
+                    result['conv' + str(count_ones)] = new_conv
+                    count_ones += 1
+                    sequential_ones = []
+                
+                sequential_zeros.append(1)
+        
+        if len(sequential_ones) > 0:
+            new_conv = self.create_miniconv_from(original_conv, sequential_ones)
+            result['conv' + str(count_ones)] = new_conv
+        elif len(sequential_zeros) > 0:
+            new_conv = ZeroConv(sequential_zeros)
+            result['zero' + str(count_zeros)] = new_conv
+        
+        return result
+
+
+    def create_miniconv_from(self, original_conv, channels_list):
+        new_conv = nn.Conv2d(
+            in_channels=original_conv.in_channels, out_channels=len(channels_list), 
+            kernel_size=original_conv.kernel_size, padding=original_conv.padding,
+            stride=original_conv.stride, groups=original_conv.groups,
+            bias = True if original_conv.bias is not None else False
+        )
+        new_conv.weight.data = original_conv.weight[ channels_list[0] : channels_list[-1]+1 ]
+        if original_conv.bias is not None:
+            new_conv.bias.data = original_conv.bias[ channels_list[0] : channels_list[-1]+1 ]
+
+        return new_conv
+
+
+class ZeroConv(nn.Module):
+
+    def __init__(self, channels_list, kernel_size, padding, stride):
+        super().__init__()    
+        self.channels = len(channels_list)
+        self.kernel = kernel_size
+        self.padding = padding
+        self.stride = stride
+    
+    
+    def forward(self, input):
+        batch_size = input.shape[0]
+        width, height = input.shape[-2:]
+        width = self.compute_size(width, self.kernel[0], self.padding[0], self.stride[0])
+        height = self.compute_size(height, self.kernel[1], self.padding[1], self.stride[1])
+        
+        return torch.zeros(torch.Size([batch_size, self.channels, width, height]))
+    
+
+    def compute_size(self, dimension, kernel, padding, stride):
+        return int( ( (dimension - kernel + 2 * padding) / stride) + 1)
+
+
+class SparseYOLO(nn.Module):
+
+    def __init__(self, pruned_yolo):
+        super().__init__()
+
+        self.module_defs = pruned_yolo.module_defs
+        self.create_module_list(pruned_yolo)
+        self.yolo_layers = pruned_yolo.yolo_layers
+    
+
+    def forward(self, x, verbose=False):
+        img_size = x.shape[-2:]
+        yolo_out, out = [], []
+        verbose = False
+        if verbose:
+            str = ''
+            print('0', x.shape)
+
+        for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
+            mtype = mdef['type']
+            if mtype in ['convolutional', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'upsample', 'maxpool']:
+                x = module(x)
+            elif mtype == 'shortcut':  # sum
+                if verbose:
+                    l = [i - 1] + module.layers  # layers
+                    s = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes
+                    str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
+                x = module(x, out)  # weightedFeatureFusion()
+            elif mtype == 'route': # concat
+                layers = mdef['layers']
+                if verbose:
+                    l = [i - 1] + layers  # layers
+                    s = [list(x.shape)] + [list(out[i].shape) for i in layers]  # shapes
+                    str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
+                if len(layers) == 1:
+                    x = out[layers[0]]
+                else:
+                    try:
+                        x = torch.cat([out[i] for i in layers], 1)
+                    except:  # apply stride 2 for darknet reorg layer
+                        out[layers[1]] = F.interpolate(out[layers[1]], scale_factor=[0.5, 0.5])
+                        x = torch.cat([out[i] for i in layers], 1)
+                    # print(''), [print(out[i].shape) for i in layers], print(x.shape)
+            elif mtype == 'yolo':
+                yolo_out.append(module(x, img_size))
+            out.append(x if i in self.routs else [])
+            if verbose:
+                print('%g/%g %s -' % (i, len(self.module_list), mtype), list(x.shape), str)
+                str = ''
+
+        if self.training: # train
+            return yolo_out
+        elif ONNX_EXPORT: # export
+            x = [torch.cat(x, 0) for x in zip(*yolo_out)]
+            return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4
+        else: # test
+            io, p = zip(*yolo_out)  # inference output, training output
+            return torch.cat(io, 1), p
+
+    def fuse(self):
+        # Fuse Conv2d + BatchNorm2d layers throughout model
+        fused_list = nn.ModuleList()
+        for a in list(self.children())[0]:
+            if isinstance(a, nn.Sequential):
+                for i, b in enumerate(a):
+                    if isinstance(b, nn.modules.batchnorm.BatchNorm2d):
+                        # fuse this bn layer with the previous conv2d layer
+                        conv = a[i - 1]
+                        fused = torch_utils.fuse_conv_and_bn(conv, b)
+                        a = nn.Sequential(fused, *list(a.children())[i + 1:])
+                        break
+            fused_list.append(a)
+        self.module_list = fused_list
+        # model_info(self)  # yolov3-spp reduced from 225 to 152 layers
+
+
+    def create_module_list(self, pruned_yolo):
+        self.module_list = nn.ModuleList()
+
+        for m in pruned_yolo.module_list:
+            if type(m) is nn.Conv2d:
+                new_conv = SparseConv(m)
+                self.module_list.append(new_conv)
+            else: self.module_list.append(deepcopy(m))
+        
+        self.routs = pruned_yolo.routs
