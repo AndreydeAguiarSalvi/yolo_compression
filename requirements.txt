@@ -1,8 +1,8 @@
 # pip install -U -r requirements.txt
 numpy == 1.17.1
+Cython
 opencv-python >= 4.1
 torch
-Cython
 torchvision
 matplotlib
 pycocotools
