@@ -1490,10 +1490,10 @@ class SparseYOLO(nn.Module):
     def create_module_list(self, pruned_yolo):
         self.module_list = nn.ModuleList()
 
-        for m in pruned_yolo.module_list:
-            if type(m) is nn.Conv2d:
-                new_conv = SparseConv(m)
-                self.module_list.append(new_conv)
-            else: self.module_list.append(deepcopy(m))
+        for module in pruned_yolo.module_list:
+            my_module = deepcopy(module)
+            if type(my_module) is nn.Sequential:
+                my_module[0] = SparseConv(my_module[0])
+            self.module_list.append(my_module)
         
         self.routs = pruned_yolo.routs
