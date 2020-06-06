@@ -4,8 +4,8 @@ from models import Darknet, SparseYOLO
 from utils.utils import non_max_suppression
 from utils.pruning import apply_mask_LTH, create_mask_LTH
 
-ck_model = torch.load('weights/voc_yolov3/size-multi_scale/2020_03_22/15_54_35/best.pt', map_device='cuda:1')
-ck_mask = torch.load('weights/voc_yolov3/size-multi_scale/2020_03_22/15_54_35/mask_1_prune.pt', map_device='cuda:1')
+ck_model = torch.load('weights/voc_yolov3/size-multi_scale/2020_03_22/15_54_35/best.pt', map_location='cuda:2')
+ck_mask = torch.load('weights/voc_yolov3/size-multi_scale/2020_03_22/15_54_35/mask_1_prune.pt', map_location='cuda:2')
 
 dataset = LoadImages('output/', img_size=416)
 
@@ -14,11 +14,12 @@ yolo.load_state_dict(ck_model['model'])
 mask = create_mask_LTH(yolo)
 mask.load_state_dict(ck_mask)
 
-apply_mask_LTH(yolo)
+apply_mask_LTH(yolo, mask)
 sparse = SparseYOLO(yolo)
 
 path, img, im0s, _ = next(dataset)
 img = torch.from_numpy(img).to('cuda:2')
+img = img.float()
 img /= 255.0  # 0 - 255 to 0.0 - 1.0
 if img.ndimension() == 3:
     img = img.unsqueeze(0)

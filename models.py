@@ -13,7 +13,7 @@ from utils.google_utils import *
 from utils.parse_config import *
 from copy import deepcopy
 from utils.utils import *
-
+from collections import OrderedDict
 ONNX_EXPORT = False
 
 
@@ -1368,7 +1368,7 @@ class SparseConv(nn.Module):
             new_conv = self.create_miniconv_from(original_conv, sequential_ones)
             result['conv' + str(count_ones)] = new_conv
         elif len(sequential_zeros) > 0:
-            new_conv = ZeroConv(sequential_zeros)
+            new_conv = ZeroConv(sequential_zeros, original_conv.kernel_size, original_conv.padding, original_conv.stride)
             result['zero' + str(count_zeros)] = new_conv
         
         return result
