@@ -15,7 +15,7 @@ mask = create_mask_LTH(yolo)
 mask.load_state_dict(ck_mask)
 
 apply_mask_LTH(yolo, mask)
-sparse = SparseYOLO(yolo)
+sparse = SparseYOLO(yolo).to('cuda:2')
 
 path, img, im0s, _ = next(iter(dataset))
 img = torch.from_numpy(img).to('cuda:2')
