@@ -1316,7 +1316,7 @@ class YOLO_Nano(nn.Module):
 
 class SparseConv(nn.Module):
 
-    def __init__(self, original_conv, device):
+    def __init__(self, original_conv):
         super(SparseConv, self).__init__()
         self.device = device
         self.find_non_null_filters(original_conv)
@@ -1350,7 +1350,7 @@ class SparseConv(nn.Module):
         for i in range(self.convs_list.shape[0]):
             if self.convs_list[i] == torch.tensor(1): 
                 if len(sequential_zeros ) > 0:
-                    new_conv = ZeroConv(self.device, sequential_zeros, original_conv.kernel_size, original_conv.padding, original_conv.stride)
+                    new_conv = ZeroConv(sequential_zeros, original_conv.kernel_size, original_conv.padding, original_conv.stride)
                     result['zero' + str(count_zeros)] = new_conv
                     count_zeros += 1
                     sequential_zeros = []
@@ -1369,7 +1369,7 @@ class SparseConv(nn.Module):
             new_conv = self.create_miniconv_from(original_conv, sequential_ones)
             result['conv' + str(count_ones)] = new_conv
         elif len(sequential_zeros) > 0:
-            new_conv = ZeroConv(self.device, sequential_zeros, original_conv.kernel_size, original_conv.padding, original_conv.stride)
+            new_conv = ZeroConv(sequential_zeros, original_conv.kernel_size, original_conv.padding, original_conv.stride)
             result['zero' + str(count_zeros)] = new_conv
         
         return result
@@ -1391,9 +1391,8 @@ class SparseConv(nn.Module):
 
 class ZeroConv(nn.Module):
 
-    def __init__(self, device, channels_list, kernel_size, padding, stride):
+    def __init__(self, channels_list, kernel_size, padding, stride):
         super().__init__()    
-        self.device = device
         self.channels = len(channels_list)
         self.kernel = kernel_size
         self.padding = padding
@@ -1401,12 +1400,13 @@ class ZeroConv(nn.Module):
     
     
     def forward(self, input):
+        dvc = input.get_device() if input.is_cuda() else 'cpu'
         batch_size = input.shape[0]
         width, height = input.shape[-2:]
         width = self.compute_size(width, self.kernel[0], self.padding[0], self.stride[0])
         height = self.compute_size(height, self.kernel[1], self.padding[1], self.stride[1])
         
-        return torch.zeros(torch.Size([batch_size, self.channels, width, height]), device=self.device)
+        return torch.zeros(torch.Size([batch_size, self.channels, width, height]), device=dvc)
     
 
     def compute_size(self, dimension, kernel, padding, stride):
