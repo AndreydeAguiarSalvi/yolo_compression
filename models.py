@@ -1493,7 +1493,7 @@ class SparseYOLO(nn.Module):
         for module in pruned_yolo.module_list:
             my_module = deepcopy(module)
             if type(my_module) is nn.Sequential:
-                my_module[0] = SparseConv(my_module[0])
+                if len(module) > 0: my_module[0] = SparseConv(my_module[0])
             self.module_list.append(my_module)
         
         self.routs = pruned_yolo.routs
