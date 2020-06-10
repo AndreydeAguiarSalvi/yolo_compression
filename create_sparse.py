@@ -31,7 +31,7 @@ pred1 = yolo(img)[0]
 pred2 = sparse(img)[0]
 
 # Apply NMS
-pred1 = non_max_suppression(pred1, 0,3, 0.6)
+pred1 = non_max_suppression(pred1, 0.3, 0.6)
 pred2 = non_max_suppression(pred2, 0.3, 0.6)
 
 for i, (det1, det2) in enumerate(zip(pred1, pred2)):
