@@ -17,7 +17,7 @@ mask.load_state_dict(ck_mask)
 apply_mask_LTH(yolo, mask)
 sparse = SparseYOLO(yolo)
 
-path, img, im0s, _ = next(dataset)
+path, img, im0s, _ = next(iter(dataset))
 img = torch.from_numpy(img).to('cuda:2')
 img = img.float()
 img /= 255.0  # 0 - 255 to 0.0 - 1.0
