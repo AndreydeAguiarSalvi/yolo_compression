@@ -9,7 +9,7 @@ ck_mask = torch.load('weights/voc_yolov3/size-multi_scale/2020_03_22/15_54_35/ma
 
 dataset = LoadImages('output/', img_size=416)
 
-yolo = Darknet(cfg='cfg/voc_yolov3.cfg')
+yolo = Darknet(cfg='cfg/voc_yolov3.cfg').to('cuda:2')
 yolo.load_state_dict(ck_model['model'])
 mask = create_mask_LTH(yolo)
 mask.load_state_dict(ck_mask)

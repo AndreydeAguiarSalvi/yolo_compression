@@ -1335,8 +1335,9 @@ class SparseConv(nn.Module):
         
 
     def find_non_null_filters(self, conv): # conv.shape is out_channels, in_channels, x, y
+        device = next(conv.parameters()).device
         onehot_parameters = torch.sum(torch.abs(conv.weight), dim=(1, 2, 3))
-        self.convs_list = torch.where( onehot_parameters > 0, torch.tensor(1), torch.tensor(0) )
+        self.convs_list = torch.where( onehot_parameters > 0, torch.tensor(1, device=device), torch.tensor(0, device=device) )
         
 
     def create_splited_convs(self, original_conv):
