@@ -1399,7 +1399,7 @@ class ZeroConv(nn.Module):
     
     
     def forward(self, input):
-        dvc = input.get_device() if input.is_cuda() else 'cpu'
+        dvc = input.get_device() if input.is_cuda else 'cpu'
         batch_size = input.shape[0]
         width, height = input.shape[-2:]
         width = self.compute_size(width, self.kernel[0], self.padding[0], self.stride[0])
