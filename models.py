@@ -1318,7 +1318,6 @@ class SparseConv(nn.Module):
 
     def __init__(self, original_conv):
         super(SparseConv, self).__init__()
-        self.device = device
         self.find_non_null_filters(original_conv)
         dict = self.create_splited_convs(original_conv)
         self.fractional_convs = nn.ModuleDict(dict)
