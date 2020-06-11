@@ -12,6 +12,8 @@ Python 3.7 or later with all of the `pip install -U -r requirements.txt` package
 - `opencv-python`
 - `Pillow`
 
+Even more, install [THOP](https://github.com/Lyken17/pytorch-OpCounter) to count the MACs
+pip install --upgrade git+https://github.com/Lyken17/pytorch-OpCounter.git
 
 # Training
 
