@@ -1444,38 +1444,36 @@ class SparseYOLO(nn.Module):
 
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
-            try: 
-                if mtype in ['convolutional', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'upsample', 'maxpool', 'softconv']:
-                    x = module(x)
-                elif mtype == 'shortcut':  # sum
-                    if verbose:
-                        l = [i - 1] + module.layers  # layers
-                        s = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes
-                        str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
-                    x = module(x, out)  # weightedFeatureFusion()
-                elif mtype == 'route': # concat
-                    layers = mdef['layers']
-                    if verbose:
-                        l = [i - 1] + layers  # layers
-                        s = [list(x.shape)] + [list(out[i].shape) for i in layers]  # shapes
-                        str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
-                    if len(layers) == 1:
-                        x = out[layers[0]]
-                    else:
-                        try:
-                            x = torch.cat([out[i] for i in layers], 1)
-                        except:  # apply stride 2 for darknet reorg layer
-                            out[layers[1]] = F.interpolate(out[layers[1]], scale_factor=[0.5, 0.5])
-                            x = torch.cat([out[i] for i in layers], 1)
-                        # print(''), [print(out[i].shape) for i in layers], print(x.shape)
-                elif mtype == 'yolo':
-                    yolo_out.append(module(x, img_size))
-                out.append(x if i in self.routs else [])
+            if mtype in ['convolutional', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'upsample', 'maxpool', 'softconv']:
+                x = module(x)
+            elif mtype == 'shortcut':  # sum
                 if verbose:
-                    print('%g/%g %s -' % (i, len(self.module_list), mtype), list(x.shape), str)
-                    str = ''
-            except:
-                print(f"Error with module {i}")
+                    l = [i - 1] + module.layers  # layers
+                    s = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes
+                    str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
+                x = module(x, out)  # weightedFeatureFusion()
+            elif mtype == 'route': # concat
+                layers = mdef['layers']
+                if verbose:
+                    l = [i - 1] + layers  # layers
+                    s = [list(x.shape)] + [list(out[i].shape) for i in layers]  # shapes
+                    str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
+                if len(layers) == 1:
+                    x = out[layers[0]]
+                else:
+                    try:
+                        x = torch.cat([out[i] for i in layers], 1)
+                    except:  # apply stride 2 for darknet reorg layer
+                        out[layers[1]] = F.interpolate(out[layers[1]], scale_factor=[0.5, 0.5])
+                        x = torch.cat([out[i] for i in layers], 1)
+                    # print(''), [print(out[i].shape) for i in layers], print(x.shape)
+            elif mtype == 'yolo':
+                yolo_out.append(module(x, img_size))
+            out.append(x if i in self.routs else [])
+            if verbose:
+                print('%g/%g %s -' % (i, len(self.module_list), mtype), list(x.shape), str)
+                str = ''
+            
         if self.training: # train
             return yolo_out
         elif ONNX_EXPORT: # export
