@@ -1335,7 +1335,9 @@ class SparseConv(nn.Module):
 
     def find_non_null_filters(self, conv): # conv.shape is out_channels, in_channels, x, y
         device = next(conv.parameters()).device
-        onehot_parameters = torch.sum(torch.abs(conv.weight), dim=(1, 2, 3))
+        if type(conv) is SoftMaskedConv2d: params = conv.weight * conv.mask
+        else: params = conv.weight
+        onehot_parameters = torch.sum(torch.abs(params), dim=(1, 2, 3))
         self.convs_list = torch.where( onehot_parameters > 0, torch.tensor(1, device=device), torch.tensor(0, device=device) )
         
 
@@ -1375,15 +1377,25 @@ class SparseConv(nn.Module):
 
 
     def create_miniconv_from(self, original_conv, channels_list):
-        new_conv = nn.Conv2d(
-            in_channels=original_conv.in_channels, out_channels=len(channels_list), 
-            kernel_size=original_conv.kernel_size, padding=original_conv.padding,
-            stride=original_conv.stride, groups=original_conv.groups,
-            bias = True if original_conv.bias is not None else False
-        )
-        new_conv.weight.data = original_conv.weight[ channels_list[0] : channels_list[-1]+1 ]
-        if original_conv.bias is not None:
-            new_conv.bias.data = original_conv.bias[ channels_list[0] : channels_list[-1]+1 ]
+        if type(original_conv) == SoftMaskedConv2d:
+            new_conv = nn.Conv2d(
+                in_channels=original_conv.in_channels, out_channels=len(channels_list), 
+                kernel_size=original_conv.kernel_size, padding=original_conv.padding,
+                stride=original_conv.stride,
+                bias = False
+            )
+            data = original_conv.weight * original_conv.mask
+            new_conv.weight.data = data
+        else:
+            new_conv = nn.Conv2d(
+                in_channels=original_conv.in_channels, out_channels=len(channels_list), 
+                kernel_size=original_conv.kernel_size, padding=original_conv.padding,
+                stride=original_conv.stride, groups=original_conv.groups,
+                bias = True if original_conv.bias is not None else False
+            )
+            new_conv.weight.data = original_conv.weight[ channels_list[0] : channels_list[-1]+1 ]
+            if original_conv.bias is not None:
+                new_conv.bias.data = original_conv.bias[ channels_list[0] : channels_list[-1]+1 ]
 
         return new_conv
 
