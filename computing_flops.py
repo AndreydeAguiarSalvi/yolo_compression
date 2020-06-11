@@ -20,11 +20,11 @@ x = torch.Tensor(1, 3, 416, 416).to(device)
 
 # Initialize model
 if args['darknet'] == 'default':
-    model = Darknet(args['cfg'], arc=args['arc']).to(device)
+    model = Darknet(args['cfg']).to(device)
 elif args['darknet'] == 'nano':
     model = YOLO_Nano().to(device)
 elif args['darknet'] == 'soft':
-    model = SoftDarknet(args['cfg'], arc=args['arc']).to(device)
+    model = SoftDarknet(args['cfg']).to(device)
     model.ticket = True
     _ = model(x)
 
