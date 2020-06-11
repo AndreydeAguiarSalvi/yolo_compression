@@ -1405,9 +1405,9 @@ class ZeroConv(nn.Module):
     def __init__(self, channels_list, kernel_size, padding, stride):
         super().__init__()    
         self.channels = len(channels_list)
-        self.kernel = kernel_size
-        self.padding = padding
-        self.stride = stride
+        self.kernel = kernel_size if isinstance(kernel_size, list) else [kernel_size, kernel_size]
+        self.padding = padding if isinstance(padding, list) else [padding, padding]
+        self.stride = stride if isinstance(stride, list) else [stride, stride]
     
     
     def forward(self, input):
@@ -1428,10 +1428,10 @@ class SparseYOLO(nn.Module):
 
     def __init__(self, pruned_yolo):
         super().__init__()
-
-        self.module_defs = pruned_yolo.module_defs
-        self.create_module_list(pruned_yolo)
-        self.yolo_layers = pruned_yolo.yolo_layers
+        with torch.no_grad():
+            self.module_defs = pruned_yolo.module_defs
+            self.create_module_list(pruned_yolo)
+            self.yolo_layers = pruned_yolo.yolo_layers
     
 
     def forward(self, x, verbose=False):
