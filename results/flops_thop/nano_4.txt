@@ -1,0 +1,15 @@
+[INFO] Register count_convNd() for <class 'torch.nn.modules.conv.Conv2d'>.
+[INFO] Register count_bn() for <class 'torch.nn.modules.batchnorm.BatchNorm2d'>.
+[INFO] Register zero_ops() for <class 'torch.nn.modules.activation.ReLU6'>.
+[91m[WARN] Cannot find rule for <class 'torch.nn.modules.container.Sequential'>. Treat it as zero Macs and zero Params.[00m
+[91m[WARN] Cannot find rule for <class 'models.PEP'>. Treat it as zero Macs and zero Params.[00m
+[91m[WARN] Cannot find rule for <class 'models.EP'>. Treat it as zero Macs and zero Params.[00m
+[INFO] Register count_adap_avgpool() for <class 'torch.nn.modules.pooling.AdaptiveAvgPool2d'>.
+[INFO] Register count_linear() for <class 'torch.nn.modules.linear.Linear'>.
+[91m[WARN] Cannot find rule for <class 'torch.nn.modules.activation.Sigmoid'>. Treat it as zero Macs and zero Params.[00m
+[91m[WARN] Cannot find rule for <class 'models.FCA'>. Treat it as zero Macs and zero Params.[00m
+[91m[WARN] Cannot find rule for <class 'models.YOLOLayer'>. Treat it as zero Macs and zero Params.[00m
+[91m[WARN] Cannot find rule for <class 'models.YOLO_Nano'>. Treat it as zero Macs and zero Params.[00m
+Params(M) | FLOPs(G)
+---|---
+2.89 | 2.08
