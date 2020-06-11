@@ -28,6 +28,7 @@ if is_CS:
     _ = yolo(img)
 else: 
     yolo = Darknet(cfg='cfg/voc_yolov3.cfg').to(device)
+    yolo.load_state_dict(ck_model['model'])
     mask = create_mask_LTH(yolo)
     mask.load_state_dict(ck_mask)
     apply_mask_LTH(yolo, mask)
