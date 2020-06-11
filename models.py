@@ -1475,7 +1475,9 @@ class SparseYOLO(nn.Module):
                     print('%g/%g %s -' % (i, len(self.module_list), mtype), list(x.shape), str)
                     str = ''
             except:
-                print(f"Error in mtype {mdef}, i {i},\nmodule {module}")
+                print(f"Error in modules")
+                print(f"Module before -> type: {self.module_defs[i-1]['mtype']}  module: {self.module_list[i-1]}")
+                print(f"Current module -> type: {self.module_defs[i]['mtype']}  module: {self.module_list[i]}")
                 exit()
         if self.training: # train
             return yolo_out
