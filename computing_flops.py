@@ -36,13 +36,13 @@ except:
     print("model key don't found in checkpoint. Trying without model key")
     model.load_state_dict(checkpoint)
 
-if args['darknet'] != 'soft' and (args['mask'] or args['embbed']):
+if (args['mask'] or args['embbed']):
     mask = create_mask_LTH(model)
     if args['mask']: mask.load_state_dict(torch.load(args['mask'], map_location=device))
     else: mask.load_state_dict(checkpoint['mask'])
     apply_mask_LTH(model, mask)
 
-if args['darknet'] == 'nano': total_ops, total_params = profile(model, (x,), verbose=True)
+if not (args['mask'] or args['embbed']): total_ops, total_params = profile(model, (x,), verbose=True)
 else:
     sparse = SparseYOLO(model).to(device)
     total_ops, total_params = profile(sparse, (x, ), verbose=True)
