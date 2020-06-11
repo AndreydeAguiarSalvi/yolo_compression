@@ -1405,9 +1405,9 @@ class ZeroConv(nn.Module):
     def __init__(self, channels_list, kernel_size, padding, stride):
         super().__init__()    
         self.channels = len(channels_list)
-        self.kernel = kernel_size if isinstance(kernel_size, list) else [kernel_size, kernel_size]
-        self.padding = padding if isinstance(padding, list) else [padding, padding]
-        self.stride = stride if isinstance(stride, list) else [stride, stride]
+        self.kernel = kernel_size if (isinstance(kernel_size, list) or isinstance(kernel_size, tuple)) else [kernel_size, kernel_size]
+        self.padding = padding if (isinstance(padding, list) or isinstance(padding, tuple)) else [padding, padding]
+        self.stride = stride if (isinstance(stride, list) or isinstance(stride, tuple)) else [stride, stride]
     
     
     def forward(self, input):
