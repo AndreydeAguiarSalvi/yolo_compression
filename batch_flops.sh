@@ -1,9 +1,9 @@
 # Tiny
-python computing_flops.py --model weights/voc_yolov3_tiny/size-multi_scale/2020_03_30/10_14_23/best.pt --darknet default --cfg cfg/voc_yolov3_tiny.cfg --device cuda:3 | tee results/flops/tiny_0.txt
-python computing_flops.py --model weights/voc_yolov3_tiny/size-multi_scale/2020_03_31/01_17_27/best.pt --darknet default --cfg cfg/voc_yolov3_tiny.cfg --device cuda:3 | tee results/flops/tiny_1.txt
-python computing_flops.py --model weights/voc_yolov3_tiny/size-multi_scale/2020_03_31/15_08_25/best.pt --darknet default --cfg cfg/voc_yolov3_tiny.cfg --device cuda:3 | tee results/flops/tiny_2.txt
-python computing_flops.py --model weights/voc_yolov3_tiny/size-multi_scale/2020_04_01/07_03_47/best.pt --darknet default --cfg cfg/voc_yolov3_tiny.cfg --device cuda:3 | tee results/flops/tiny_3.txt
-python computing_flops.py --model weights/voc_yolov3_tiny/size-multi_scale/2020_04_02/00_37_26/best.pt --darknet default --cfg cfg/voc_yolov3_tiny.cfg --device cuda:3 | tee results/flops/tiny_4.txt
+python computing_flops.py --model weights/voc_yolov3-tiny/size-multi_scale/2020_03_30/10_14_23/best.pt --darknet default --cfg cfg/voc_yolov3-tiny.cfg --device cuda:3 | tee results/flops/tiny_0.txt
+python computing_flops.py --model weights/voc_yolov3-tiny/size-multi_scale/2020_03_31/01_17_27/best.pt --darknet default --cfg cfg/voc_yolov3-tiny.cfg --device cuda:3 | tee results/flops/tiny_1.txt
+python computing_flops.py --model weights/voc_yolov3-tiny/size-multi_scale/2020_03_31/15_08_25/best.pt --darknet default --cfg cfg/voc_yolov3-tiny.cfg --device cuda:3 | tee results/flops/tiny_2.txt
+python computing_flops.py --model weights/voc_yolov3-tiny/size-multi_scale/2020_04_01/07_03_47/best.pt --darknet default --cfg cfg/voc_yolov3-tiny.cfg --device cuda:3 | tee results/flops/tiny_3.txt
+python computing_flops.py --model weights/voc_yolov3-tiny/size-multi_scale/2020_04_02/00_37_26/best.pt --darknet default --cfg cfg/voc_yolov3-tiny.cfg --device cuda:3 | tee results/flops/tiny_4.txt
 
 # V3
 python computing_flops.py --model weights/voc_yolov3/size-multi_scale/2020_04_02/17_14_20/best.pt --darknet default --cfg cfg/voc_yolov3.cfg --device cuda:3 | tee results/flops/v3_0.txt
