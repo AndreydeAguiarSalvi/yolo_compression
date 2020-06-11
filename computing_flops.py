@@ -11,7 +11,7 @@ parser.add_argument('--darknet', type=str, help='Architecture to create.', requi
 parser.add_argument('--cfg', type=str, help='args file to create the model.')
 parser.add_argument('--mask', type=str, default=None, help='Path to load the mask, if existis.')
 parser.add_argument('--embbed', action='store_true', help='To load the mask from the same checkpoint of model.')
-parser.add_argument('device', help='cuda:id or cpu', required=True)
+parser.add_argument('--device', help='cuda:id or cpu', required=True)
 # parser.add_argument('--clever_format', action='store_true')
 args = vars(parser.parse_args())
 
