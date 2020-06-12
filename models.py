@@ -1385,7 +1385,7 @@ class SparseConv(nn.Module):
                 bias = False
             )
             data = original_conv.weight * original_conv.mask
-            new_conv.weight.data = data
+            new_conv.weight.data = data[ channels_list[0] : channels_list[-1]+1 ]
         else:
             new_conv = nn.Conv2d(
                 in_channels=original_conv.in_channels, out_channels=len(channels_list), 
