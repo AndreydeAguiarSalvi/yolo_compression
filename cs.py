@@ -274,7 +274,7 @@ if __name__ == '__main__':
     best_fitness = 0.0
     
     start_iteration, start_epoch, best_fitness, model, _, weights, optimizer = load_checkpoints_mask(
-        config, model, None, weights, 
+        config, model, None,  
         optimizer, device, 
         attempt_download, load_darknet_weights
     )

@@ -332,15 +332,15 @@ def create_dataloaders(config):
     return trainloader, validloader
 
 
-def load_checkpoints(config, model, weights, optimizer, device, try_download_function, darknet_load_function):
+def load_checkpoints(config, model, optimizer, device, try_download_function, darknet_load_function):
     import torch
     
     start_epoch = 0
     best_fitness = 0.0
-    try_download_function(weights)
-    if weights.endswith('.pt'):  # pytorch format
+    try_download_function(config['weights'])
+    if config['weights'].endswith('.pt'):  # pytorch format
         # possible weights are '*.pt', 'yolov3-spp.pt', 'yolov3-tiny.pt' etc.
-        chkpt = torch.load(weights, map_location=device)
+        chkpt = torch.load(config['weights'], map_location=device)
 
         # load model
         try:
@@ -364,23 +364,23 @@ def load_checkpoints(config, model, weights, optimizer, device, try_download_fun
         start_epoch = chkpt['epoch'] + 1
         del chkpt
 
-    elif len(weights) > 0:  # darknet format
+    elif len(config['weights']) > 0:  # darknet format
         # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-        darknet_load_function(model, weights)
+        darknet_load_function(model, config['weights'])
 
-    return start_epoch, best_fitness, model, weights, optimizer
+    return start_epoch, best_fitness, model, optimizer
 
 
-def load_checkpoints_mask(config, model, mask, weights, optimizer, device, try_download_function, darknet_load_function):
+def load_checkpoints_mask(config, model, mask, optimizer, device, try_download_function, darknet_load_function):
     import torch
     
     start_epoch = 0
     start_iteration = 0
     best_fitness = 0.0
-    try_download_function(weights)
-    if weights.endswith('.pt'):  # pytorch format
+    try_download_function(config['weights'])
+    if config['weights'].endswith('.pt'):  # pytorch format
         # possible weights are '*.pt', 'yolov3-spp.pt', 'yolov3-tiny.pt' etc.
-        chkpt = torch.load(weights, map_location=device)
+        chkpt = torch.load(config['weights'], map_location=device)
 
         # load model
         try:
@@ -415,8 +415,8 @@ def load_checkpoints_mask(config, model, mask, weights, optimizer, device, try_d
         start_epoch = chkpt['epoch'] + 1
         del chkpt
 
-    elif len(weights) > 0:  # darknet format
+    elif len(config['weights']) > 0:  # darknet format
         # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-        darknet_load_function(model, weights)
+        darknet_load_function(model, config['weights'])
 
-    return start_iteration, start_epoch, best_fitness, model, mask, weights, optimizer
+    return start_iteration, start_epoch, best_fitness, model, mask, optimizer

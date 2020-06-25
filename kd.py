@@ -7,7 +7,7 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_train_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders
+from utils.my_utils import create_kd_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints
 from utils.pruning import sum_of_the_weights
 
 mixed_precision = True
@@ -24,8 +24,7 @@ def train():
     epochs = config['epochs']  # 500200 batches at bs 64, 117263 images = 273 epochs
     batch_size = config['batch_size']
     accumulate = config['accumulate']  # effective bs = batch_size * accumulate = 16 * 4 = 64
-    weights = config['weights']  # initial training weights
-
+    
     # Initialize
     init_seeds(config['seed'])
     if config['multi_scale']:
@@ -40,73 +39,37 @@ def train():
     test_path = data_dict['valid']
     nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
 
-    # Initialize model
-    if config['darknet'] == 'default':
-        model = Darknet(cfg, arc=config['arc']).to(device)
-    elif config['darknet'] == 'multibias':
-        model = Reduced_Darknet(cfg, arc=config['arc']).to(device)
-        print('Creating a multibias Darknet')
-    elif config['darknet'] == 'multiconv_multibias':
-        model = Reduced_Darknet(cfg, arc=config['arc'], conv_type='multiconv_multibias').to(device)
-        print('Creating a multiconv_multibias Darknet')
+    # Initialize models
+    if config['teacher_darknet'] == 'default':
+        teacher = Darknet(cfg, arc=config['arc']).to(device)
+    elif config['teacher_darknet'] == 'nano':
+        teacher = YOLO_Nano().to(device)
+    elif config['teacher_darknet'] == 'soft':
+        teacher = SoftDarknet(cfg, arc=config['arc']).to(device)
+    if config['student_darknet'] == 'default':
+        student = Darknet(cfg, arc=config['arc']).to(device)
+    elif config['teacher_darknet'] == 'nano':
+        student = YOLO_Nano().to(device)
+    elif config['teacher_darknet'] == 'soft':
+        student = SoftDarknet(cfg, arc=config['arc']).to(device)
+    optimizer = create_optimizer(student, config)
 
-    optimizer = create_optimizer(model, config)
-
-    start_epoch = 0
-    best_fitness = 0.0
-    attempt_download(weights)
-    if weights.endswith('.pt'):  # pytorch format
-        # possible weights are '*.pt', 'yolov3-spp.pt', 'yolov3-tiny.pt' etc.
-        chkpt = torch.load(weights, map_location=device)
-
-        # load model
-        try:
-            chkpt['model'] = {k: v for k, v in chkpt['model'].items() if model.state_dict()[k].numel() == v.numel()}
-            model.load_state_dict(chkpt['model'], strict=False)
-        except KeyError as e:
-            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
-                "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
-            raise KeyError(s) from e
-
-        # load optimizer
-        if chkpt['optimizer'] is not None:
-            optimizer.load_state_dict(chkpt['optimizer'])
-            best_fitness = chkpt['best_fitness']
-
-        # load results
-        if chkpt.get('training_results') is not None:
-            with open(config['results_file'], 'w') as file:
-                file.write(chkpt['training_results'])  # write results.txt
-
-        start_epoch = chkpt['epoch'] + 1
-        del chkpt
-
-    elif len(weights) > 0:  # darknet format
-        # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
-        load_darknet_weights(model, weights)
+    start_epoch, best_fitness, teacher, optimizer = load_checkpoints(
+        config, teacher, 
+        optimizer, device, 
+        attempt_download, load_darknet_weights
+    )
 
     if config['xavier_norm']:
-        initialize_model(model, torch.nn.init.xavier_normal_)
+        initialize_model(student, torch.nn.init.xavier_normal_)
     elif config['xavier_uniform']:
-        initialize_model(model, torch.nn.init.xavier_uniform_)
+        initialize_model(student, torch.nn.init.xavier_uniform_)
 
     scheduler = create_scheduler(config, optimizer, start_epoch)
 
     # Mixed precision training https://github.com/NVIDIA/apex
     if mixed_precision:
-        model, optimizer = amp.initialize(model, optimizer, opt_level='O1', verbosity=0)
-
-
-    # # Plot lr schedule
-    # y = []
-    # for _ in range(epochs):
-    #     scheduler.step()
-    #     y.append(optimizer.param_groups[0]['lr'])
-    # plt.plot(y, '.-', label='LambdaLR')
-    # plt.xlabel('epoch')
-    # plt.ylabel('LR')
-    # plt.tight_layout()
-    # plt.savefig('LR.png', dpi=300)
+        student, optimizer = amp.initialize(student, optimizer, opt_level='O1', verbosity=0)
 
     # Initialize distributed training
     if device.type != 'cpu' and torch.cuda.device_count() > 1 and torch.distributed.is_available():
@@ -114,31 +77,34 @@ def train():
                                 init_method='tcp://127.0.0.1:9999',  # distributed training init method
                                 world_size=1,  # number of nodes for distributed training
                                 rank=0)  # distributed training node rank
-        model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
-        model.yolo_layers = model.module.yolo_layers  # move yolo layer indices to top level
+        teacher = torch.nn.parallel.DistributedDataParallel(teacher, find_unused_parameters=True)
+        teacher.yolo_layers = teacher.module.yolo_layers  # move yolo layer indices to top level
+        student = torch.nn.parallel.DistributedDataParallel(student, find_unused_parameters=True)
+        student.yolo_layers = student.module.yolo_layers  # move yolo layer indices to top level
 
     trainloader, validloader = create_dataloaders(config)
 
     # Start training
     nb = len(trainloader)
     prebias = start_epoch == 0
-    model.nc = nc  # attach number of classes to model
-    model.arc = config['arc']  # attach yolo architecture
-    model.hyp = config['hyp']  # attach hyperparameters to model
-    model.class_weights = labels_to_class_weights(trainloader.dataset.labels, nc).to(device)  # attach class weights
+    student.nc = nc  # attach number of classes to student
+    student.arc = config['arc']  # attach yolo architecture
+    student.hyp = config['hyp']  # attach hyperparameters to student
+    student.class_weights = labels_to_class_weights(trainloader.dataset.labels, nc).to(device)  # attach class weights
     maps = np.zeros(nc)  # mAP per class
     # torch.autograd.set_detect_anomaly(True)
     results = (0, 0, 0, 0, 0, 0, 0)  # 'P', 'R', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification'
     t0 = time.time()
-    torch_utils.model_info(model, report='summary')  # 'full' or 'summary'
+    torch_utils.model_info(student, report='summary')  # 'full' or 'summary'
     print('Starting training for %g epochs...' % epochs)
 
+    teacher.eval()
     ###############
     # Start epoch #
     ###############
     for epoch in range(start_epoch, epochs):  
-        model.train()
-        model.gr = 1 - (1 + math.cos(min(epoch * 2, epochs) * math.pi / epochs)) / 2  # GIoU <-> 1.0 loss ratio
+        student.train()
+        student.gr = 1 - (1 + math.cos(min(epoch * 2, epochs) * math.pi / epochs)) / 2  # GIoU <-> 1.0 loss ratio
 
         # Prebias
         if prebias:
@@ -146,7 +112,7 @@ def train():
             ps = np.interp(epoch, [0, ne], [0.1, config['hyp']['lr0'] * 2]), \
                 np.interp(epoch, [0, ne], [0.9, config['hyp']['momentum']])  # prebias settings (lr=0.1, momentum=0.9)
             if epoch == ne:
-                print_model_biases(model)
+                print_model_biases(student)
                 prebias = False
 
             # Bias optimizer settings
@@ -156,7 +122,7 @@ def train():
 
         # Update image weights (optional)
         if trainloader.dataset.image_weights:
-            w = model.class_weights.cpu().numpy() * (1 - maps) ** 2  # class weights
+            w = student.class_weights.cpu().numpy() * (1 - maps) ** 2  # class weights
             image_weights = labels_to_image_weights(trainloader.dataset.labels, nc=nc, class_weights=w)
             trainloader.dataset.indices = random.choices(range(trainloader.dataset.n), weights=image_weights, k=trainloader.dataset.n)  # rand weighted idx
 
@@ -188,8 +154,15 @@ def train():
                     ns = [math.ceil(x * sf / 32.) * 32 for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
-            # Run model
-            pred = model(imgs)
+            # Run teacher
+            with torch.no_grad(): 
+                pred_tch, fts_tch = \
+                    teacher(imgs, config['teacher_indexes']) if type(teacher) is YOLO_Nano \
+                    else forward(teacher, imgs, config['teacher_indexes'])
+            # Run student
+            pred_std, fts_std = \
+                student(imgs, config['student_indexes']) if type(student) is YOLO_Nano \
+                    else forward(student, imgs, config['student_indexes']) 
 
             # Compute loss
             loss, loss_items = compute_loss(pred, targets, model)
@@ -226,10 +199,10 @@ def train():
         
         final_epoch = epoch + 1 == epochs
         if not config['notest'] or final_epoch:  # Calculate mAP
-            is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
+            is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and student.nc == 80
             results, maps = test.test(
                 cfg = cfg, data = data, batch_size=batch_size,
-                img_size=img_size_test, model=model, 
+                img_size=img_size_test, model=student, 
                 conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
                 iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
                 dataloader=validloader, folder = config['sub_working_dir']
@@ -262,8 +235,8 @@ def train():
                 chkpt = {'epoch': epoch,
                          'best_fitness': best_fitness,
                          'training_results': f.read(),
-                         'model': model.module.state_dict() if type(
-                             model) is nn.parallel.DistributedDataParallel else model.state_dict(),
+                         'model': student.module.state_dict() if type(
+                             student) is nn.parallel.DistributedDataParallel else student.state_dict(),
                          'optimizer': None if final_epoch else optimizer.state_dict()}
 
             # Save last checkpoint
@@ -279,6 +252,7 @@ def train():
 
             # Delete checkpoint
             del chkpt
+            torch.cuda.empty_cache()
     #############
     # End epoch #
     #############
@@ -311,7 +285,7 @@ def train():
 
 
 if __name__ == '__main__':
-    args = create_train_argparser()
+    args = create_kd_argparser()
     config = create_config(args)
     print("sub working dir: %s" % config['sub_working_dir'])
 

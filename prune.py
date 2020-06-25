@@ -17,7 +17,6 @@ def train():
     img_size, img_size_test = config['img_size'] if len(config['img_size']) == 2 else config['img_size'] * 2  # train, test sizes
     epochs = config['epochs']  # 500200 batches at bs 64, 117263 images = 273 epochs
     accumulate = config['accumulate']  # effective bs = batch_size * accumulate = 16 * 4 = 64
-    weights = config['weights']  # initial training weights
 
     # Initialize
     init_seeds(config['seed'])
@@ -36,8 +35,8 @@ def train():
     mask = create_mask_LTH(model)
         
     optimizer = create_optimizer(model, config)
-    start_iteration, start_epoch, best_fitness, model, mask, weights, optimizer = load_checkpoints_mask(
-        config, model, mask, weights, 
+    start_iteration, start_epoch, best_fitness, model, mask, optimizer = load_checkpoints_mask(
+        config, model, mask, 
         optimizer, device, 
         attempt_download, load_darknet_weights
     )
