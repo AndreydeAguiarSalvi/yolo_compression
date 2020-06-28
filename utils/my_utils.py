@@ -126,10 +126,63 @@ def create_prune_argparser():
     parser.add_argument('--final_temperature', type=float, help='final beta to binarize sigmoid function')
     parser.add_argument('--lambda', type=float, help='lambda for L1 mask regularization')
 
-    parser.add_argument('--params', type=str, default='params/test_prune.yaml', help='json config to load the hyperparameters')
+    parser.add_argument('--params', type=str, required=True, help='json config to load the hyperparameters')
     args = vars(parser.parse_args())
 
     return args
+
+
+def create_kd_argparser():
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--epochs', type=int)  # 500200 batches at bs 16, 117263 COCO images = 300 epochs
+    parser.add_argument('--batch_size', type=int)  # effective bs = batch_size * accumulate = 16 * 4 = 64
+    parser.add_argument('--accumulate', type=int, help='batches to accumulate before optimizing')
+    parser.add_argument('--teacher_cfg', type=str, help='*.cfg teacher path')
+    parser.add_argument('--student_cfg', type=str, help='*.cfg student path')
+    parser.add_argument('--data', type=str, help='*.data path')
+    parser.add_argument('--multi_scale', action='store_true', help='adjust (67% - 150%) img_size every 10 batches')
+    parser.add_argument('--img_size', nargs='+', type=int, help='train and test image-sizes')
+    parser.add_argument('--resume', action='store_true', help='resume training from last.pt')
+    parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
+    parser.add_argument('--notest', action='store_true', help='only test final epoch')
+    parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
+    parser.add_argument('--bucket', type=str, help='gsutil bucket')
+    parser.add_argument('--cache_images', action='store_true', help='cache images for faster training')
+    parser.add_argument('--cache_labels', action='store_true', help='cache labels for faster training')
+    parser.add_argument('--teacher_weights', type=str, help='initial teacher weights')
+    parser.add_argument('--student_weights', type=str, help='initial student weights')
+    parser.add_argument('--teacher_arc', type=str, help='yolo architecture')  # default, uCE, uBCE
+    parser.add_argument('--student_arc', type=str, help='yolo architecture')  # default, uCE, uBCE
+    parser.add_argument('--teacher_darknet', type=str, help='Teacher Darknet type (default, multibias)')
+    parser.add_argument('--student_darknet', type=str, help='Student Darknet type (default, multibias)')
+    parser.add_argument('--name', help='renames results.txt to results_name.txt if supplied')
+    parser.add_argument('--device', help='device id (i.e. 0 or 0,1 or cpu)')
+    parser.add_argument('--adam', action='store_true', help='use adam optimizer')
+    # hyp parameters
+    parser.add_argument('--lr0', type=float, help='initial learning rate')
+    parser.add_argument('--lrf', type=float, help='final learning rate')
+    parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
+    parser.add_argument('--weight_decay', type=float, help='weight decay for pg1 parameters')
+    # My additioned parameters
+    parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
+    parser.add_argument('--decay_steps', type=str)
+    parser.add_argument('--exponential_ramp', action='store_true', help="changes inverse exponential learning rate decay to be exponential")
+    parser.add_argument('--cosine_ramp', action='store_true', help="changes inverse exponential learning rate decay to be cosine ramp")
+    parser.add_argument('--xavier_uniform', action='store_true', help='initialize model with xavier uniform function')
+    parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
+    parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
+    parser.add_argument('--seed', type=int, default=0, help='seed to function init_seeds')
+    # Teacher parameters
+    parser.add_argument('--mask', action='store_ture', help='There is a mask to load inside teacher checkpoint')
+    parser.add_argument('--mask_path', type=str, help='There is a mask to load on another path')
+    # KD parameters
+    parser.add_argument('--params', type=str, default='params/KD_Guoblin.yaml', help='json config to load the hyperparameters')
+    args = vars(parser.parse_args())
+
+    return args
+
 
 #############
 # From ONet #
@@ -193,15 +246,16 @@ def create_config(opt):
 
     # Create sub_working_dir
     if opt['resume']:
-        folders = opt['weights'].split('/')
+        folders = opt['weights'].split('/') if 'weights' in opt.keys() 
+            else opt['student_weights'].split('/')
         config['sub_working_dir'] = ''
         for i in range(len(folders) - 1):
             config['sub_working_dir'] += folders[i] + '/'
     else:
         sub_working_dir = '{}/{}/size-{}/{}'.format(
             config['working_dir'],
-            opt['cfg'].split('/')[1].split('.')[0] if opt['cfg'] is not None 
-                else config['cfg'].split('/')[1].split('.')[0], # Get the architecture name
+            opt['cfg'].split('/')[1].split('.')[0] if 'cfg' in opt.keys() 
+                else opt['student_cfg'].split('/')[1].split('.')[0]
             config['img_size'][0] if opt['multi_scale'] is False and opt['img_size'] is None 
                 else 'multi_scale' if opt['multi_scale'] is True else opt['img_size'][0],
 
@@ -363,6 +417,7 @@ def load_checkpoints(config, model, optimizer, device, try_download_function, da
 
         start_epoch = chkpt['epoch'] + 1
         del chkpt
+        torch.cuda.empty_cache()
 
     elif len(config['weights']) > 0:  # darknet format
         # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
@@ -414,9 +469,80 @@ def load_checkpoints_mask(config, model, mask, optimizer, device, try_download_f
             start_iteration = 0
         start_epoch = chkpt['epoch'] + 1
         del chkpt
+        torch.cuda.empty_cache()
 
     elif len(config['weights']) > 0:  # darknet format
         # possible weights are '*.weights', 'yolov3-tiny.conv.15',  'darknet53.conv.74' etc.
         darknet_load_function(model, config['weights'])
 
     return start_iteration, start_epoch, best_fitness, model, mask, optimizer
+
+
+def load_kd_checkpoints(config, teacher, student, mask, hint_model, optimizer, device):
+    import torch
+    
+    start_epoch = 0
+    best_fitness = 0.0
+    
+    # possible weights are '*.pt', 'yolov3-spp.pt', 'yolov3-tiny.pt' etc.
+    chkpt = torch.load(config['teacher_weights'], map_location=device)
+
+    # load teacher
+    try:
+        chkpt['model'] = {k: v for k, v in chkpt['model'].items() if teacher.state_dict()[k].numel() == v.numel()}
+        teacher.load_state_dict(chkpt['model'], strict=False)
+    except KeyError as e:
+        s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+            "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
+        raise KeyError(s) from e
+    # load mask
+    try:
+        if chkpt['mask']:
+            mask.load_state_dict(chkpt['mask'])
+        elif config['mask_path'] is not None:
+            msk = torch.load(config['mask_path'], map_location=device)
+            if 'mask' in msk: mask.load_state_dict(msk['mask'])
+            else: mask.load_state_dict(msk)
+            del msk
+    except:
+        print('Mask not found')
+    
+    # Reseting checkpoint
+    del chkpt
+    torch.cuda.empty_cache()
+    if config['student_weights'].endswith('.pt'):
+        chkpt = torch.load(config['student_weights'], map_location=device)
+        
+        # load student
+        try:
+            chkpt['model'] = {k: v for k, v in chkpt['model'].items() if student.state_dict()[k].numel() == v.numel()}
+            student.load_state_dict(chkpt['model'], strict=False)
+        except KeyError as e:
+            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
+            raise KeyError(s) from e
+        
+        # load hint models
+        try:
+            chkpt['hint'] = {k: v for k, v in chkpt['hint'].items() if hint_model.state_dict()[k].numel() == v.numel()}
+            hint_model.load_state_dict(chkpt['hint'], strict=False)
+        except KeyError as e:
+            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
+            raise KeyError(s) from e
+
+        # load optimizer
+        if chkpt['optimizer'] is not None:
+            optimizer.load_state_dict(chkpt['optimizer'])
+            best_fitness = chkpt['best_fitness']
+
+        # load results
+        if chkpt.get('training_results') is not None:
+            with open(config['results_file'], 'w') as file:
+                file.write(chkpt['training_results'])  # write results.txt
+
+        start_epoch = chkpt['epoch'] + 1
+        del chkpt
+        torch.cuda.empty_cache()
+
+    return start_epoch, best_fitness, teacher, student, mask, hint_model, optimizer

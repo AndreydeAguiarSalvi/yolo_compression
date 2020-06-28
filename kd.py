@@ -7,8 +7,8 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_kd_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints
-from utils.pruning import sum_of_the_weights
+from utils.my_utils import create_kd_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_kd_checkpoints
+from utils.pruning import create_mask_LTH, apply_mask_LTH
 
 mixed_precision = True
 try:  # Mixed precision training https://github.com/NVIDIA/apex
@@ -18,7 +18,6 @@ except:
 
 
 def train():
-    cfg = config['cfg']
     data = config['data']
     img_size, img_size_test = config['img_size'] if len(config['img_size']) == 2 else config['img_size'] * 2  # train, test sizes
     epochs = config['epochs']  # 500200 batches at bs 64, 117263 images = 273 epochs
@@ -39,26 +38,40 @@ def train():
     test_path = data_dict['valid']
     nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
 
-    # Initialize models
+    # Initialize Teacher
     if config['teacher_darknet'] == 'default':
-        teacher = Darknet(cfg, arc=config['arc']).to(device)
+        teacher = Darknet(cfg=config['teacher_cfg'], arc=config['teacher_arc']).to(device)
     elif config['teacher_darknet'] == 'nano':
         teacher = YOLO_Nano().to(device)
     elif config['teacher_darknet'] == 'soft':
-        teacher = SoftDarknet(cfg, arc=config['arc']).to(device)
+        teacher = SoftDarknet(cfg=config['teacher_cfg'], arc=config['teacher_arc']).to(device)
+    # Initialize Student
     if config['student_darknet'] == 'default':
-        student = Darknet(cfg, arc=config['arc']).to(device)
+        student = Darknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     elif config['teacher_darknet'] == 'nano':
         student = YOLO_Nano().to(device)
     elif config['teacher_darknet'] == 'soft':
-        student = SoftDarknet(cfg, arc=config['arc']).to(device)
+        student = SoftDarknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
+    # Create Hint Layers
+    hint_models = HintModel(config, student, teacher)
+    
     optimizer = create_optimizer(student, config)
 
-    start_epoch, best_fitness, teacher, optimizer = load_checkpoints(
-        config, teacher, 
-        optimizer, device, 
-        attempt_download, load_darknet_weights
+    mask = None
+    if config['mask'] or config['mask_path'] is not None:
+        mask = create_mask_LTH(teacher).to(device)
+
+    start_epoch, best_fitness, teacher, student, mask, hint_models, optimizer = load_kd_checkpoints(
+        config, 
+        teacher, student, 
+        mask, hint_models,
+        optimizer, device
     )
+
+    if mask is not None:
+        apply_mask_LTH(teacher, mask)
+        del mask
+        torch.cuda.empty_cache()
 
     if config['xavier_norm']:
         initialize_model(student, torch.nn.init.xavier_normal_)
@@ -232,12 +245,15 @@ def train():
         if save:
             with open(config['results_file'], 'r') as f:
                 # Create checkpoint
-                chkpt = {'epoch': epoch,
-                         'best_fitness': best_fitness,
-                         'training_results': f.read(),
-                         'model': student.module.state_dict() if type(
-                             student) is nn.parallel.DistributedDataParallel else student.state_dict(),
-                         'optimizer': None if final_epoch else optimizer.state_dict()}
+                chkpt = {
+                    'epoch': epoch,
+                    'best_fitness': best_fitness,
+                    'training_results': f.read(),
+                    'model': student.module.state_dict() if type(student) is nn.parallel.DistributedDataParallel 
+                        else student.state_dict(),
+                    'hint': hint_layer.module.state_dict() if type(hint_layer) is nn.parallel.DistributedDataParallel 
+                        else hint_layer.state_dict(),
+                    'optimizer': None if final_epoch else optimizer.state_dict()}
 
             # Save last checkpoint
             torch.save(chkpt, config['last'])
@@ -245,10 +261,6 @@ def train():
             # Save best checkpoint
             if best_fitness == fi:
                 torch.save(chkpt, config['best'])
-
-            # Save backup every 10 epochs (optional)
-            # if epoch > 0 and epoch % 10 == 0:
-            #     torch.save(chkpt, config['sub_working_dir'] + 'backup%g.pt' % epoch)
 
             # Delete checkpoint
             del chkpt
@@ -298,7 +310,7 @@ if __name__ == '__main__':
     config['last'] = config['sub_working_dir'] + 'last.pt'
     config['best'] = config['sub_working_dir'] + 'best.pt'
     config['results_file'] = config['sub_working_dir'] + 'results.txt'
-    config['weights'] = config['last'] if config['resume'] else config['weights']
+    config['student_weights'] = config['last'] if config['resume'] else config['student_weights']
 
     print(config)
     

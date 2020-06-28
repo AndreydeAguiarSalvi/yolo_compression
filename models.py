@@ -1259,6 +1259,47 @@ class ZeroConv(nn.Module):
         return int( ( (dimension - kernel + 2 * padding) / stride) + 1)
 
 
+class HintModel(nn.Module):
+
+    def __init__(self, config, teacher, student):
+        super(HintModel, self).__init__()   
+        
+        self.hint_layers = nn.ModuleList()
+        x = torch.Tensor(1, 3, 416, 416).to(device)
+        
+        # Get Features sizes
+        with torch.no_grad(): 
+            _, fts_tch = \
+                    teacher(x, config['teacher_indexes']) if type(teacher) is YOLO_Nano \
+                    else forward(teacher, x, config['teacher_indexes'])
+            _, fts_std = \
+                student(x, config['student_indexes']) if type(student) is YOLO_Nano \
+                    else forward(student, x, config['student_indexes']) 
+
+        for i, (ft_tch, ft_std) in enumerate(zip(fts_tch, fts_std)):
+            _, chnl_tch, w_tch, h_tch = ft_tch.shape
+            _, chnl_std, w_std, h_std = ft_std.shape
+            if w_tch != w_std or h_tch != h_std: 
+                print(f'Skiping {i}-th hint layer because shapes do not match:\n\tTeacher -> {[w_tch, h_tch)]}\tStudent -> {[w_std, h_std]}')
+            else: 
+                hint_layer = nn.Sequential(
+                    nn.Conv2d(
+                        in_channels=ft_std.chnl_std, out_channels=chnl_tch,
+                        kernel_size=(3, 3), stride=(1, 1),
+                        padding=(1, 1)
+                    ),
+                    nn.LeakyReLU(0.1, inplace=True)
+                )
+                self.hint_layers.add_module(f'hint_{i}', hint_layer)
+    
+
+    def forward(self, fts):
+        y = []
+        for i, x in enumerate(fts):
+            y.append(self.hint_layers[i](x))
+        return y
+
+
 def forward(model, x, fts_indexes=[], verbose=False):
         img_size = x.shape[-2:]
         yolo_out, out, features = [], [], []
