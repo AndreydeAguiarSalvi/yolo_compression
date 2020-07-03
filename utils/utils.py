@@ -127,26 +127,6 @@ def xywh2xyxy(x):
     return y
 
 
-# def xywh2xyxy(box):
-#     # Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2]
-#     if isinstance(box, torch.Tensor):
-#         x, y, w, h = box.t()
-#         return torch.stack((x - w / 2, y - h / 2, x + w / 2, y + h / 2)).t()
-#     else:  # numpy
-#         x, y, w, h = box.T
-#         return np.stack((x - w / 2, y - h / 2, x + w / 2, y + h / 2)).T
-#
-#
-# def xyxy2xywh(box):
-#     # Convert nx4 boxes from [x1, y1, x2, y2] to [x, y, w, h]
-#     if isinstance(box, torch.Tensor):
-#         x1, y1, x2, y2 = box.t()
-#         return torch.stack(((x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1)).t()
-#     else:  # numpy
-#         x1, y1, x2, y2 = box.T
-#         return np.stack(((x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1)).T
-
-
 def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
     # Rescale coords (xyxy) from img1_shape to img0_shape
     if ratio_pad is None:  # calculate from img0_shape
@@ -457,10 +437,10 @@ def compute_loss(p, targets, model):  # predictions, targets, model
     return loss, torch.cat((lbox, lobj, lcls, loss)).detach()
 
 
-def compute_kd_loss(p_teacher, p_student, targets, model_student):  # predictions, targets, model
+def compute_kd_loss(p_teacher, p_student, targets, fts_teacher, fts_student, model_student):  # predictions, targets, model
     ft = torch.cuda.FloatTensor if p_student[0].is_cuda else torch.Tensor
-    lcls, lbox, lobj = ft([0]), ft([0]), ft([0])
-    tcls, tbox, indices, anchor_vec = build_targets(model, targets)
+    lcls, lbox, lobj, lhint = ft([0]), ft([0]), ft([0]), ft([0])
+    tcls, tbox, indices, anchor_vec = build_targets(model_student, targets)
     h = model_student.hyp  # hyperparameters
     arc = model_student.arc  # # (default, uCE, uBCE) detection architectures
     red = 'mean'  # Loss reduction (sum or mean)
@@ -470,6 +450,7 @@ def compute_kd_loss(p_teacher, p_student, targets, model_student):  # prediction
     BCEobj = nn.BCEWithLogitsLoss(pos_weight=ft([h['obj_pw']]), reduction=red)
     BCE = nn.BCEWithLogitsLoss(reduction=red)
     CE = nn.CrossEntropyLoss(reduction=red)  # weight=model_student.class_weights
+    HINT = nn.MSELoss(reduction=red)
 
     # class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
     smooth = False
@@ -535,6 +516,9 @@ def compute_kd_loss(p_teacher, p_student, targets, model_student):  # prediction
                 t[b, a, gj, gi] = tcls[i] + 1
             lcls += CE(pi[..., 4:].view(-1, model_student.nc + 1), t.view(-1))
 
+    for (hint, guided) in zip(fts_teacher, fts_student):
+        lhint += HINT(guided, hint)
+
     lbox *= h['giou']
     lobj *= h['obj']
     lcls *= h['cls']
@@ -545,8 +529,8 @@ def compute_kd_loss(p_teacher, p_student, targets, model_student):  # prediction
             lcls *= 3 / ng / model_student.nc
             lbox *= 3 / ng
 
-    loss = lbox + lobj + lcls
-    return loss, torch.cat((lbox, lobj, lcls, loss)).detach()
+    loss = lbox + lobj + lcls + lhint
+    return loss, torch.cat((lbox, lobj, lcls, lhint, loss)).detach()
 
 
 def build_targets(model, targets):

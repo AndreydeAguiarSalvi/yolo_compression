@@ -1,12 +1,3 @@
-# TODO
-# concluir função de Loss para KD
-# refatorar cs.py
-# fazer kd.py
-# 
-
-# Maybe help to understand this fucking code:
-# https://www.cyberailab.com/home/a-closer-look-at-yolov3
-# https://towardsdatascience.com/yolo-v3-object-detection-53fb7d3bfe6b
 import torch.nn.functional as F
 
 from utils.google_utils import *
@@ -1285,8 +1276,8 @@ class HintModel(nn.Module):
                 hint_layer = nn.Sequential(
                     nn.Conv2d(
                         in_channels=ft_std.chnl_std, out_channels=chnl_tch,
-                        kernel_size=(3, 3), stride=(1, 1),
-                        padding=(1, 1)
+                        kernel_size=(1, 1), stride=(1, 1),
+                        padding=(1, 1) # Missing padding trick from https://arxiv.org/pdf/1507.00448.pdf to match the resolution
                     ),
                     nn.LeakyReLU(0.1, inplace=True)
                 )

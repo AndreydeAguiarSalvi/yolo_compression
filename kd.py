@@ -1,8 +1,8 @@
 # Based on 
 # https://papers.nips.cc/paper/6676-learning-efficient-object-detection-models-with-knowledge-distillation.pdf
-# TODO: Hint Loss *
-# TODO: Weighted Cross Entropy Loss
-# TODO: Teacher regression as upper bound  
+# TODO: Hint Loss [3.4] 
+# TODO: Weighted Cross Entropy Loss in Classification + (Hard Softmax + Soft Knowledge Distillation) [3.2] *
+# TODO: Teacher regression as upper bound  (Smoothed L1 Loss + Teacher bounded L2 Loss) [3.3]
 
 import torch.distributed as dist
 
