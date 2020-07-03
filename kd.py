@@ -1,5 +1,8 @@
 # Based on 
 # https://papers.nips.cc/paper/6676-learning-efficient-object-detection-models-with-knowledge-distillation.pdf
+# TODO: Hint Loss *
+# TODO: Weighted Cross Entropy Loss
+# TODO: Teacher regression as upper bound  
 
 import torch.distributed as dist
 
@@ -214,7 +217,7 @@ def train():
         if not config['notest'] or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and student.nc == 80
             results, maps = test.test(
-                cfg = cfg, data = data, batch_size=batch_size,
+                cfg = config['cfg'], data = data, batch_size=batch_size,
                 img_size=img_size_test, model=student, 
                 conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
                 iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
@@ -251,8 +254,8 @@ def train():
                     'training_results': f.read(),
                     'model': student.module.state_dict() if type(student) is nn.parallel.DistributedDataParallel 
                         else student.state_dict(),
-                    'hint': hint_layer.module.state_dict() if type(hint_layer) is nn.parallel.DistributedDataParallel 
-                        else hint_layer.state_dict(),
+                    'hint': hint_models.module.state_dict() if type(hint_models) is nn.parallel.DistributedDataParallel 
+                        else hint_models.state_dict(),
                     'optimizer': None if final_epoch else optimizer.state_dict()}
 
             # Save last checkpoint
@@ -310,7 +313,6 @@ if __name__ == '__main__':
     config['last'] = config['sub_working_dir'] + 'last.pt'
     config['best'] = config['sub_working_dir'] + 'best.pt'
     config['results_file'] = config['sub_working_dir'] + 'results.txt'
-    config['student_weights'] = config['last'] if config['resume'] else config['student_weights']
 
     print(config)
     

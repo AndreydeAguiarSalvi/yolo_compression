@@ -1280,7 +1280,7 @@ class HintModel(nn.Module):
             _, chnl_tch, w_tch, h_tch = ft_tch.shape
             _, chnl_std, w_std, h_std = ft_std.shape
             if w_tch != w_std or h_tch != h_std: 
-                print(f'Skiping {i}-th hint layer because shapes do not match:\n\tTeacher -> {[w_tch, h_tch)]}\tStudent -> {[w_std, h_std]}')
+                print(f'Skiping {i}-th hint layer because shapes do not match:\n\tTeacher -> {[w_tch, h_tch]}\tStudent -> {[w_std, h_std]}')
             else: 
                 hint_layer = nn.Sequential(
                     nn.Conv2d(
