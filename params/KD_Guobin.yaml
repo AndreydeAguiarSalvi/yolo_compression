@@ -1,5 +1,5 @@
 inherit_from: params/default.yaml
-cfg: Guobin_KD
+cfg: /Guobin_KD.cfg
 weights: ''
 arc : ''
 darknet : ''
