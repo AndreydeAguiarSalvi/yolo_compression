@@ -175,7 +175,7 @@ def create_kd_argparser():
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
     parser.add_argument('--seed', type=int, default=0, help='seed to function init_seeds')
     # Teacher parameters
-    parser.add_argument('--mask', action='store_ture', help='There is a mask to load inside teacher checkpoint')
+    parser.add_argument('--mask', action='store_true', help='There is a mask to load inside teacher checkpoint')
     parser.add_argument('--mask_path', type=str, help='There is a mask to load on another path')
     # KD parameters
     parser.add_argument('--params', type=str, default='params/KD_Guoblin.yaml', help='json config to load the hyperparameters')
