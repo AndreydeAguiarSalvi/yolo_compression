@@ -1,8 +1,8 @@
 # Based on 
 # https://papers.nips.cc/paper/6676-learning-efficient-object-detection-models-with-knowledge-distillation.pdf
 # TODO: Hint Loss [3.4] 
-# TODO: Weighted Cross Entropy Loss in Classification + (Hard Softmax + Soft Knowledge Distillation) [3.2] *
-# TODO: Teacher regression as upper bound  (Smoothed L1 Loss + Teacher bounded L2 Loss) [3.3]
+# TODO: Weighted Cross Entropy Loss in Classification + (Hard Softmax + Soft Knowledge Distillation) [3.2]
+# TODO: Teacher regression as upper bound  (Smoothed L1 Loss + Teacher bounded L2 Loss) [3.3] 
 
 import torch.distributed as dist
 
@@ -51,14 +51,15 @@ def train():
     # Initialize Student
     if config['student_darknet'] == 'default':
         student = Darknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
-    elif config['teacher_darknet'] == 'nano':
+    elif config['student_darknet'] == 'nano':
         student = YOLO_Nano().to(device)
-    elif config['teacher_darknet'] == 'soft':
+    elif config['student_darknet'] == 'soft':
         student = SoftDarknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     # Create Hint Layers
     hint_models = HintModel(config, student, teacher)
     
     optimizer = create_optimizer(student, config)
+    optimizer.add_param_group({"hint_params": hint_models.parameters()})
 
     mask = None
     if config['mask'] or config['mask_path'] is not None:
@@ -143,7 +144,7 @@ def train():
             trainloader.dataset.indices = random.choices(range(trainloader.dataset.n), weights=image_weights, k=trainloader.dataset.n)  # rand weighted idx
 
         mloss = torch.zeros(4).to(device)  # mean losses
-        print(('\n' + '%10s' * 8) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'total', 'targets', 'img_size'))
+        print(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'hint', 'total', 'targets', 'img_size'))
         pbar = tqdm(enumerate(trainloader), total=nb)  # progress bar
         ####################
         # Start mini-batch #
@@ -181,7 +182,7 @@ def train():
                     else forward(student, imgs, config['student_indexes']) 
 
             # Compute loss
-            loss, loss_items = compute_loss(pred, targets, model)
+            loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, fts_tch, fts_std, teacher, student)
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results
@@ -204,7 +205,7 @@ def train():
             # Print batch results
             mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
             mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
-            s = ('%10s' * 2 + '%10.3g' * 6) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
+            s = ('%10s' * 2 + '%10.3g' * 7) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
             pbar.set_description(s)
         ##################
         # End mini-batch #
@@ -233,7 +234,7 @@ def train():
         # Write Tensorboard results
         if tb_writer:
             x = list(mloss) + list(results)
-            titles = ['GIoU', 'Objectness', 'Classification', 'Train loss',
+            titles = ['GIoU', 'Objectness', 'Classification', 'Hint', 'Train loss',
                       'Precision', 'Recall', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification']
             for xi, title in zip(x, titles):
                 tb_writer.add_scalar(title, xi, epoch)

@@ -1,6 +1,14 @@
-cfg : ''
+inherit_from: params/default.yaml
+cfg: Guobin_KD
+weights: ''
+arc : ''
+darknet : ''
+
 teacher_cfg : cfg/voc_yolov3.cfg
-student_cfg : cfg/voc_yolov3-tiny3.cfg
+teacher_weights: weights/voc_yolov3/size-multi_scale/2020_03_18/18_00_18/best.pt
+teacher_darknet: default
+
+student_cfg : cfg/voc_yolov3-nano.cfg
+student_darknet: nano
+
 data : data/voc2012.data
-weights : ''
-working_dir : /A/andrey/yolo_ultra/weights
