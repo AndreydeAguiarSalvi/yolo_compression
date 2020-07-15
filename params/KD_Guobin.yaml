@@ -9,6 +9,7 @@ teacher_weights: weights/voc_yolov3/size-multi_scale/2020_03_18/18_00_18/best.pt
 teacher_darknet: default
 
 student_cfg : cfg/voc_yolov3-nano.cfg
+student_weights: ''
 student_darknet: nano
 
 data : data/voc2012.data

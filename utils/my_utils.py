@@ -244,6 +244,11 @@ def create_config(opt):
 
     config = load_config(opt['params'])
 
+    for key, value in opt.items():
+        if value is not None:
+            if key in config['hyp']: config['hyp'][key] = value
+            else: config[key] = value
+
     # Create sub_working_dir
     if opt['resume']:
         folders = opt['weights'].split('/') if 'weights' in opt.keys() \
@@ -271,11 +276,6 @@ def create_config(opt):
         if not os.path.exists(sub_working_dir):
             os.makedirs(sub_working_dir)
         config["sub_working_dir"] = sub_working_dir
-
-    for key, value in opt.items():
-        if value is not None:
-            if key in config['hyp']: config['hyp'][key] = value
-            else: config[key] = value
 
     return config
 
