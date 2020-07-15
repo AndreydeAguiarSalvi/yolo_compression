@@ -59,7 +59,7 @@ def train():
     hint_models = HintModel(config, student, teacher, device)
     
     optimizer = create_optimizer(student, config)
-    optimizer.add_param_group({"hint_params": hint_models.parameters()})
+    optimizer.add_param_group({"hint_params": hint_models})
 
     mask = None
     if config['mask'] or config['mask_path'] is not None:
