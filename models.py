@@ -1274,7 +1274,7 @@ class HintModel(nn.Module):
             else: 
                 hint_layer = nn.Sequential(
                     nn.Conv2d(
-                        in_channels=ft_std.chnl_std, out_channels=chnl_tch,
+                        in_channels=chnl_std, out_channels=chnl_tch,
                         kernel_size=(1, 1), stride=(1, 1),
                         padding=(1, 1) # Missing padding trick from https://arxiv.org/pdf/1507.00448.pdf to match the resolution
                     ),
