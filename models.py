@@ -1252,7 +1252,7 @@ class ZeroConv(nn.Module):
 
 class HintModel(nn.Module):
 
-    def __init__(self, config, teacher, student):
+    def __init__(self, config, teacher, student, device):
         super(HintModel, self).__init__()   
         
         self.hint_layers = nn.ModuleList()
