@@ -973,7 +973,6 @@ class YOLO_Nano(nn.Module):
     def forward(self, x, fts_indexes=[]):
         yolo_outputs = []
         features = []
-        image_size = x.size(2)
         current_size = x.shape[-2:]
 
         out = self.conv1(x)
@@ -1072,14 +1071,14 @@ class YOLO_Nano(nn.Module):
         if 44 in fts_indexes: features.append(out_conv11)
         yolo_outputs.append(self.yolo_layer13(out_conv11, current_size))
 
-        if model.training: # train
-            return yolo_out, features if len(fts_indexes) else yolo_out
+        if self.training: # train
+            return yolo_outputs, features if len(fts_indexes) else yolo_outputs
         elif ONNX_EXPORT: # export
-            x = [torch.cat(x, 0) for x in zip(*yolo_out)]
+            x = [torch.cat(x, 0) for x in zip(*yolo_outputs)]
                                                                                 # scores, boxes: 3780x80, 3780x4
             return x[0], torch.cat(x[1:3], 1), features if len(fts_indexes) else x[0], torch.cat(x[1:3], 1)
         else: # test
-            io, p = zip(*yolo_out)  # inference output, training output
+            io, p = zip(*yolo_outputs)  # inference output, training output
             return torch.cat(io, 1), p, features if len(fts_indexes) else torch.cat(io, 1), p
     
 
