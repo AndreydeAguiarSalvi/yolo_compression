@@ -39,7 +39,7 @@ def train():
     data_dict = parse_data_cfg(data)
     train_path = data_dict['train']
     test_path = data_dict['valid']
-    nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
+    nc = int(data_dict['classes'])  # number of classes
 
     # Initialize Teacher
     if config['teacher_darknet'] == 'default':
