@@ -244,6 +244,7 @@ def create_config(opt):
 
     config = load_config(opt['params'])
 
+    # Update config with opt (terminal arguments)
     for key, value in opt.items():
         if value is not None:
             if key in config['hyp']: config['hyp'][key] = value
@@ -251,16 +252,14 @@ def create_config(opt):
 
     # Create sub_working_dir
     if opt['resume']:
-        folders = opt['weights'].split('/') if 'weights' in opt.keys() \
-            else opt['student_weights'].split('/')
+        folders = config['weights'].split('/'),
         config['sub_working_dir'] = ''
         for i in range(len(folders) - 1):
             config['sub_working_dir'] += folders[i] + '/'
     else:
         sub_working_dir = '{}/{}/size-{}/{}'.format(
             config['working_dir'],
-            opt['cfg'].split('/')[1].split('.')[0] if 'cfg' in opt.keys() \
-                else opt['student_cfg'].split('/')[1].split('.')[0],
+            config['cfg'].split('/')[1].split('.')[0],
             config['img_size'][0] if opt['multi_scale'] is False and opt['img_size'] is None 
                 else 'multi_scale' if opt['multi_scale'] is True else opt['img_size'][0],
 
