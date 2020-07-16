@@ -496,7 +496,7 @@ def load_kd_checkpoints(config, teacher, student, mask, hint_model, optimizer, d
         raise KeyError(s) from e
     # load mask
     try:
-        if chkpt['mask']:
+        if 'mask' is chkpt:
             mask.load_state_dict(chkpt['mask'])
         elif config['mask_path'] is not None:
             msk = torch.load(config['mask_path'], map_location=device)

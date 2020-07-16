@@ -105,9 +105,17 @@ def train():
     nb = len(trainloader)
     prebias = start_epoch == 0
     student.nc = nc  # attach number of classes to student
+    teacher.nc = nc
+    
     student.arc = config['arc']  # attach yolo architecture
+    teacher.arc = config['arc']
+
     student.hyp = config['hyp']  # attach hyperparameters to student
+    teacher.hyp = config['hyp']
+    
     student.class_weights = labels_to_class_weights(trainloader.dataset.labels, nc).to(device)  # attach class weights
+    teacher.class_weights = student.class_weights
+
     maps = np.zeros(nc)  # mAP per class
     # torch.autograd.set_detect_anomaly(True)
     results = (0, 0, 0, 0, 0, 0, 0)  # 'P', 'R', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification'
