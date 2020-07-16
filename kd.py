@@ -59,7 +59,7 @@ def train():
     hint_models = HintModel(config, student, teacher, device)
     
     optimizer = create_optimizer(student, config)
-    optimizer.add_param_group({"params": hint_models})
+    optimizer.add_param_group({"params": hint_models.parameters()})
 
     mask = None
     if config['mask'] or config['mask_path'] is not None:
@@ -175,7 +175,7 @@ def train():
             with torch.no_grad(): 
                 pred_tch, fts_tch = \
                     teacher(imgs, config['teacher_indexes']) if type(teacher) is YOLO_Nano \
-                    else forward(teacher, imgs, config['teacher_indexes'])
+                    else forward(teacher, imgs, config['teacher_indexes'], is_teacher=True)
             # Run student
             pred_std, fts_std = \
                 student(imgs, config['student_indexes']) if type(student) is YOLO_Nano \

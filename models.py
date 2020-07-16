@@ -1290,7 +1290,7 @@ class HintModel(nn.Module):
         return y
 
 
-def forward(model, x, fts_indexes=[], verbose=False):
+def forward(model, x, fts_indexes=[], verbose=False, is_teacher=False):
         img_size = x.shape[-2:]
         yolo_out, out, features = [], [], []
         verbose = False
@@ -1337,7 +1337,7 @@ def forward(model, x, fts_indexes=[], verbose=False):
                 print('%g/%g %s -' % (i, len(model.module_list), mtype), list(x.shape), str)
                 str = ''
 
-        if model.training: # train
+        if model.training or is_teacher: # train
             return yolo_out, features if len(fts_indexes) else yolo_out
         elif ONNX_EXPORT: # export
             x = [torch.cat(x, 0) for x in zip(*yolo_out)]
