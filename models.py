@@ -764,20 +764,20 @@ class SoftDarknet(MaskedNet):
 
 
 # Adapted from https://github.com/liux0614/yolo_nano/blob/master/models/yolo_nano.py
-def conv1x1(input_channels, output_channels, stride=1, bn=True):
+def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False):
     # 1x1 convolution without padding
     if bn == True:
         return nn.Sequential(
             nn.Conv2d(
                 input_channels, output_channels, kernel_size=1,
-                stride=stride, bias=False),
+                stride=stride, bias=bias),
             nn.BatchNorm2d(output_channels),
             nn.ReLU6(inplace=True)
         )
     else:
         return nn.Conv2d(
                 input_channels, output_channels, kernel_size=1,
-                stride=stride, bias=False)
+                stride=stride, bias=bias)
 
 
 def conv3x3(input_channels, output_channels, stride=1, bn=True):
@@ -936,39 +936,54 @@ class YOLO_Nano(nn.Module):
         self.pep20 = PEP(197, 122, 58, stride=1) # output: 52x52x122
         self.pep21 = PEP(122, 87, 52, stride=1) # output: 52x52x87
         self.pep22 = PEP(87, 93, 47, stride=1) # output: 52x52x93
-        self.conv9 = conv1x1(93, self.yolo_channels, stride=1, bn=False) # output: 52x52x yolo_channels
+        self.conv9 = conv1x1(93, self.yolo_channels, stride=1, bn=False, bias=True) # output: 52x52x yolo_channels
         self.yolo_layer52 = YOLOLayer(
             anchors=self.anchors[0:3], nc=self.num_classes,
             img_size=(image_size, image_size), yolo_index=0, arc='default'
         )
+        try:
+            bias_ = self.conv9.bias
+            bias = bias_[:self.yolo_layer52.no * self.yolo_layer52.na].view(self.yolo_layer52.na, -1)  # shape(3,85)
+            bias[:, 4] += -4.5  # obj
+            bias[:, 5:] += math.log(0.6 / (self.yolo_layer52.nc - 0.99))  # cls (sigmoid(p) = 1/nc)
+            self.conv9.bias = torch.nn.Parameter(bias_, requires_grad=bias_.requires_grad)
+        except:
+            print('WARNING: smart bias initialization failure.')
 
         # conv7 -> ep6
         self.ep6 = EP(98, 183, stride=1) # output: 26x26x183
-        self.conv10 = conv1x1(183, self.yolo_channels, stride=1, bn=False) # output: 26x26x yolo_channels
+        self.conv10 = conv1x1(183, self.yolo_channels, stride=1, bn=False, bias=True) # output: 26x26x yolo_channels
         self.yolo_layer26 = YOLOLayer(
             anchors=self.anchors[3:6], nc=self.num_classes,
             img_size=(image_size, image_size), yolo_index=1, arc='default'
         )
+        try:
+            bias_ = self.conv10.bias
+            bias = bias_[:self.yolo_layer26.no * self.yolo_layer26.na].view(self.yolo_layer26.na, -1)  # shape(3,85)
+            bias[:, 4] += -4.5  # obj
+            bias[:, 5:] += math.log(0.6 / (self.yolo_layer26.nc - 0.99))  # cls (sigmoid(p) = 1/nc)
+            self.conv10.bias = torch.nn.Parameter(bias_, requires_grad=bias_.requires_grad)
+        except:
+            print('WARNING: smart bias initialization failure.')
 
         # conv5 -> ep7
         self.ep7 = EP(189, 462, stride=1) # output: 13x13x462
-        self.conv11 = conv1x1(462, self.yolo_channels, stride=1, bn=False) # output: 13x13x yolo_channels
+        self.conv11 = conv1x1(462, self.yolo_channels, stride=1, bn=False, bias=True) # output: 13x13x yolo_channels
         self.yolo_layer13 = YOLOLayer(
             anchors=self.anchors[6:], nc=self.num_classes,
             img_size=(image_size, image_size), yolo_index=2, arc='default'
         )
-
-        self.module_list = []
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                m.weight = nn.init.xavier_normal_(m.weight, gain=0.02)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.normal_(m.weight.data, 1.0, 0.02)
-                m.bias.data.zero_()
-            self.module_list.append(m)
+        try:
+            bias_ = self.conv11.bias
+            bias = bias_[:self.yolo_layer13.no * self.yolo_layer13.na].view(self.yolo_layer13.na, -1)  # shape(3,85)
+            bias[:, 4] += -4.5  # obj
+            bias[:, 5:] += math.log(0.6 / (self.yolo_layer13.nc - 0.99))  # cls (sigmoid(p) = 1/nc)
+            self.conv11.bias = torch.nn.Parameter(bias_, requires_grad=bias_.requires_grad)
+        except:
+            print('WARNING: smart bias initialization failure.')
     
         self.create_modules()
-        self.yolo_layers = [37, 40, 43]
+        self.yolo_layers = [43, 40, 37]
 
     def forward(self, x, fts_indexes=[]):
         yolo_outputs = []
@@ -1070,6 +1085,8 @@ class YOLO_Nano(nn.Module):
         out_conv11 = self.conv11(out)
         if 44 in fts_indexes: features.append(out_conv11)
         yolo_outputs.append(self.yolo_layer13(out_conv11, current_size))
+
+        yolo_outputs.reverse()
 
         if self.training: # train
             return yolo_outputs, features if len(fts_indexes) else yolo_outputs

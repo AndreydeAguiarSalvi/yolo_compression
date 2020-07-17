@@ -189,8 +189,10 @@ def train():
                 student(imgs, config['student_indexes']) if type(student) is YOLO_Nano \
                     else forward(student, imgs, config['student_indexes']) 
 
+            fts_guided = hint_models(fts_std)
+
             # Compute loss
-            loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, fts_tch, fts_std, teacher, student)
+            loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, fts_tch, fts_guided, teacher, student)
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results

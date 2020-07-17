@@ -437,7 +437,7 @@ def compute_loss(p, targets, model):  # predictions, targets, model
     return loss, torch.cat((lbox, lobj, lcls, loss)).detach()
 
 
-def compute_kd_loss(p_teacher, p_student, targets, fts_teacher, fts_student, model_teacher, model_student):  # predictions, targets, model
+def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_teacher, model_student):  # predictions, targets, model
     ft = torch.cuda.FloatTensor if p_student[0].is_cuda else torch.Tensor
     lcls, lbox, lobj = ft([0]), ft([0]), ft([0])
     lhard_cls, lhard_box =  ft([0]), ft([0])
@@ -527,7 +527,7 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_teacher, fts_student, mod
             lhard_cls += CE(student_pi[..., 4:].view(-1, model_student.nc + 1), t.view(-1))
 
     # Compute the L1 Loss between every teacher fts and guided (by Hint) student fts
-    for (hint, guided) in zip(fts_teacher, fts_student):
+    for (hint, guided) in zip(fts_hint, fts_guided):
         lhint += HINT(guided, hint)
 
     lhard_box *= h['giou']
