@@ -220,6 +220,7 @@ class YOLOLayer(nn.Module):
     def __init__(self, anchors, nc, img_size, yolo_index, arc):
         super(YOLOLayer, self).__init__()
 
+        self.yolo_index = yolo_index
         self.anchors = torch.Tensor(anchors)
         self.na = len(anchors)  # number of anchors (3)
         self.nc = nc  # number of classes (80)
@@ -939,7 +940,7 @@ class YOLO_Nano(nn.Module):
         self.conv9 = conv1x1(93, self.yolo_channels, stride=1, bn=False, bias=True) # output: 52x52x yolo_channels
         self.yolo_layer52 = YOLOLayer(
             anchors=self.anchors[0:3], nc=self.num_classes,
-            img_size=(image_size, image_size), yolo_index=0, arc='default'
+            img_size=(image_size, image_size), yolo_index=2, arc='default'
         )
         try:
             bias_ = self.conv9.bias
@@ -971,7 +972,7 @@ class YOLO_Nano(nn.Module):
         self.conv11 = conv1x1(462, self.yolo_channels, stride=1, bn=False, bias=True) # output: 13x13x yolo_channels
         self.yolo_layer13 = YOLOLayer(
             anchors=self.anchors[6:], nc=self.num_classes,
-            img_size=(image_size, image_size), yolo_index=2, arc='default'
+            img_size=(image_size, image_size), yolo_index=0, arc='default'
         )
         try:
             bias_ = self.conv11.bias
@@ -986,7 +987,7 @@ class YOLO_Nano(nn.Module):
         self.yolo_layers = [43, 40, 37]
 
     def forward(self, x, fts_indexes=[]):
-        yolo_outputs = []
+        yolo_out = []
         features = []
         current_size = x.shape[-2:]
 
@@ -1072,31 +1073,33 @@ class YOLO_Nano(nn.Module):
         if 37 in fts_indexes: features.append(out)
         out_conv9 = self.conv9(out)
         if 38 in fts_indexes: features.append(out_conv9)
-        yolo_outputs.append(self.yolo_layer52(out_conv9, current_size))
+        yolo_out.append(self.yolo_layer52(out_conv9, current_size))
 
         out = self.ep6(out_conv7)
         if 40 in fts_indexes: features.append(out)
         out_conv10 = self.conv10(out)
         if 41 in fts_indexes: features.append(out_conv10)
-        yolo_outputs.append(self.yolo_layer26(out_conv10, current_size))
+        yolo_out.append(self.yolo_layer26(out_conv10, current_size))
 
         out = self.ep7(out_conv5)
         if 43 in fts_indexes: features.append(out)
         out_conv11 = self.conv11(out)
         if 44 in fts_indexes: features.append(out_conv11)
-        yolo_outputs.append(self.yolo_layer13(out_conv11, current_size))
+        yolo_out.append(self.yolo_layer13(out_conv11, current_size))
 
-        yolo_outputs.reverse()
+        yolo_out.reverse()
 
         if self.training: # train
-            return yolo_outputs, features if len(fts_indexes) else yolo_outputs
+            if len(fts_indexes): return yolo_out, features
+            return yolo_out
         elif ONNX_EXPORT: # export
-            x = [torch.cat(x, 0) for x in zip(*yolo_outputs)]
-                                                                                # scores, boxes: 3780x80, 3780x4
-            return x[0], torch.cat(x[1:3], 1), features if len(fts_indexes) else x[0], torch.cat(x[1:3], 1)
+            x = [torch.cat(x, 0) for x in zip(*yolo_out)]
+            if len(fts_indexes): return x[0], torch.cat(x[1:3], 1), features
+            return x[0], torch.cat(x[1:3], 1) # scores, boxes: 3780x80, 3780x4
         else: # test
-            io, p = zip(*yolo_outputs)  # inference output, training output
-            return torch.cat(io, 1), p, features if len(fts_indexes) else torch.cat(io, 1), p
+            io, p = zip(*yolo_out)  # inference output, training output
+            if len(fts_indexes): return torch.cat(io, 1), p, features
+            return torch.cat(io, 1), p
     
 
     def create_modules(self):
@@ -1307,59 +1310,61 @@ class HintModel(nn.Module):
         return y
 
 
-def forward(model, x, fts_indexes=[], verbose=False, is_teacher=False):
-        img_size = x.shape[-2:]
-        yolo_out, out, features = [], [], []
-        verbose = False
-        if verbose:
-            str = ''
-            print('0', x.shape)
+def forward(model, x, fts_indexes=[], verbose=False):
+    img_size = x.shape[-2:]
+    yolo_out, out, features = [], [], []
+    verbose = False
+    if verbose:
+        str = ''
+        print('0', x.shape)
 
-        for i, (mdef, module) in enumerate(zip(model.module_defs, model.module_list)):
-            mtype = mdef['type']
-            if mtype in ['convolutional', 'softconv', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'upsample', 'maxpool']:
-                if mtype == 'softconv': 
-                    x1 = module[0](x, model.temp, model.ticket)
-                    x = module[1:](x1)
-                else: x = module(x)
-            elif mtype == 'shortcut':  # sum
-                if verbose:
-                    l = [i - 1] + module.layers  # layers
-                    s = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes
-                    str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
-                x = module(x, out)  # weightedFeatureFusion()
-            elif mtype == 'route': # concat
-                layers = mdef['layers']
-                if verbose:
-                    l = [i - 1] + layers  # layers
-                    s = [list(x.shape)] + [list(out[i].shape) for i in layers]  # shapes
-                    str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
-                if len(layers) == 1:
-                    x = out[layers[0]]
-                else:
-                    try:
-                        x = torch.cat([out[i] for i in layers], 1)
-                    except:  # apply stride 2 for darknet reorg layer
-                        out[layers[1]] = F.interpolate(out[layers[1]], scale_factor=[0.5, 0.5])
-                        x = torch.cat([out[i] for i in layers], 1)
-                    # print(''), [print(out[i].shape) for i in layers], print(x.shape)
-            elif mtype == 'yolo':
-                yolo_out.append(module(x, img_size))
-            
-            # Features to output
-            if i in fts_indexes: features.append(x)
-            
-            out.append(x if i in model.routs else [])
+    for i, (mdef, module) in enumerate(zip(model.module_defs, model.module_list)):
+        mtype = mdef['type']
+        if mtype in ['convolutional', 'softconv', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'upsample', 'maxpool']:
+            if mtype == 'softconv': 
+                x1 = module[0](x, model.temp, model.ticket)
+                x = module[1:](x1)
+            else: x = module(x)
+        elif mtype == 'shortcut':  # sum
             if verbose:
-                print('%g/%g %s -' % (i, len(model.module_list), mtype), list(x.shape), str)
-                str = ''
+                l = [i - 1] + module.layers  # layers
+                s = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes
+                str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
+            x = module(x, out)  # weightedFeatureFusion()
+        elif mtype == 'route': # concat
+            layers = mdef['layers']
+            if verbose:
+                l = [i - 1] + layers  # layers
+                s = [list(x.shape)] + [list(out[i].shape) for i in layers]  # shapes
+                str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
+            if len(layers) == 1:
+                x = out[layers[0]]
+            else:
+                try:
+                    x = torch.cat([out[i] for i in layers], 1)
+                except:  # apply stride 2 for darknet reorg layer
+                    out[layers[1]] = F.interpolate(out[layers[1]], scale_factor=[0.5, 0.5])
+                    x = torch.cat([out[i] for i in layers], 1)
+                # print(''), [print(out[i].shape) for i in layers], print(x.shape)
+        elif mtype == 'yolo':
+            yolo_out.append(module(x, img_size))
+        # Features to output
+        if i in fts_indexes: features.append(x)
 
-        if model.training or is_teacher: # train
-            return yolo_out, features if len(fts_indexes) else yolo_out
-        elif ONNX_EXPORT: # export
-            x = [torch.cat(x, 0) for x in zip(*yolo_out)]
-                                                                                # scores, boxes: 3780x80, 3780x4
-            return x[0], torch.cat(x[1:3], 1), features if len(fts_indexes) else x[0], torch.cat(x[1:3], 1)
-        else: # test
-            io, p = zip(*yolo_out)  # inference output, training output
-            return torch.cat(io, 1), p, features if len(fts_indexes) else torch.cat(io, 1), p
+        out.append(x if i in model.routs else [])
+
+        if verbose:
+            print('%g/%g %s -' % (i, len(model.module_list), mtype), list(x.shape), str)
+            str = ''
+
+    if model.training: # train
+        if len(fts_indexes): return yolo_out, features
+        return yolo_out
+    elif ONNX_EXPORT: # export
+        x = [torch.cat(x, 0) for x in zip(*yolo_out)]
+        if len(fts_indexes): return x[0], torch.cat(x[1:3], 1), features
+        return x[0], torch.cat(x[1:3], 1) # scores, boxes: 3780x80, 3780x4
+    else: # test
+        io, p = zip(*yolo_out)  # inference output, training output
+        if len(fts_indexes): return torch.cat(io, 1), p, features
+        return torch.cat(io, 1), p
