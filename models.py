@@ -1327,7 +1327,7 @@ class HintModel(nn.Module):
     def forward(self, fts):
         y = []
         for i, x in enumerate(fts):
-            y.append(self.hint_layers[i](x))
+            y.append(self.hint_layers[f'hint_{i}'](x))
         return y
 
 
