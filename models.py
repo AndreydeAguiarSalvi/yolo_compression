@@ -1317,8 +1317,8 @@ class HintModel(nn.Module):
                 hint_layer = nn.Sequential()
                 conv = nn.Conv2d(
                         in_channels=chnl_std, out_channels=chnl_tch,
-                        kernel_size=(1, 1), stride=(1, 1),
-                        padding=(1, 1) # Missing padding trick from https://arxiv.org/pdf/1507.00448.pdf to match the resolution
+                        kernel_size=(1, 1), stride=1,
+                        padding=0 # Missing padding trick from https://arxiv.org/pdf/1507.00448.pdf to match the resolution
                 )
                 hint_layer.add_module(f'hint_{i}', conv)
                 hint_layer.add_module('activation', nn.LeakyReLU(0.1, inplace=True))

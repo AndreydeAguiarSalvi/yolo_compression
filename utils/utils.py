@@ -497,7 +497,7 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
             teacher_giou = bbox_iou(teacher_pbox.t(), teacher_tbox[i], x1y1x2y2=False, GIoU=True)  # giou computation
             
             lhard_box += (1. - student_giou).mean() if (1. - student_giou).mean() + margin > (1. - teacher_giou).mean() else .0
-            lsoft_box += L1_S(student_pbox.t(), student_tbox[i])
+            lsoft_box += L1_S(student_pbox.t(), student_tbox[i].t())
             
             tobj[b, a, gj, gi] = (1.0 - model_student.gr) + model_student.gr * student_giou.detach().clamp(0).type(tobj.dtype)  # giou ratio
 
