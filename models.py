@@ -768,7 +768,7 @@ class SoftDarknet(MaskedNet):
 def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, activation='ReLU6'):
     act_ftn = None
     if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
-    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(inplace=True)
+    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
     else: assert(f'Not recognized function: {activation}')
     
     # 1x1 convolution without padding
@@ -789,7 +789,7 @@ def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, acti
 def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='ReLU6'):
     act_ftn = None
     if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
-    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(inplace=True)
+    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
     else: assert(f'Not recognized function: {activation}')
     
     # 3x3 convolution with padding=1
@@ -811,7 +811,7 @@ def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1, activa
     
     act_ftn = None
     if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
-    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(inplace=True)
+    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
     else: assert(f'Not recognized function: {activation}')
     
     return nn.Sequential(
@@ -880,7 +880,7 @@ class FCA(nn.Module):
 
         act_ftn = None
         if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
-        elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(inplace=True)
+        elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
         else: assert(f'Not recognized function: {activation}')
 
         hidden_channels = channels // reduction_ratio
