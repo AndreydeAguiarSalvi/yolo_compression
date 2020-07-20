@@ -443,17 +443,17 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
     lhard_cls, lhard_box =  ft([0]), ft([0])
     lhint, lsoft_cls, lsoft_box = ft([0]), ft([0]), ft([0])
     
-    teacher_tcls, teacher_tbox, _, teacher_anchor_vec = build_targets(model_teacher, targets)
-    _, student_tbox, student_indices, student_anchor_vec = build_targets(model_student, targets)
+    tch_tcls, tch_tbox, tch_indices, tch_anchor_vec = build_targets(model_teacher, targets)
+    std_tcls, std_tbox, std_indices, std_anchor_vec = build_targets(model_student, targets)
     
 
     h = model_student.hyp  # hyperparameters
     arc = model_student.arc  # # (default, uCE, uBCE) detection architectures
     red = 'mean'  # Loss reduction (sum or mean)
     
-    mu = .6 # mu variable to weight the hard lcls and soft lcls in Eq: 2 (value not informed)
-    ni = .5 # ni variable to weight the teacher bounded regression loss. 
-    margin = 1e-5 # m variable used as margin in teacher bounded regression loss. (value not informed)
+    mu = ft([.6]) # mu variable to weight the hard lcls and soft lcls in Eq: 2 (value not informed)
+    ni = ft([.5]) # ni variable to weight the teacher bounded regression loss. 
+    margin = ft([1e-5]) # m variable used as margin in teacher bounded regression loss. (value not informed)
 
     # Define criteria
     BCEcls = nn.BCEWithLogitsLoss(pos_weight=ft([h['cls_pw']]), reduction=red)
@@ -471,60 +471,62 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
 
     # Compute losses
     np, ng = 0, 0  # number grid points, targets
-    for i, (student_pi, teacher_pi) in enumerate(zip(p_student, p_teacher)):  # layer index, layer predictions
-        b, a, gj, gi = student_indices[i]  # image, anchor, gridy, gridx
-        tobj = torch.zeros_like(student_pi[..., 0])  # target obj
+    for i, (std_pi, tch_pi) in enumerate(zip(p_student, p_teacher)):  # layer index, layer predictions
+        std_b, std_a, std_gj, std_gi = std_indices[i]  # image, anchor, gridy, gridx
+        tch_b, tch_a, tch_gj, tch_gi = tch_indices[i]
+        
+        tobj = torch.zeros_like(std_pi[..., 0])  # target obj
         np += tobj.numel()
 
         # Compute losses
-        nb = len(b)
+        nb = len(std_b)
         if nb:  # number of targets
             ng += nb
-            student_ps = student_pi[b, a, gj, gi]  # prediction subset corresponding to targets
-            teacher_ps = teacher_pi[b, a, gj, gi]
+            std_ps = std_pi[std_b, std_a, std_gj, std_gi]  # prediction subset corresponding to targets
+            tch_ps = tch_pi[tch_b, tch_a, tch_gj, tch_gi]
 
             # GIoU
             # Here, hard loss bbox is the teacher bounded regression
-            # There are loss if student_bbox_loss + margin > teacher_bbox_loss
-            student_pxy = torch.sigmoid(student_ps[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
-            student_pwh = torch.exp(student_ps[:, 2:4]).clamp(max=1E3) * student_anchor_vec[i]
-            student_pbox = torch.cat((student_pxy, student_pwh), 1)  # predicted box
-            student_giou = bbox_iou(student_pbox.t(), student_tbox[i], x1y1x2y2=False, GIoU=True)  # giou computation
+            # There are loss if std_bbox_loss + margin > tch_bbox_loss
+            std_pxy = torch.sigmoid(std_ps[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
+            std_pwh = torch.exp(std_ps[:, 2:4]).clamp(max=1E3) * std_anchor_vec[i]
+            std_pbox = torch.cat((std_pxy, std_pwh), 1)  # predicted box
+            std_giou = bbox_iou(std_pbox.t(), std_tbox[i], x1y1x2y2=False, GIoU=True)  # giou computation
             
-            teacher_pxy = torch.sigmoid(teacher_ps[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
-            teacher_pwh = torch.exp(teacher_ps[:, 2:4]).clamp(max=1E3) * teacher_anchor_vec[i]
-            teacher_pbox = torch.cat((teacher_pxy, teacher_pwh), 1)  # predicted box
-            teacher_giou = bbox_iou(teacher_pbox.t(), teacher_tbox[i], x1y1x2y2=False, GIoU=True)  # giou computation
+            tch_pxy = torch.sigmoid(tch_ps[:, 0:2])  # pxy = pxy * s - (s - 1) / 2,  s = 1.5  (scale_xy)
+            tch_pwh = torch.exp(tch_ps[:, 2:4]).clamp(max=1E3) * tch_anchor_vec[i]
+            tch_pbox = torch.cat((tch_pxy, tch_pwh), 1)  # predicted box
+            tch_giou = bbox_iou(tch_pbox.t(), tch_tbox[i], x1y1x2y2=False, GIoU=True)  # giou computation
             
-            lhard_box += (1. - student_giou).mean() if (1. - student_giou).mean() + margin > (1. - teacher_giou).mean() else .0
-            lsoft_box += L1_S(student_pbox.t(), student_tbox[i].t())
+            lhard_box += (1. - std_giou).mean() if (1. - std_giou).mean() + margin > (1. - tch_giou).mean() else .0
+            lsoft_box += L1_S(std_pbox.t(), std_tbox[i].t())
             
-            tobj[b, a, gj, gi] = (1.0 - model_student.gr) + model_student.gr * student_giou.detach().clamp(0).type(tobj.dtype)  # giou ratio
+            tobj[std_b, std_a, std_gj, std_gi] = (1.0 - model_student.gr) + model_student.gr * std_giou.detach().clamp(0).type(tobj.dtype)  # giou ratio
 
             if 'default' in arc and model_student.nc > 1:  # cls loss (only if multiple classes)
-                t = torch.zeros_like(student_ps[:, 5:]) + cn  # targets
-                t[range(nb), teacher_tcls[i]] = cp
-                lhard_cls += BCEcls(student_ps[:, 5:], t)  # BCE
+                t = torch.zeros_like(std_ps[:, 5:]) + cn  # targets
+                t[range(nb), std_tcls[i]] = cp
+                lhard_cls += BCEcls(std_ps[:, 5:], t)  # BCE
                 
                 # w_c: class weight used in Eq: 3
-                w_c = torch.ones_like(student_ps[:, 5:]) + cn  # targets
-                w_c[range(nb), teacher_tcls[i]] = 1.5
-                lsoft_cls -= torch.sum(w_c * teacher_ps[:, 5:] * torch.log(student_ps[:, 5:]))
+                w_c = torch.ones_like(std_ps[:, 5:]) # weighted classification
+                # w_c[range(nb), ~tch_tcls[i]] = 1.5 # YOLO does not classify the background
+                lsoft_cls -= torch.sum(w_c * tch_ps[:, 5:] * torch.log(std_ps[:, 5:]))
 
         if 'default' in arc:  # separate obj and cls
-            lobj += BCEobj(student_pi[..., 4], tobj)  # obj loss
+            lobj += BCEobj(std_pi[..., 4], tobj)  # obj loss
 
         elif 'BCE' in arc:  # unified BCE (80 classes)
-            t = torch.zeros_like(student_pi[..., 5:])  # targets
+            t = torch.zeros_like(std_pi[..., 5:])  # targets
             if nb:
-                t[b, a, gj, gi, teacher_tcls[i]] = 1.0
-            lobj += BCE(student_pi[..., 5:], t)
+                t[std_b, std_a, std_gj, std_gi, tch_tcls[i]] = 1.0
+            lobj += BCE(std_pi[..., 5:], t)
 
         elif 'CE' in arc:  # unified CE (1 background + 80 classes)
-            t = torch.zeros_like(student_pi[..., 0], dtype=torch.long)  # targets
+            t = torch.zeros_like(std_pi[..., 0], dtype=torch.long)  # targets
             if nb:
-                t[b, a, gj, gi] = teacher_tcls[i] + 1
-            lhard_cls += CE(student_pi[..., 4:].view(-1, model_student.nc + 1), t.view(-1))
+                t[std_b, std_a, std_gj, std_gi] = tch_tcls[i] + 1
+            lhard_cls += CE(std_pi[..., 4:].view(-1, model_student.nc + 1), t.view(-1))
 
     # Compute the L1 Loss between every teacher fts and guided (by Hint) student fts
     for (hint, guided) in zip(fts_hint, fts_guided):

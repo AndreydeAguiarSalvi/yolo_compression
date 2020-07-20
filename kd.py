@@ -107,8 +107,8 @@ def train():
     student.nc = nc  # attach number of classes to student
     teacher.nc = nc
     
-    student.arc = config['arc']  # attach yolo architecture
-    teacher.arc = config['arc']
+    student.arc = config['student_arc']  # attach yolo architecture
+    teacher.arc = config['teacher_arc']
 
     student.hyp = config['hyp']  # attach hyperparameters to student
     teacher.hyp = config['hyp']

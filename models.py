@@ -769,7 +769,7 @@ def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, acti
     act_ftn = None
     if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
     elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    else: assert(f'Not recognized function: {activation}')
+    assert(activation == 'LeakyReLU' or activation == 'ReLU6')
     
     # 1x1 convolution without padding
     if bn == True:
@@ -790,7 +790,7 @@ def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='ReLU
     act_ftn = None
     if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
     elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    else: assert(f'Not recognized function: {activation}')
+    assert(activation == 'LeakyReLU' or activation == 'ReLU6')
     
     # 3x3 convolution with padding=1
     if bn == True:
@@ -812,7 +812,7 @@ def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1, activa
     act_ftn = None
     if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
     elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    else: assert(f'Not recognized function: {activation}')
+    assert(activation == 'LeakyReLU' or activation == 'ReLU6')
     
     return nn.Sequential(
         # pw
@@ -881,7 +881,7 @@ class FCA(nn.Module):
         act_ftn = None
         if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
         elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-        else: assert(f'Not recognized function: {activation}')
+        assert(activation == 'LeakyReLU' or activation == 'ReLU6')
 
         hidden_channels = channels // reduction_ratio
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
