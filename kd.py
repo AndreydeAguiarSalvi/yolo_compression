@@ -123,7 +123,7 @@ def train():
     torch_utils.model_info(student, report='summary')  # 'full' or 'summary'
     print('Starting training for %g epochs...' % epochs)
 
-    teacher.eval()
+    teacher.train()
     ###############
     # Start epoch #
     ###############
@@ -183,7 +183,7 @@ def train():
             with torch.no_grad(): 
                 pred_tch, fts_tch = \
                     teacher(imgs, config['teacher_indexes']) if type(teacher) is YOLO_Nano \
-                    else forward(teacher, imgs, config['teacher_indexes'], is_teacher=True)
+                    else forward(teacher, imgs, config['teacher_indexes'])
             # Run student
             pred_std, fts_std = \
                 student(imgs, config['student_indexes']) if type(student) is YOLO_Nano \
