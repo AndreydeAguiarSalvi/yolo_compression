@@ -1313,21 +1313,22 @@ class HintModel(nn.Module):
             if w_tch != w_std or h_tch != h_std: 
                 print(f'Skiping {i}-th hint layer because shapes do not match:\n\tTeacher -> {[w_tch, h_tch]}\tStudent -> {[w_std, h_std]}')
             else: 
-                hint_layer = nn.Sequential(
-                    nn.Conv2d(
+                hint_layer = nn.Sequential()
+                conv = nn.Conv2d(
                         in_channels=chnl_std, out_channels=chnl_tch,
                         kernel_size=(1, 1), stride=(1, 1),
                         padding=(1, 1) # Missing padding trick from https://arxiv.org/pdf/1507.00448.pdf to match the resolution
-                    ),
-                    nn.LeakyReLU(0.1, inplace=True)
                 )
-                self.hint_layers.add_module(f'hint_{i}', hint_layer)
+                hint_layer.add_module(f'hint_{i}', conv)
+                hint_layer.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
+                
+                self.hint_layers.append(hint_layer)
     
 
     def forward(self, fts):
         y = []
-        for i, x in enumerate(fts):
-            y.append(self.hint_layers[f'hint_{i}'](x))
+        for i, (x, module) in enumerate(zip(fts, self.hint_layers)):
+            y.append(module(x))
         return y
 
 
