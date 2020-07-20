@@ -56,7 +56,7 @@ def train():
     elif config['student_darknet'] == 'soft':
         student = SoftDarknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     # Create Hint Layers
-    hint_models = HintModel(config, student, teacher, device)
+    hint_models = HintModel(config, teacher, student, device)
     
     optimizer = create_optimizer(student, config)
     optimizer.add_param_group({"params": hint_models.parameters()})
