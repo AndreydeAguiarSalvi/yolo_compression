@@ -151,7 +151,7 @@ def train():
             image_weights = labels_to_image_weights(trainloader.dataset.labels, nc=nc, class_weights=w)
             trainloader.dataset.indices = random.choices(range(trainloader.dataset.n), weights=image_weights, k=trainloader.dataset.n)  # rand weighted idx
 
-        mloss = torch.zeros(4).to(device)  # mean losses
+        mloss = torch.zeros(5).to(device)  # mean losses
         print(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'hint', 'total', 'targets', 'img_size'))
         pbar = tqdm(enumerate(trainloader), total=nb)  # progress bar
         ####################
