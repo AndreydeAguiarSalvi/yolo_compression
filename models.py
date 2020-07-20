@@ -1292,10 +1292,11 @@ class ZeroConv(nn.Module):
 
 class HintModel(nn.Module):
 
-    def __init__(self, config, teacher, student, device):
+    def __init__(self, config, teacher, student):
         super(HintModel, self).__init__()   
         
         self.hint_layers = nn.ModuleList()
+        device = next(teacher.parameters()).device
         x = torch.Tensor(1, 3, 416, 416).to(device)
         
         # Get Features sizes
