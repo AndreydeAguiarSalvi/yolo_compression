@@ -45,14 +45,14 @@ def train():
     if config['teacher_darknet'] == 'default':
         teacher = Darknet(cfg=config['teacher_cfg'], arc=config['teacher_arc']).to(device)
     elif config['teacher_darknet'] == 'nano':
-        teacher = YOLO_Nano().to(device)
+        teacher = YOLO_Nano(activation='LeakyReLU').to(device)
     elif config['teacher_darknet'] == 'soft':
         teacher = SoftDarknet(cfg=config['teacher_cfg'], arc=config['teacher_arc']).to(device)
     # Initialize Student
     if config['student_darknet'] == 'default':
         student = Darknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     elif config['student_darknet'] == 'nano':
-        student = YOLO_Nano().to(device)
+        student = YOLO_Nano(activation='LeakyReLU').to(device)
     elif config['student_darknet'] == 'soft':
         student = SoftDarknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     # Create Hint Layers

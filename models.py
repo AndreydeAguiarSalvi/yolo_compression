@@ -765,7 +765,12 @@ class SoftDarknet(MaskedNet):
 
 
 # Adapted from https://github.com/liux0614/yolo_nano/blob/master/models/yolo_nano.py
-def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False):
+def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, activation='ReLU6'):
+    act_ftn = None
+    if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
+    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(inplace=True)
+    else: assert(f'Not recognized function: {activation}')
+    
     # 1x1 convolution without padding
     if bn == True:
         return nn.Sequential(
@@ -773,7 +778,7 @@ def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False):
                 input_channels, output_channels, kernel_size=1,
                 stride=stride, bias=bias),
             nn.BatchNorm2d(output_channels),
-            nn.ReLU6(inplace=True)
+            act_ftn
         )
     else:
         return nn.Conv2d(
@@ -781,7 +786,12 @@ def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False):
                 stride=stride, bias=bias)
 
 
-def conv3x3(input_channels, output_channels, stride=1, bn=True):
+def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='ReLU6'):
+    act_ftn = None
+    if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
+    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(inplace=True)
+    else: assert(f'Not recognized function: {activation}')
+    
     # 3x3 convolution with padding=1
     if bn == True:
         return nn.Sequential(
@@ -789,7 +799,7 @@ def conv3x3(input_channels, output_channels, stride=1, bn=True):
                 input_channels, output_channels, kernel_size=3,
                 stride=stride, padding=1, bias=False),
             nn.BatchNorm2d(output_channels),
-            nn.ReLU6(inplace=True)
+            act_ftn
         )
     else:
         nn.Conv2d(
@@ -797,20 +807,26 @@ def conv3x3(input_channels, output_channels, stride=1, bn=True):
                 stride=stride, padding=1, bias=False)
 
 
-def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1):
+def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1, activation='ReLU6'):
+    
+    act_ftn = None
+    if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
+    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(inplace=True)
+    else: assert(f'Not recognized function: {activation}')
+    
     return nn.Sequential(
         # pw
         nn.Conv2d(
             input_channels, input_channels * expand_ratio,
             kernel_size=1, stride=1, bias=False),
         nn.BatchNorm2d(input_channels * expand_ratio),
-        nn.ReLU6(inplace=True),
+        act_ftn,
         # dw
         nn.Conv2d(
             input_channels * expand_ratio, input_channels * expand_ratio, kernel_size=3, 
             stride=stride, padding=1, groups=input_channels * expand_ratio, bias=False),
         nn.BatchNorm2d(input_channels * expand_ratio),
-        nn.ReLU6(inplace=True),
+        act_ftn,
         # pw-linear
         nn.Conv2d(
             input_channels * expand_ratio, output_channels,
@@ -820,14 +836,14 @@ def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1):
 
 
 class EP(nn.Module):
-    def __init__(self, input_channels, output_channels, stride=1):
+    def __init__(self, input_channels, output_channels, stride=1, activation='ReLU6'):
         super(EP, self).__init__()
         self.input_channels = input_channels
         self.output_channels = output_channels
         self.stride = stride
         self.use_res_connect = self.stride == 1 and input_channels == output_channels
 
-        self.sepconv = sepconv3x3(input_channels, output_channels, stride=stride)
+        self.sepconv = sepconv3x3(input_channels, output_channels, stride=stride, activation=activation)
         
     def forward(self, x):
         if self.use_res_connect:
@@ -837,15 +853,15 @@ class EP(nn.Module):
 
 
 class PEP(nn.Module):
-    def __init__(self, input_channels, output_channels, x, stride=1):
+    def __init__(self, input_channels, output_channels, x, stride=1, activation='ReLU6'):
         super(PEP, self).__init__()
         self.input_channels = input_channels
         self.output_channels = output_channels
         self.stride = stride
         self.use_res_connect = self.stride == 1 and input_channels == output_channels
 
-        self.conv = conv1x1(input_channels, x)
-        self.sepconv = sepconv3x3(x, output_channels, stride=stride)
+        self.conv = conv1x1(input_channels, x, activation=activation)
+        self.sepconv = sepconv3x3(x, output_channels, stride=stride, activation=activation)
         
     def forward(self, x):        
         out = self.conv(x)
@@ -857,16 +873,21 @@ class PEP(nn.Module):
 
 
 class FCA(nn.Module):
-    def __init__(self, channels, reduction_ratio):
+    def __init__(self, channels, reduction_ratio, activation='ReLU6'):
         super(FCA, self).__init__()
         self.channels = channels
         self.reduction_ratio = reduction_ratio
+
+        act_ftn = None
+        if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
+        elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(inplace=True)
+        else: assert(f'Not recognized function: {activation}')
 
         hidden_channels = channels // reduction_ratio
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
             nn.Linear(channels, hidden_channels, bias=False),
-            nn.ReLU6(inplace=True),
+            act_ftn,
             nn.Linear(hidden_channels, channels, bias=False),
             nn.Sigmoid()
         )
@@ -880,64 +901,64 @@ class FCA(nn.Module):
 
 
 class YOLO_Nano(nn.Module):
-    def __init__(self, num_classes=20, image_size=416, anchor_type='PASCAL'):
+    def __init__(self, num_classes=20, image_size=416, activation='ReLU6'):
         super(YOLO_Nano, self).__init__()
         self.num_classes = num_classes
         self.image_size = image_size
         self.num_anchors = 3
         self.yolo_channels = (self.num_classes + 5) * self.num_anchors
         
-        if anchor_type == 'PASCAL':
+        if num_classes == 20:
             self.anchors = [ [26,31],  [43,84],  [81,171],   [103,68],  [145,267],  [180,135],  [247,325],  [362,178],  [412,346] ]
-        elif anchor_type == 'COCO':
+        elif num_classes == 80:
             self.anchors = [ [10,13],  [16,30],  [33,23],  [30,61],  [62,45],  [59,119],  [116,90],  [156,198],  [373,326] ]
 
         # image:  416x416x3
-        self.conv1 = conv3x3(3, 12, stride=1) # output: 416x416x12
-        self.conv2 = conv3x3(12, 24, stride=2) # output: 208x208x24
-        self.pep1 = PEP(24, 24, 7, stride=1) # output: 208x208x24
-        self.ep1 = EP(24, 70, stride=2) # output: 104x104x70
-        self.pep2 = PEP(70, 70, 25, stride=1) # output: 104x104x70
-        self.pep3 = PEP(70, 70, 24, stride=1) # output: 104x104x70
-        self.ep2 = EP(70, 150, stride=2) # output: 52x52x150
-        self.pep4 = PEP(150, 150, 56, stride=1) # output: 52x52x150
-        self.conv3 = conv1x1(150, 150, stride=1) # output: 52x52x150
-        self.fca1 = FCA(150, 8) # output: 52x52x150
-        self.pep5 = PEP(150, 150, 73, stride=1) # output: 52x52x150
-        self.pep6 = PEP(150, 150, 71, stride=1) # output: 52x52x150
+        self.conv1 = conv3x3(3, 12, stride=1, activation=activation) # output: 416x416x12
+        self.conv2 = conv3x3(12, 24, stride=2, activation=activation) # output: 208x208x24
+        self.pep1 = PEP(24, 24, 7, stride=1, activation=activation) # output: 208x208x24
+        self.ep1 = EP(24, 70, stride=2, activation=activation) # output: 104x104x70
+        self.pep2 = PEP(70, 70, 25, stride=1, activation=activation) # output: 104x104x70
+        self.pep3 = PEP(70, 70, 24, stride=1, activation=activation) # output: 104x104x70
+        self.ep2 = EP(70, 150, stride=2, activation=activation) # output: 52x52x150
+        self.pep4 = PEP(150, 150, 56, stride=1, activation=activation) # output: 52x52x150
+        self.conv3 = conv1x1(150, 150, stride=1, activation=activation) # output: 52x52x150
+        self.fca1 = FCA(150, 8, activation=activation) # output: 52x52x150
+        self.pep5 = PEP(150, 150, 73, stride=1, activation=activation) # output: 52x52x150
+        self.pep6 = PEP(150, 150, 71, stride=1, activation=activation) # output: 52x52x150
         
-        self.pep7 = PEP(150, 150, 75, stride=1) # output: 52x52x150
-        self.ep3 = EP(150, 325, stride=2) # output: 26x26x325
-        self.pep8 = PEP(325, 325, 132, stride=1) # output: 26x26x325
-        self.pep9 = PEP(325, 325, 124, stride=1) # output: 26x26x325
-        self.pep10 = PEP(325, 325, 141, stride=1) # output: 26x26x325
-        self.pep11 = PEP(325, 325, 140, stride=1) # output: 26x26x325
-        self.pep12 = PEP(325, 325, 137, stride=1) # output: 26x26x325
-        self.pep13 = PEP(325, 325, 135, stride=1) # output: 26x26x325
-        self.pep14 = PEP(325, 325, 133, stride=1) # output: 26x26x325
+        self.pep7 = PEP(150, 150, 75, stride=1, activation=activation) # output: 52x52x150
+        self.ep3 = EP(150, 325, stride=2, activation=activation) # output: 26x26x325
+        self.pep8 = PEP(325, 325, 132, stride=1, activation=activation) # output: 26x26x325
+        self.pep9 = PEP(325, 325, 124, stride=1, activation=activation) # output: 26x26x325
+        self.pep10 = PEP(325, 325, 141, stride=1, activation=activation) # output: 26x26x325
+        self.pep11 = PEP(325, 325, 140, stride=1, activation=activation) # output: 26x26x325
+        self.pep12 = PEP(325, 325, 137, stride=1, activation=activation) # output: 26x26x325
+        self.pep13 = PEP(325, 325, 135, stride=1, activation=activation) # output: 26x26x325
+        self.pep14 = PEP(325, 325, 133, stride=1, activation=activation) # output: 26x26x325
         
-        self.pep15 = PEP(325, 325, 140, stride=1) # output: 26x26x325
-        self.ep4 = EP(325, 545, stride=2) # output: 13x13x545
-        self.pep16 = PEP(545, 545, 276, stride=1) # output: 13x13x545
-        self.conv4 = conv1x1(545, 230, stride=1) # output: 13x13x230
-        self.ep5 = EP(230, 489, stride=1) # output: 13x13x489
-        self.pep17 = PEP(489, 469, 213, stride=1) # output: 13x13x469
+        self.pep15 = PEP(325, 325, 140, stride=1, activation=activation) # output: 26x26x325
+        self.ep4 = EP(325, 545, stride=2, activation=activation) # output: 13x13x545
+        self.pep16 = PEP(545, 545, 276, stride=1, activation=activation) # output: 13x13x545
+        self.conv4 = conv1x1(545, 230, stride=1, activation=activation) # output: 13x13x230
+        self.ep5 = EP(230, 489, stride=1, activation=activation) # output: 13x13x489
+        self.pep17 = PEP(489, 469, 213, stride=1, activation=activation) # output: 13x13x469
         
-        self.conv5 = conv1x1(469, 189, stride=1) # output: 13x13x189
-        self.conv6 = conv1x1(189, 105, stride=1) # output: 13x13x105
+        self.conv5 = conv1x1(469, 189, stride=1, activation=activation) # output: 13x13x189
+        self.conv6 = conv1x1(189, 105, stride=1, activation=activation) # output: 13x13x105
         # upsampling conv6 to 26x26x105
         # concatenating [conv6, pep15] -> pep18 (26x26x430)
-        self.pep18 = PEP(430, 325, 113, stride=1) # output: 26x26x325
-        self.pep19 = PEP(325, 207, 99, stride=1) # output: 26x26x325
+        self.pep18 = PEP(430, 325, 113, stride=1, activation=activation) # output: 26x26x325
+        self.pep19 = PEP(325, 207, 99, stride=1, activation=activation) # output: 26x26x325
         
-        self.conv7 = conv1x1(207, 98, stride=1) # output: 26x26x98
-        self.conv8 = conv1x1(98, 47, stride=1) # output: 26x26x47
+        self.conv7 = conv1x1(207, 98, stride=1, activation=activation) # output: 26x26x98
+        self.conv8 = conv1x1(98, 47, stride=1, activation=activation) # output: 26x26x47
         # upsampling conv8 to 52x52x47
         # concatenating [conv8, pep7] -> pep20 (52x52x197)
-        self.pep20 = PEP(197, 122, 58, stride=1) # output: 52x52x122
-        self.pep21 = PEP(122, 87, 52, stride=1) # output: 52x52x87
-        self.pep22 = PEP(87, 93, 47, stride=1) # output: 52x52x93
-        self.conv9 = conv1x1(93, self.yolo_channels, stride=1, bn=False, bias=True) # output: 52x52x yolo_channels
+        self.pep20 = PEP(197, 122, 58, stride=1, activation=activation) # output: 52x52x122
+        self.pep21 = PEP(122, 87, 52, stride=1, activation=activation) # output: 52x52x87
+        self.pep22 = PEP(87, 93, 47, stride=1, activation=activation) # output: 52x52x93
+        self.conv9 = conv1x1(93, self.yolo_channels, stride=1, bn=False, bias=True, activation=activation) # output: 52x52x yolo_channels
         self.yolo_layer52 = YOLOLayer(
             anchors=self.anchors[0:3], nc=self.num_classes,
             img_size=(image_size, image_size), yolo_index=2, arc='default'
@@ -952,8 +973,8 @@ class YOLO_Nano(nn.Module):
             print('WARNING: smart bias initialization failure.')
 
         # conv7 -> ep6
-        self.ep6 = EP(98, 183, stride=1) # output: 26x26x183
-        self.conv10 = conv1x1(183, self.yolo_channels, stride=1, bn=False, bias=True) # output: 26x26x yolo_channels
+        self.ep6 = EP(98, 183, stride=1, activation=activation) # output: 26x26x183
+        self.conv10 = conv1x1(183, self.yolo_channels, stride=1, bn=False, bias=True, activation=activation) # output: 26x26x yolo_channels
         self.yolo_layer26 = YOLOLayer(
             anchors=self.anchors[3:6], nc=self.num_classes,
             img_size=(image_size, image_size), yolo_index=1, arc='default'
@@ -968,8 +989,8 @@ class YOLO_Nano(nn.Module):
             print('WARNING: smart bias initialization failure.')
 
         # conv5 -> ep7
-        self.ep7 = EP(189, 462, stride=1) # output: 13x13x462
-        self.conv11 = conv1x1(462, self.yolo_channels, stride=1, bn=False, bias=True) # output: 13x13x yolo_channels
+        self.ep7 = EP(189, 462, stride=1, activation=activation) # output: 13x13x462
+        self.conv11 = conv1x1(462, self.yolo_channels, stride=1, bn=False, bias=True, activation=activation) # output: 13x13x yolo_channels
         self.yolo_layer13 = YOLOLayer(
             anchors=self.anchors[6:], nc=self.num_classes,
             img_size=(image_size, image_size), yolo_index=0, arc='default'
