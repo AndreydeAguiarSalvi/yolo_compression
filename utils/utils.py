@@ -451,9 +451,9 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
     arc = model_student.arc  # # (default, uCE, uBCE) detection architectures
     red = 'mean'  # Loss reduction (sum or mean)
     
-    mu = ft([.6]) # mu variable to weight the hard lcls and soft lcls in Eq: 2 (value not informed)
-    ni = ft([.5]) # ni variable to weight the teacher bounded regression loss. 
-    margin = ft([1e-5]) # m variable used as margin in teacher bounded regression loss. (value not informed)
+    mu = ft([h['mu']]) # mu variable to weight the hard lcls and soft lcls in Eq: 2 (value not informed)
+    ni = ft([h['ni']]) # ni variable to weight the teacher bounded regression loss. 
+    margin = ft([h['margin']]) # m variable used as margin in teacher bounded regression loss. (value not informed)
 
     # Define criteria
     BCEcls = nn.BCEWithLogitsLoss(pos_weight=ft([h['cls_pw']]), reduction=red)

@@ -1,4 +1,9 @@
 inherit_from: params/default.yaml
+hyp :
+    mu: 0.6
+    ni: 0.5
+    margin: 0.00001
+
 cfg: /Guobin_KD.cfg
 weights: ''
 arc : ''
