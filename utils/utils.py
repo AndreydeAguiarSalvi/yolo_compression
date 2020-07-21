@@ -513,7 +513,7 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
                 # w_c[range(nb), ~tcls_t[i]] = 1.5 # YOLO does not classify the background
                 P_t = nn.functional.softmax(ps_t[:, 5:])
                 P_s = nn.functional.softmax(ps_s[:, 5:])
-                lcls_soft -= torch.sum(w_c * P_t * torch.log(P_s))
+                lcls_soft -= torch.sum(w_c * P_t * torch.log(P_s)) / nb # Equation 3
 
         if 'default' in arc:  # separate obj and cls
             lobj += BCEobj(pi_s[..., 4], tobj)  # obj loss
@@ -532,15 +532,15 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
 
     # Compute the L1 Loss between every teacher fts and guided (by Hint) student fts
     for (hint, guided) in zip(fts_hint, fts_guided):
-        lhint += HINT(guided, hint)
+        lhint += HINT(guided, hint) # Equation 6
 
     lbox_hard *= h['giou']
     lobj *= h['obj']
     lcls_hard *= h['cls']
 
     # Loss = Loss Hard + Loss Soft
-    lcls = mu * lcls_hard + (1. - mu) * lcls_soft
-    lbox = lbox_soft + ni * lbox_hard
+    lcls = mu * lcls_hard + (1. - mu) * lcls_soft # Equation 2
+    lbox = lbox_soft + ni * lbox_hard # Equation 4
 
     loss = lbox + lobj + lcls + lhint
     return loss, torch.cat((lbox, lobj, lcls, lhint, loss)).detach()

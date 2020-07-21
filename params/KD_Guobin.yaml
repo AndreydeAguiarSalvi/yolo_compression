@@ -18,3 +18,4 @@ student_arc: default
 student_indexes: [12]
 
 data : data/voc2012.data
+single_cls: False
