@@ -255,7 +255,7 @@ def create_config(opt):
 
     # Create sub_working_dir
     if opt['resume']:
-        folders = config['weights'].split('/'),
+        folders = config['weights'].split('/')
         config['sub_working_dir'] = ''
         for i in range(len(folders) - 1):
             config['sub_working_dir'] += folders[i] + '/'
