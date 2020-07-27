@@ -255,7 +255,13 @@ def create_config(opt):
 
     # Create sub_working_dir
     if opt['resume']:
-        folders = config['weights'].split('/')
+        if 'student_weights' in config:
+            if config['student_weights']: folders = config['student_weights'].split('/')
+        else: 
+            if config['weights']: folders = config['weights'].split('/')
+            else:
+                print("No weights right to resume")
+                exit()
         config['sub_working_dir'] = ''
         for i in range(len(folders) - 1):
             config['sub_working_dir'] += folders[i] + '/'
