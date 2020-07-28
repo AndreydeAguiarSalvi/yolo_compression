@@ -183,11 +183,11 @@ def train():
             with torch.no_grad(): 
                 pred_tch, fts_tch = \
                     teacher(imgs, config['teacher_indexes']) if type(teacher) is YOLO_Nano \
-                    else forward(teacher, imgs, config['teacher_indexes'])
+                    else YOLO_forward(teacher, imgs, config['teacher_indexes'])
             # Run student
             pred_std, fts_std = \
                 student(imgs, config['student_indexes']) if type(student) is YOLO_Nano \
-                    else forward(student, imgs, config['student_indexes']) 
+                    else YOLO_forward(student, imgs, config['student_indexes']) 
 
             fts_guided = hint_models(fts_std)
 
