@@ -438,6 +438,7 @@ def compute_loss(p, targets, model):  # predictions, targets, model
 
 
 def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_teacher, model_student):  # predictions, targets, model
+    # https://papers.nips.cc/paper/6676-learning-efficient-object-detection-models-with-knowledge-distillation.pdf
     ft = torch.cuda.FloatTensor if p_student[0].is_cuda else torch.Tensor
     lcls, lbox, lobj = ft([0]), ft([0]), ft([0])
     lcls_hard, lbox_hard =  ft([0]), ft([0])
@@ -511,8 +512,12 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
                 # w_c: class weight used in Eq: 3
                 w_c = torch.ones_like(ps_s[:, 5:]) # weighted classification
                 # w_c[range(nb), ~tcls_t[i]] = 1.5 # YOLO does not classify the background
-                P_t = nn.functional.softmax(ps_t[:, 5:])
-                P_s = nn.functional.softmax(ps_s[:, 5:])
+                if h['cls_function'] == 'sigmoid':
+                    P_t = nn.functional.sigmoid(ps_t[:, 5:])
+                    P_t = nn.functional.sigmoid(ps_t[:, 5:])
+                elif h['cls_function'] == 'softmax':
+                    P_t = nn.functional.softmax(ps_t[:, 5:])
+                    P_s = nn.functional.softmax(ps_s[:, 5:])
                 lcls_soft -= torch.sum(w_c * P_t * torch.log(P_s)) / nb # Equation 3
 
         if 'default' in arc:  # separate obj and cls
