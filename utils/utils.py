@@ -522,7 +522,7 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
                 # w_c[range(nb), ~tcls_t[i]] = 1.5 # YOLO does not classify the background
                 if h['cls_function'] == 'sigmoid':
                     P_t = nn.functional.sigmoid(ps_t[:, 5:])
-                    P_t = nn.functional.sigmoid(ps_t[:, 5:])
+                    P_s = nn.functional.sigmoid(ps_s[:, 5:])
                 elif h['cls_function'] == 'softmax':
                     P_t = nn.functional.softmax(ps_t[:, 5:])
                     P_s = nn.functional.softmax(ps_s[:, 5:])
