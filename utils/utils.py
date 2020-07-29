@@ -463,6 +463,7 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
     CE = nn.CrossEntropyLoss(reduction=red)  # weight=model_student.class_weights
     HINT = nn.L1Loss(reduction=red)
     L1_S = nn.SmoothL1Loss(reduction=red)
+    L2 = nn.MSELoss(reduction=red)
 
     cp, cn = 1.0, 0.0
 
@@ -499,7 +500,14 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
             pbox_t = torch.cat((pxy_t, pwh_t), 1)  # predicted box
             giou_t = bbox_iou(pbox_t.t(), tbox_t[i], x1y1x2y2=False, GIoU=True)  # giou computation
             
-            lbox_hard += (1. - giou_s).mean() if (1. - giou_s).mean() + margin > (1. - giou_t).mean() else .0
+            if h['giou_reg_loss']:
+                lgiou_s = (1. - giou_s).mean()
+                lgiou_t = (1. - giou_t).mean()
+                lbox_hard += lgiou_s if lgiou_s + margin > lgiou_t else .0
+            else:
+                lreg_s = L2(pbox_s.t(), tbox_s[i].t())
+                lreg_t = L2(pbox_t.t(), tbox_t[i].t())
+                lbox_hard += lreg_s if lreg_s + margin > lreg_t else ft([0]) # Equation 4.1
             lbox_soft += L1_S(pbox_s.t(), tbox_s[i].t())
             
             tobj[b_s, a_s, gj_s, gi_s] = (1.0 - model_student.gr) + model_student.gr * giou_s.detach().clamp(0).type(tobj.dtype)  # giou ratio
@@ -545,7 +553,7 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
 
     # Loss = Loss Hard + Loss Soft
     lcls = mu * lcls_hard + (1. - mu) * lcls_soft # Equation 2
-    lbox = lbox_soft + ni * lbox_hard # Equation 4
+    lbox = lbox_soft + ni * lbox_hard # Equation 4.2
 
     loss = lbox + lobj + lcls + lhint
     return loss, torch.cat((lbox, lobj, lcls, lhint, loss)).detach()

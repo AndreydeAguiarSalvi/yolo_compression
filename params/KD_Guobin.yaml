@@ -4,6 +4,7 @@ hyp :
     ni: 0.5
     margin: 0.00001
     cls_function: softmax
+    giou_reg_loss: True
 
 cfg: /Guobin_KD.cfg
 weights: ''
