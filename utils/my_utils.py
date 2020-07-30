@@ -63,6 +63,7 @@ def create_test_argparser():
     parser.add_argument('--mask', action='store_true', help='wheter has a mask inside the checkpoint')
     parser.add_argument('--mask_weight', type=str, default=None, help='wheter mask is another checkpoint')
     parser.add_argument('--architecture', type=str, default='default', help='mask to apply in the model')
+    parser.add_argument('--nano_activation', type=str, default='ReLU6', help='activation used in YOLO Nano')
     args = vars(parser.parse_args())
 
     pieces = args['weights'].split('/')

@@ -29,8 +29,8 @@ def test(cfg,
          architecture='default'):
     # Initialize/load model and set device
     if model is None:
-        device = torch_utils.select_device(args['device'], batch_size=batch_size) # BUG HERE
-        verbose = args['task'] == 'test' # BUG HERE
+        device = torch_utils.select_device(args['device'], batch_size=batch_size)
+        verbose = args['task'] == 'test'
 
         # Remove previous
         for f in glob.glob(folder + 'test_batch*.png'):
@@ -38,7 +38,7 @@ def test(cfg,
 
         # Initialize model
         if 'nano' in cfg:
-            model = YOLO_Nano().to(device)
+            model = YOLO_Nano(activation=args['nano_activation']).to(device)
         elif 'soft' in cfg:
             model = SoftDarknet(cfg=cfg).to(device)
             model.ticket = True
