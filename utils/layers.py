@@ -195,11 +195,11 @@ class SoftMaskedConv2d(nn.Module):
 
 
 # Adapted from https://github.com/liux0614/yolo_nano/blob/master/models/yolo_nano.py
-def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, activation='ReLU6'):
+def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, activation='relu6'):
     act_ftn = None
-    if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
-    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    assert(activation == 'LeakyReLU' or activation == 'ReLU6')
+    if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
+    elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+    assert(activation == 'leaky' or activation == 'relu6')
     
     # 1x1 convolution without padding
     if bn == True:
@@ -216,11 +216,11 @@ def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, acti
                 stride=stride, bias=bias)
 
 
-def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='ReLU6'):
+def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='relu6'):
     act_ftn = None
-    if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
-    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    assert(activation == 'LeakyReLU' or activation == 'ReLU6')
+    if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
+    elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+    assert(activation == 'leaky' or activation == 'relu6')
     
     # 3x3 convolution with padding=1
     if bn == True:
@@ -237,12 +237,12 @@ def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='ReLU
                 stride=stride, padding=1, bias=False)
 
 
-def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1, activation='ReLU6'):
+def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1, activation='relu6'):
     
     act_ftn = None
-    if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
-    elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    assert(activation == 'LeakyReLU' or activation == 'ReLU6')
+    if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
+    elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+    assert(activation == 'leaky' or activation == 'relu6')
     
     return nn.Sequential(
         # pw
@@ -266,7 +266,7 @@ def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1, activa
 
 
 class EP(nn.Module):
-    def __init__(self, input_channels, output_channels, stride=1, activation='ReLU6'):
+    def __init__(self, input_channels, output_channels, stride=1, activation='relu6'):
         super(EP, self).__init__()
         self.input_channels = input_channels
         self.output_channels = output_channels
@@ -283,7 +283,7 @@ class EP(nn.Module):
 
 
 class PEP(nn.Module):
-    def __init__(self, input_channels, output_channels, x, stride=1, activation='ReLU6'):
+    def __init__(self, input_channels, output_channels, x, stride=1, activation='relu6'):
         super(PEP, self).__init__()
         self.input_channels = input_channels
         self.output_channels = output_channels
@@ -303,15 +303,15 @@ class PEP(nn.Module):
 
 
 class FCA(nn.Module):
-    def __init__(self, channels, reduction_ratio, activation='ReLU6'):
+    def __init__(self, channels, reduction_ratio, activation='relu6'):
         super(FCA, self).__init__()
         self.channels = channels
         self.reduction_ratio = reduction_ratio
 
         act_ftn = None
-        if activation == 'ReLU6': act_ftn = nn.ReLU6(inplace=True)
-        elif activation == 'LeakyReLU': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-        assert(activation == 'LeakyReLU' or activation == 'ReLU6')
+        if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
+        elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+        assert(activation == 'leaky' or activation == 'relu6')
 
         hidden_channels = channels // reduction_ratio
         self.avg_pool = nn.AdaptiveAvgPool2d(1)

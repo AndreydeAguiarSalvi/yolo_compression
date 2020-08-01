@@ -1,7 +1,7 @@
 import torch
 import argparse
 from thop import profile
-from models import Darknet, SparseYOLO, SoftDarknet, YOLO_Nano
+from models import Darknet, SparseYOLO, SoftDarknet
 from utils.pruning import create_mask_LTH, apply_mask_LTH
 
 
@@ -21,8 +21,6 @@ x = torch.Tensor(1, 3, 416, 416).to(device)
 # Initialize model
 if args['darknet'] == 'default':
     model = Darknet(args['cfg']).to(device)
-elif args['darknet'] == 'nano':
-    model = YOLO_Nano().to(device)
 elif args['darknet'] == 'soft':
     model = SoftDarknet(args['cfg']).to(device)
     model.ticket = True

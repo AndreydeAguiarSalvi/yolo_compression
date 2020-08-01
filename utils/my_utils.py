@@ -271,7 +271,7 @@ def create_config(opt):
     else:
         sub_working_dir = '{}/{}/size-{}/{}'.format(
             config['working_dir'],
-            config['cfg'].split('/')[1].split('.')[0],
+            config['cfg'].split('/')[2].split('.')[0],
             config['img_size'][0] if opt['multi_scale'] is False and opt['img_size'] is None 
                 else 'multi_scale' if opt['multi_scale'] is True else opt['img_size'][0],
 

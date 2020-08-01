@@ -82,6 +82,39 @@ def create_modules(module_defs, img_size, arc):
             elif mdef['activation'] == 'swish':
                 modules.add_module('activation', Swish())
 
+        elif mdef['type'] == 'PEP':
+            filters = mdef['filters']
+            x = mdef['x']
+            stride = mdef['stride']
+            act = mdef['activation']
+            modules.add_module('PEP', PEP(
+                    input_channels=output_filters[-1],
+                    output_channels=filters,
+                    x=x, stride=stride, activation=act
+                )
+            )
+        
+        elif mdef['type'] == 'EP':
+            filters = mdef['filters']
+            stride = mdef['stride']
+            act = mdef['activation']
+            modules.add_module('EP', EP(
+                    input_channels=output_filters[-1],
+                    output_channels=filters,
+                    stride=stride, activation=act
+                )
+            )
+
+        elif mdef['type'] == 'FCA':
+            red = mdef['reduction']
+            act = mdef['activation']
+            modules.add_module('FCA', FCA(
+                    channels=output_filters[-1],
+                    reduction_ratio=red,
+                    activation=act
+                )
+            )
+
         elif mdef['type'] == 'maxpool':
             size = mdef['size']
             stride = mdef['stride']
@@ -244,9 +277,9 @@ class Darknet(nn.Module):
         self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
         self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
 
-    def forward(self, x, verbose=False):
+    def forward(self, x, fts_indexes=[], verbose=False):
         img_size = x.shape[-2:]
-        yolo_out, out = [], []
+        yolo_out, out, fts = [], [], []
         verbose = False
         if verbose:
             str = ''
@@ -254,7 +287,11 @@ class Darknet(nn.Module):
 
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
-            if mtype in ['convolutional', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'upsample', 'maxpool']:
+            if mtype in [
+                    'convolutional', 'multibias', 'multiconv_multibias', 
+                    'halfconv', 'inception', 'upsample', 'maxpool',
+                    'PEP', 'EP', 'FCA'
+                ]:
                 x = module(x)
             elif mtype == 'shortcut':  # sum
                 if verbose:
@@ -280,17 +317,23 @@ class Darknet(nn.Module):
             elif mtype == 'yolo':
                 yolo_out.append(module(x, img_size))
             out.append(x if i in self.routs else [])
+
+            if i in fts_indexes: fts.append(x)
+
             if verbose:
                 print('%g/%g %s -' % (i, len(self.module_list), mtype), list(x.shape), str)
                 str = ''
 
         if self.training: # train
+            if len(fts_indexes): return yolo_out, fts
             return yolo_out
         elif ONNX_EXPORT: # export
             x = [torch.cat(x, 0) for x in zip(*yolo_out)]
+            if len(fts_indexes): return x[0], torch.cat(x[1:3], 1), fts
             return x[0], torch.cat(x[1:3], 1)  # scores, boxes: 3780x80, 3780x4
         else: # test
             io, p = zip(*yolo_out)  # inference output, training output
+            if len(fts_indexes): return torch.cat(io, 1), p, fts
             return torch.cat(io, 1), p
 
     def fuse(self):
@@ -577,286 +620,6 @@ class SoftDarknet(MaskedNet):
         # model_info(self)  # yolov3-spp reduced from 225 to 152 layers
 
 
-class YOLO_Nano(nn.Module):
-    def __init__(self, num_classes=20, image_size=416, activation='ReLU6'):
-        super(YOLO_Nano, self).__init__()
-        self.num_classes = num_classes
-        self.image_size = image_size
-        self.num_anchors = 3
-        self.yolo_channels = (self.num_classes + 5) * self.num_anchors
-        
-        if num_classes == 20:
-            self.anchors = [ [26,31],  [43,84],  [81,171],   [103,68],  [145,267],  [180,135],  [247,325],  [362,178],  [412,346] ]
-        elif num_classes == 80:
-            self.anchors = [ [10,13],  [16,30],  [33,23],  [30,61],  [62,45],  [59,119],  [116,90],  [156,198],  [373,326] ]
-
-        # image:  416x416x3
-        self.conv1 = conv3x3(3, 12, stride=1, activation=activation) # output: 416x416x12
-        self.conv2 = conv3x3(12, 24, stride=2, activation=activation) # output: 208x208x24
-        self.pep1 = PEP(24, 24, 7, stride=1, activation=activation) # output: 208x208x24
-        self.ep1 = EP(24, 70, stride=2, activation=activation) # output: 104x104x70
-        self.pep2 = PEP(70, 70, 25, stride=1, activation=activation) # output: 104x104x70
-        self.pep3 = PEP(70, 70, 24, stride=1, activation=activation) # output: 104x104x70
-        self.ep2 = EP(70, 150, stride=2, activation=activation) # output: 52x52x150
-        self.pep4 = PEP(150, 150, 56, stride=1, activation=activation) # output: 52x52x150
-        self.conv3 = conv1x1(150, 150, stride=1, activation=activation) # output: 52x52x150
-        self.fca1 = FCA(150, 8, activation=activation) # output: 52x52x150
-        self.pep5 = PEP(150, 150, 73, stride=1, activation=activation) # output: 52x52x150
-        self.pep6 = PEP(150, 150, 71, stride=1, activation=activation) # output: 52x52x150
-        
-        self.pep7 = PEP(150, 150, 75, stride=1, activation=activation) # output: 52x52x150
-        self.ep3 = EP(150, 325, stride=2, activation=activation) # output: 26x26x325
-        self.pep8 = PEP(325, 325, 132, stride=1, activation=activation) # output: 26x26x325
-        self.pep9 = PEP(325, 325, 124, stride=1, activation=activation) # output: 26x26x325
-        self.pep10 = PEP(325, 325, 141, stride=1, activation=activation) # output: 26x26x325
-        self.pep11 = PEP(325, 325, 140, stride=1, activation=activation) # output: 26x26x325
-        self.pep12 = PEP(325, 325, 137, stride=1, activation=activation) # output: 26x26x325
-        self.pep13 = PEP(325, 325, 135, stride=1, activation=activation) # output: 26x26x325
-        self.pep14 = PEP(325, 325, 133, stride=1, activation=activation) # output: 26x26x325
-        
-        self.pep15 = PEP(325, 325, 140, stride=1, activation=activation) # output: 26x26x325
-        self.ep4 = EP(325, 545, stride=2, activation=activation) # output: 13x13x545
-        self.pep16 = PEP(545, 545, 276, stride=1, activation=activation) # output: 13x13x545
-        self.conv4 = conv1x1(545, 230, stride=1, activation=activation) # output: 13x13x230
-        self.ep5 = EP(230, 489, stride=1, activation=activation) # output: 13x13x489
-        self.pep17 = PEP(489, 469, 213, stride=1, activation=activation) # output: 13x13x469
-        
-        self.conv5 = conv1x1(469, 189, stride=1, activation=activation) # output: 13x13x189
-        self.conv6 = conv1x1(189, 105, stride=1, activation=activation) # output: 13x13x105
-        # upsampling conv6 to 26x26x105
-        # concatenating [conv6, pep15] -> pep18 (26x26x430)
-        self.pep18 = PEP(430, 325, 113, stride=1, activation=activation) # output: 26x26x325
-        self.pep19 = PEP(325, 207, 99, stride=1, activation=activation) # output: 26x26x325
-        
-        self.conv7 = conv1x1(207, 98, stride=1, activation=activation) # output: 26x26x98
-        self.conv8 = conv1x1(98, 47, stride=1, activation=activation) # output: 26x26x47
-        # upsampling conv8 to 52x52x47
-        # concatenating [conv8, pep7] -> pep20 (52x52x197)
-        self.pep20 = PEP(197, 122, 58, stride=1, activation=activation) # output: 52x52x122
-        self.pep21 = PEP(122, 87, 52, stride=1, activation=activation) # output: 52x52x87
-        self.pep22 = PEP(87, 93, 47, stride=1, activation=activation) # output: 52x52x93
-        self.conv9 = conv1x1(93, self.yolo_channels, stride=1, bn=False, bias=True, activation=activation) # output: 52x52x yolo_channels
-        self.yolo_layer52 = YOLOLayer(
-            anchors=self.anchors[0:3], nc=self.num_classes,
-            img_size=(image_size, image_size), yolo_index=2, arc='default'
-        )
-        try:
-            bias_ = self.conv9.bias
-            bias = bias_[:self.yolo_layer52.no * self.yolo_layer52.na].view(self.yolo_layer52.na, -1)  # shape(3,85)
-            bias[:, 4] += -4.5  # obj
-            bias[:, 5:] += math.log(0.6 / (self.yolo_layer52.nc - 0.99))  # cls (sigmoid(p) = 1/nc)
-            self.conv9.bias = torch.nn.Parameter(bias_, requires_grad=bias_.requires_grad)
-        except:
-            print('WARNING: smart bias initialization failure.')
-
-        # conv7 -> ep6
-        self.ep6 = EP(98, 183, stride=1, activation=activation) # output: 26x26x183
-        self.conv10 = conv1x1(183, self.yolo_channels, stride=1, bn=False, bias=True, activation=activation) # output: 26x26x yolo_channels
-        self.yolo_layer26 = YOLOLayer(
-            anchors=self.anchors[3:6], nc=self.num_classes,
-            img_size=(image_size, image_size), yolo_index=1, arc='default'
-        )
-        try:
-            bias_ = self.conv10.bias
-            bias = bias_[:self.yolo_layer26.no * self.yolo_layer26.na].view(self.yolo_layer26.na, -1)  # shape(3,85)
-            bias[:, 4] += -4.5  # obj
-            bias[:, 5:] += math.log(0.6 / (self.yolo_layer26.nc - 0.99))  # cls (sigmoid(p) = 1/nc)
-            self.conv10.bias = torch.nn.Parameter(bias_, requires_grad=bias_.requires_grad)
-        except:
-            print('WARNING: smart bias initialization failure.')
-
-        # conv5 -> ep7
-        self.ep7 = EP(189, 462, stride=1, activation=activation) # output: 13x13x462
-        self.conv11 = conv1x1(462, self.yolo_channels, stride=1, bn=False, bias=True, activation=activation) # output: 13x13x yolo_channels
-        self.yolo_layer13 = YOLOLayer(
-            anchors=self.anchors[6:], nc=self.num_classes,
-            img_size=(image_size, image_size), yolo_index=0, arc='default'
-        )
-        try:
-            bias_ = self.conv11.bias
-            bias = bias_[:self.yolo_layer13.no * self.yolo_layer13.na].view(self.yolo_layer13.na, -1)  # shape(3,85)
-            bias[:, 4] += -4.5  # obj
-            bias[:, 5:] += math.log(0.6 / (self.yolo_layer13.nc - 0.99))  # cls (sigmoid(p) = 1/nc)
-            self.conv11.bias = torch.nn.Parameter(bias_, requires_grad=bias_.requires_grad)
-        except:
-            print('WARNING: smart bias initialization failure.')
-    
-        self.create_modules()
-        self.yolo_layers = [43, 40, 37]
-
-    def forward(self, x, fts_indexes=[]):
-        yolo_out = []
-        features = []
-        current_size = x.shape[-2:]
-
-        out = self.conv1(x)
-        if 0 in fts_indexes: features.append(out)
-        out = self.conv2(out)
-        if 1 in fts_indexes: features.append(out)
-        out = self.pep1(out)
-        if 2 in fts_indexes: features.append(out)
-        out = self.ep1(out)
-        if 3 in fts_indexes: features.append(out)
-        out = self.pep2(out)
-        if 4 in fts_indexes: features.append(out)
-        out = self.pep3(out)
-        if 5 in fts_indexes: features.append(out)
-        out = self.ep2(out)
-        if 6 in fts_indexes: features.append(out)
-        out = self.pep4(out)
-        if 7 in fts_indexes: features.append(out)
-        out = self.conv3(out)
-        if 8 in fts_indexes: features.append(out)
-        out = self.fca1(out)
-        if 9 in fts_indexes: features.append(out)
-        out = self.pep5(out)
-        if 10 in fts_indexes: features.append(out)
-        out = self.pep6(out)
-        if 11 in fts_indexes: features.append(out)
-        
-        out_pep7 = self.pep7(out)
-        if 12 in fts_indexes: features.append(out_pep7)
-        out = self.ep3(out_pep7)
-        if 13 in fts_indexes: features.append(out)
-        out = self.pep8(out)
-        if 14 in fts_indexes: features.append(out)
-        out = self.pep9(out)
-        if 15 in fts_indexes: features.append(out)
-        out = self.pep10(out)
-        if 16 in fts_indexes: features.append(out)
-        out = self.pep11(out)
-        if 17 in fts_indexes: features.append(out)
-        out = self.pep12(out)
-        if 18 in fts_indexes: features.append(out)
-        out = self.pep13(out)
-        if 19 in fts_indexes: features.append(out)
-        out = self.pep14(out)
-        if 20 in fts_indexes: features.append(out)
-
-        out_pep15 = self.pep15(out)
-        if 21 in fts_indexes: features.append(out_pep15)
-        out = self.ep4(out_pep15)
-        if 22 in fts_indexes: features.append(out)
-        out = self.pep16(out)
-        if 23 in fts_indexes: features.append(out)
-        out = self.conv4(out)
-        if 24 in fts_indexes: features.append(out)
-        out = self.ep5(out)
-        if 25 in fts_indexes: features.append(out)
-        out = self.pep17(out)
-        if 26 in fts_indexes: features.append(out)
-
-        out_conv5 = self.conv5(out)
-        if 27 in fts_indexes: features.append(out_conv5)
-        out = F.interpolate(self.conv6(out_conv5), scale_factor=2)
-        if 28 in fts_indexes: features.append(out)
-        out = torch.cat([out, out_pep15], dim=1)
-        if 29 in fts_indexes: features.append(out)
-        out = self.pep18(out)
-        if 30 in fts_indexes: features.append(out)
-        out = self.pep19(out)
-        if 31 in fts_indexes: features.append(out)
-        
-        out_conv7 = self.conv7(out)
-        if 32 in fts_indexes: features.append(out_conv7)
-        out = F.interpolate(self.conv8(out_conv7), scale_factor=2)
-        if 33 in fts_indexes: features.append(out)
-        out = torch.cat([out, out_pep7], dim=1)
-        if 34 in fts_indexes: features.append(out)
-        out = self.pep20(out)
-        if 35 in fts_indexes: features.append(out)
-        out = self.pep21(out)
-        if 36 in fts_indexes: features.append(out)
-        out = self.pep22(out)
-        if 37 in fts_indexes: features.append(out)
-        out_conv9 = self.conv9(out)
-        if 38 in fts_indexes: features.append(out_conv9)
-        yolo_out.append(self.yolo_layer52(out_conv9, current_size))
-
-        out = self.ep6(out_conv7)
-        if 40 in fts_indexes: features.append(out)
-        out_conv10 = self.conv10(out)
-        if 41 in fts_indexes: features.append(out_conv10)
-        yolo_out.append(self.yolo_layer26(out_conv10, current_size))
-
-        out = self.ep7(out_conv5)
-        if 43 in fts_indexes: features.append(out)
-        out_conv11 = self.conv11(out)
-        if 44 in fts_indexes: features.append(out_conv11)
-        yolo_out.append(self.yolo_layer13(out_conv11, current_size))
-
-        yolo_out.reverse()
-
-        if self.training: # train
-            if len(fts_indexes): return yolo_out, features
-            return yolo_out
-        elif ONNX_EXPORT: # export
-            x = [torch.cat(x, 0) for x in zip(*yolo_out)]
-            if len(fts_indexes): return x[0], torch.cat(x[1:3], 1), features
-            return x[0], torch.cat(x[1:3], 1) # scores, boxes: 3780x80, 3780x4
-        else: # test
-            io, p = zip(*yolo_out)  # inference output, training output
-            if len(fts_indexes): return torch.cat(io, 1), p, features
-            return torch.cat(io, 1), p
-    
-
-    def create_modules(self):
-        self.module_list = []
-
-        self.module_list.append(self.conv1)
-        self.module_list.append(self.conv2)
-        self.module_list.append(self.pep1)
-        self.module_list.append(self.ep1)
-        self.module_list.append(self.pep2)
-        self.module_list.append(self.pep3)
-        self.module_list.append(self.ep2)
-        self.module_list.append(self.pep4)
-        self.module_list.append(self.conv3)
-        self.module_list.append(self.fca1)
-        self.module_list.append(self.pep5)
-        self.module_list.append(self.pep6)
-        
-        self.module_list.append(self.pep7)
-        self.module_list.append(self.ep3)
-        self.module_list.append(self.pep8)
-        self.module_list.append(self.pep9)
-        self.module_list.append(self.pep10)
-        self.module_list.append(self.pep11)
-        self.module_list.append(self.pep12)
-        self.module_list.append(self.pep13)
-        self.module_list.append(self.pep14)
-
-        self.module_list.append(self.pep15)
-        self.module_list.append(self.ep4)
-        self.module_list.append(self.pep16)
-        self.module_list.append(self.conv4)
-        self.module_list.append(self.ep5)
-        self.module_list.append(self.pep17)
-        
-        self.module_list.append(self.conv5)
-        self.module_list.append(self.conv6)
-        
-        self.module_list.append(self.pep18)
-        self.module_list.append(self.pep19)
-
-        self.module_list.append(self.conv7)
-        self.module_list.append(self.conv8)
-        
-        self.module_list.append(self.pep20)
-        self.module_list.append(self.pep21)
-        self.module_list.append(self.pep22)
-        self.module_list.append(self.conv9)
-        self.module_list.append(self.yolo_layer52)
-        
-        self.module_list.append(self.ep6)
-        self.module_list.append(self.conv10)
-        self.module_list.append(self.yolo_layer26)
-
-        self.module_list.append(self.ep7)
-        self.module_list.append(self.conv11)
-        self.module_list.append(self.yolo_layer13)
-
-
 class HintModel(nn.Module):
 
     def __init__(self, config, teacher, student):
@@ -868,12 +631,8 @@ class HintModel(nn.Module):
         
         # Get Features sizes
         with torch.no_grad(): 
-            _, fts_tch = \
-                    teacher(x, config['teacher_indexes']) if type(teacher) is YOLO_Nano \
-                    else YOLO_forward(teacher, x, config['teacher_indexes'])
-            _, fts_std = \
-                student(x, config['student_indexes']) if type(student) is YOLO_Nano \
-                    else YOLO_forward(student, x, config['student_indexes']) 
+            _, fts_tch = teacher(x, config['teacher_indexes'])
+            _, fts_std = student(x, config['student_indexes'])
 
         for i, (ft_tch, ft_std) in enumerate(zip(fts_tch, fts_std)):
             _, chnl_tch, w_tch, h_tch = ft_tch.shape
@@ -911,8 +670,7 @@ class Discriminator(nn.Module):
         
         # Get Features sizes
         with torch.no_grad(): 
-            _, fts = model(x, fts_indexes) if type(model) is YOLO_Nano \
-                else YOLO_forward(model, x, fts_indexes)
+            _, fts = model(x, fts_indexes)
         
         for i, ft in enumerate(fts):
             _, chnl, w, h = ft.shape
@@ -945,67 +703,4 @@ class Discriminator(nn.Module):
         y = []
         for i, (x, discriminator) in enumerate(zip(fts, self.D)):
             y.append(discriminator(x))
-        # y.append(self.D[0](fts[0]))
-        # y.append(self.D[1](fts[1]))
-        # y.append(self.D[2](fts[2]))
         return y
-
-
-def YOLO_forward(model, x, fts_indexes=[], verbose=False):
-    img_size = x.shape[-2:]
-    yolo_out, out, features = [], [], []
-    verbose = False
-    if verbose:
-        str = ''
-        print('0', x.shape)
-
-    for i, (mdef, module) in enumerate(zip(model.module_defs, model.module_list)):
-        mtype = mdef['type']
-        if mtype in ['convolutional', 'softconv', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'upsample', 'maxpool']:
-            if mtype == 'softconv': 
-                x1 = module[0](x, model.temp, model.ticket)
-                x = module[1:](x1)
-            else: x = module(x)
-        elif mtype == 'shortcut':  # sum
-            if verbose:
-                l = [i - 1] + module.layers  # layers
-                s = [list(x.shape)] + [list(out[i].shape) for i in module.layers]  # shapes
-                str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
-            x = module(x, out)  # weightedFeatureFusion()
-        elif mtype == 'route': # concat
-            layers = mdef['layers']
-            if verbose:
-                l = [i - 1] + layers  # layers
-                s = [list(x.shape)] + [list(out[i].shape) for i in layers]  # shapes
-                str = ' >> ' + ' + '.join(['layer %g %s' % x for x in zip(l, s)])
-            if len(layers) == 1:
-                x = out[layers[0]]
-            else:
-                try:
-                    x = torch.cat([out[i] for i in layers], 1)
-                except:  # apply stride 2 for darknet reorg layer
-                    out[layers[1]] = F.interpolate(out[layers[1]], scale_factor=[0.5, 0.5])
-                    x = torch.cat([out[i] for i in layers], 1)
-                # print(''), [print(out[i].shape) for i in layers], print(x.shape)
-        elif mtype == 'yolo':
-            yolo_out.append(module(x, img_size))
-        # Features to output
-        if i in fts_indexes: features.append(x)
-
-        out.append(x if i in model.routs else [])
-
-        if verbose:
-            print('%g/%g %s -' % (i, len(model.module_list), mtype), list(x.shape), str)
-            str = ''
-
-    if model.training: # train
-        if len(fts_indexes): return yolo_out, features
-        return yolo_out
-    elif ONNX_EXPORT: # export
-        x = [torch.cat(x, 0) for x in zip(*yolo_out)]
-        if len(fts_indexes): return x[0], torch.cat(x[1:3], 1), features
-        return x[0], torch.cat(x[1:3], 1) # scores, boxes: 3780x80, 3780x4
-    else: # test
-        io, p = zip(*yolo_out)  # inference output, training output
-        if len(fts_indexes): return torch.cat(io, 1), p, features
-        return torch.cat(io, 1), p

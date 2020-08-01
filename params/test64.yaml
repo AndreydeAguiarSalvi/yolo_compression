@@ -1,6 +1,6 @@
 inherit_from: params/default.yaml
 data: data/coco2048.data
-cfg : cfg/yolov3.cfg
+cfg : cfg/coco/yolov3.cfg
 epochs: 30
 weights: ''
 decay_steps: 0.5 0.8

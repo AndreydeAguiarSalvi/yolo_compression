@@ -20,7 +20,7 @@ hyp :
 epochs : 300
 batch_size : 8
 accumulate: 8
-cfg : cfg/yolov3-spp.cfg
+cfg : cfg/coco/yolov3-spp.cfg
 data : data/coco2014.data
 img_size : [416]
 bucket : ''

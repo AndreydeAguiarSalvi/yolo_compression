@@ -41,15 +41,11 @@ def train():
     # Initialize Teacher
     if config['teacher_darknet'] == 'default':
         teacher = Darknet(cfg=config['teacher_cfg'], arc=config['teacher_arc']).to(device)
-    elif config['teacher_darknet'] == 'nano':
-        teacher = YOLO_Nano(activation='LeakyReLU').to(device)
     elif config['teacher_darknet'] == 'soft':
         teacher = SoftDarknet(cfg=config['teacher_cfg'], arc=config['teacher_arc']).to(device)
     # Initialize Student
     if config['student_darknet'] == 'default':
         student = Darknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
-    elif config['student_darknet'] == 'nano':
-        student = YOLO_Nano(activation='LeakyReLU').to(device)
     elif config['student_darknet'] == 'soft':
         student = SoftDarknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     # Create Hint Layers
@@ -178,13 +174,9 @@ def train():
 
             # Run teacher
             with torch.no_grad(): 
-                pred_tch, fts_tch = \
-                    teacher(imgs, config['teacher_indexes']) if type(teacher) is YOLO_Nano \
-                    else YOLO_forward(teacher, imgs, config['teacher_indexes'])
+                pred_tch, fts_tch = teacher(imgs, config['teacher_indexes'])
             # Run student
-            pred_std, fts_std = \
-                student(imgs, config['student_indexes']) if type(student) is YOLO_Nano \
-                    else YOLO_forward(student, imgs, config['student_indexes']) 
+            pred_std, fts_std = student(imgs, config['student_indexes'])
 
             fts_guided = hint_models(fts_std)
 

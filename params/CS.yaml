@@ -3,7 +3,7 @@ epochs : 300
 iterations : 3
 batch_size : 8
 accumulate: 8
-cfg : cfg/voc_yolov3_soft.cfg
+cfg : cfg/pascal/yolov3_soft_orig-output.cfg
 data : data/voc2012.data
 weights : ''
 prune_kind : CS

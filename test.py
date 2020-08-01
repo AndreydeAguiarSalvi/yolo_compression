@@ -37,9 +37,7 @@ def test(cfg,
             os.remove(f)
 
         # Initialize model
-        if 'nano' in cfg:
-            model = YOLO_Nano(activation=args['nano_activation']).to(device)
-        elif 'soft' in cfg:
+        if 'soft' in cfg:
             model = SoftDarknet(cfg=cfg).to(device)
             model.ticket = True
 
