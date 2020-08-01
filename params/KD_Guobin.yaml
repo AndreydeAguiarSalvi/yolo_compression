@@ -18,7 +18,7 @@ teacher_arc: default
 teacher_indexes: [36]
 mask_path: weights/voc_yolov3/size-multi_scale/2020_03_18/18_00_18/mask_1_prune.pt
 
-student_cfg : cfg/pasval/yolo-nano.cfg
+student_cfg : cfg/pascal/yolo-nano.cfg
 student_weights: ''
 student_darknet: default
 student_arc: default
