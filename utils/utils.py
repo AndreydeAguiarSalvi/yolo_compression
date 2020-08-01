@@ -544,8 +544,9 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
             lcls_hard += CE(pi_s[..., 4:].view(-1, model_student.nc + 1), t.view(-1))
 
     # Compute the L1 Loss between every teacher fts and guided (by Hint) student fts
-    for (hint, guided) in zip(fts_hint, fts_guided):
-        lhint += HINT(guided, hint) # Equation 6
+    if len(fts_hint):
+        for (hint, guided) in zip(fts_hint, fts_guided):
+            lhint += HINT(guided, hint) # Equation 6
 
     lbox_hard *= h['giou']
     lobj *= h['obj']

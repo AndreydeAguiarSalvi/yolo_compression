@@ -49,10 +49,13 @@ def train():
     elif config['student_darknet'] == 'soft':
         student = SoftDarknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     # Create Hint Layers
-    hint_models = HintModel(config, teacher, student).to(device)
+    hint_models = None
+    if len(config['hyp']['teacher_indexes']):
+        hint_models = HintModel(config, teacher, student).to(device)
     
     optimizer = create_optimizer(student, config)
-    optimizer.add_param_group({"params": hint_models.parameters()})
+    if len(config['hyp']['teacher_indexes']):
+        optimizer.add_param_group({"params": hint_models.parameters()})
 
     mask = None
     if config['mask'] or config['mask_path'] is not None:
@@ -173,15 +176,23 @@ def train():
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
             # Run teacher
-            with torch.no_grad(): 
-                pred_tch, fts_tch = teacher(imgs, config['teacher_indexes'])
+            with torch.no_grad():
+                if len(config['hyp']['teacher_indexes']):
+                    pred_tch, fts_tch = teacher(imgs, config['teacher_indexes'])
+                else: pred_tch = teacher(imgs)
             # Run student
-            pred_std, fts_std = student(imgs, config['student_indexes'])
+            if len(config['hyp']['student_indexes']):
+                pred_std, fts_std = student(imgs, config['student_indexes'])
+            else: pred_std = student(imgs)
 
-            fts_guided = hint_models(fts_std)
+            if len(config['hyp']['teacher_indexes']):
+                fts_guided = hint_models(fts_std)
 
             # Compute loss
-            loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, fts_tch, fts_guided, teacher, student)
+            if len(config['hyp']['teacher_indexes']):
+                loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, fts_tch, fts_guided, teacher, student)
+            else:
+                loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, [], [], teacher, student)
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results
