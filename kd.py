@@ -50,11 +50,11 @@ def train():
         student = SoftDarknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     # Create Hint Layers
     hint_models = None
-    if len(config['hyp']['teacher_indexes']):
+    if len(config['teacher_indexes']):
         hint_models = HintModel(config, teacher, student).to(device)
     
     optimizer = create_optimizer(student, config)
-    if len(config['hyp']['teacher_indexes']):
+    if len(config['teacher_indexes']):
         optimizer.add_param_group({"params": hint_models.parameters()})
 
     mask = None
@@ -177,19 +177,19 @@ def train():
 
             # Run teacher
             with torch.no_grad():
-                if len(config['hyp']['teacher_indexes']):
+                if len(['teacher_indexes']):
                     pred_tch, fts_tch = teacher(imgs, config['teacher_indexes'])
                 else: pred_tch = teacher(imgs)
             # Run student
-            if len(config['hyp']['student_indexes']):
+            if len(config['student_indexes']):
                 pred_std, fts_std = student(imgs, config['student_indexes'])
             else: pred_std = student(imgs)
 
-            if len(config['hyp']['teacher_indexes']):
+            if len(config['teacher_indexes']):
                 fts_guided = hint_models(fts_std)
 
             # Compute loss
-            if len(config['hyp']['teacher_indexes']):
+            if len(config['teacher_indexes']):
                 loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, fts_tch, fts_guided, teacher, student)
             else:
                 loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, [], [], teacher, student)
