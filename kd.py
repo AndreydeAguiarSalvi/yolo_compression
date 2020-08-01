@@ -265,7 +265,8 @@ def train():
                     'training_results': f.read(),
                     'model': student.module.state_dict() if type(student) is nn.parallel.DistributedDataParallel 
                         else student.state_dict(),
-                    'hint': hint_models.module.state_dict() if type(hint_models) is nn.parallel.DistributedDataParallel 
+                    'hint': None if hint_models is None
+                        else hint_models.module.state_dict() if type(hint_models) is nn.parallel.DistributedDataParallel 
                         else hint_models.state_dict(),
                     'optimizer': None if final_epoch else optimizer.state_dict()}
 
