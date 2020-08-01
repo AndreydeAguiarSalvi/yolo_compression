@@ -177,7 +177,7 @@ def train():
 
             # Run teacher
             with torch.no_grad():
-                if len(['teacher_indexes']):
+                if len(config['teacher_indexes']):
                     pred_tch, fts_tch = teacher(imgs, config['teacher_indexes'])
                 else: pred_tch = teacher(imgs)
             # Run student
