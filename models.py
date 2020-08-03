@@ -662,7 +662,7 @@ class HintModel(nn.Module):
 
 class Discriminator(nn.Module):
 
-    def __init__(self, fts_indexes, model):
+    def __init__(self, fts_indexes, model, kernel=(1, 1)):
         super(Discriminator, self).__init__()
         
         self.D = nn.ModuleList()
@@ -683,7 +683,7 @@ class Discriminator(nn.Module):
                 cnv = nn.Conv2d(
                     in_channels = in_sizes[j],
                     out_channels = out_sizes[j],
-                    kernel_size = (1, 1)
+                    kernel_size = kernel
                 )
                 dct.add_module(f'D-{i}__Layer-{j}', cnv)
                 dct.add_module(f'D-{i}__Norm-{j}', nn.BatchNorm2d(out_sizes[j], momentum=0.1))
