@@ -7,7 +7,7 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_kd_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_kd_checkpoints
+from utils.my_utils import create_kd_argparser, create_config, create_scheduler, create_optimizer, add_to_optimizer, initialize_model, create_dataloaders, load_kd_checkpoints
 from utils.pruning import create_mask_LTH, apply_mask_LTH
 
 mixed_precision = True
@@ -55,20 +55,22 @@ def train():
     
     optimizer = create_optimizer(student, config)
     if len(config['teacher_indexes']):
-        optimizer.add_param_group({"params": hint_models.parameters()})
+        add_to_optimizer(config, hint_models, optimizer)        
 
     mask = None
-    if config['mask'] or config['mask_path'] is not None:
+    if ('mask' in config and config['mask']) or ('mask_path' in config and config['mask_path']):
+        print('Creating mask')
         mask = create_mask_LTH(teacher).to(device)
 
-    start_epoch, best_fitness, teacher, student, mask, hint_models, optimizer = load_kd_checkpoints(
+    start_epoch, best_fitness, teacher, student, mask, hint_models, optimizer, _ = load_kd_checkpoints(
         config, 
         teacher, student, 
         mask, hint_models,
-        optimizer, device
+        optimizer, None, device
     )
 
     if mask is not None:
+        print('Applying mask in teacher')
         apply_mask_LTH(teacher, mask)
         del mask
         torch.cuda.empty_cache()

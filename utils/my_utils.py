@@ -318,9 +318,10 @@ def create_scheduler(opt, optimizer, start_epoch):
     return scheduler
 
 
-def create_optimizer(model, opt):
+def create_optimizer(model, opt, is_D=False):
     import torch.optim as optim
 
+    learning_rate = opt['hyp']['lr0'] if not is_D else opt['hyp']['Dlr0']
     # Optimizer
     pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
     for k, v in dict(model.named_parameters()).items():
@@ -333,11 +334,11 @@ def create_optimizer(model, opt):
                 pg0 += [v]  # all else
 
     if opt['adam']:
-        # opt['hyp']['lr0'] *= 0.1  # reduce lr (i.e. SGD=5E-3, Adam=5E-4)
-        optimizer = optim.Adam(pg0, lr=opt['hyp']['lr0'])
-        # optimizer = AdaBound(pg0, lr=opt['hyp']['lr0'], final_lr=0.1)
+        # learning_rate *= 0.1  # reduce lr (i.e. SGD=5E-3, Adam=5E-4)
+        optimizer = optim.Adam(pg0, lr=learning_rate)
+        # optimizer = AdaBound(pg0, lr=learning_rate, final_lr=0.1)
     else:
-        optimizer = optim.SGD(pg0, lr=opt['hyp']['lr0'], momentum=opt['hyp']['momentum'], nesterov=True)
+        optimizer = optim.SGD(pg0, lr=learning_rate, momentum=opt['hyp']['momentum'], nesterov=True)
     
     optimizer.add_param_group({'params': pg1, 'weight_decay': opt['hyp']['weight_decay']})  # add pg1 with weight_decay
     optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
@@ -347,6 +348,25 @@ def create_optimizer(model, opt):
     # optimizer = torch_utils.Lookahead(optimizer, k=5, alpha=0.5)
 
     return optimizer
+
+
+def add_to_optimizer(opt, model, optimizer):
+    # Optimizer
+    pg0, pg1, pg2 = [], [], []  # optimizer parameter groups
+    for k, v in dict(model.named_parameters()).items():
+        if 'mask' not in k:
+            if '.bias' in k:
+                pg2 += [v]  # biases
+            elif 'Conv2d.weight' in k:
+                pg1 += [v]  # apply weight_decay
+            else:
+                pg0 += [v]  # all else
+    
+    optimizer.add_param_group({'params': pg0, 'momentum':opt['hyp']['momentum']})
+    optimizer.add_param_group({'params': pg1, 'weight_decay': opt['hyp']['weight_decay']})  # add pg1 with weight_decay
+    optimizer.add_param_group({'params': pg2})  # add pg2 (biases)
+
+    del pg0, pg1, pg2
 
 
 def initialize_model(model, function):
@@ -491,7 +511,7 @@ def load_checkpoints_mask(config, model, mask, optimizer, device, try_download_f
     return start_iteration, start_epoch, best_fitness, model, mask, optimizer
 
 
-def load_kd_checkpoints(config, teacher, student, mask, hint_model, optimizer, device):
+def load_kd_checkpoints(config, teacher, student, mask, another_model, optimizer1, optimizer2, device):
     import torch
     
     start_epoch = 0
@@ -537,18 +557,40 @@ def load_kd_checkpoints(config, teacher, student, mask, hint_model, optimizer, d
         
         # load hint models
         try:
-            chkpt['hint'] = {k: v for k, v in chkpt['hint'].items() if hint_model.state_dict()[k].numel() == v.numel()}
-            hint_model.load_state_dict(chkpt['hint'], strict=False)
+            if 'hint' in chkpt:
+                chkpt['hint'] = {k: v for k, v in chkpt['hint'].items() if another_model.state_dict()[k].numel() == v.numel()}
+                another_model.load_state_dict(chkpt['hint'], strict=False)
+            else: print('There is no Hint Layer to load')
         except KeyError as e:
             s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
                 "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
             raise KeyError(s) from e
 
-        # load optimizer
-        if chkpt['optimizer'] is not None:
-            optimizer.load_state_dict(chkpt['optimizer'])
-            best_fitness = chkpt['best_fitness']
+        # load discriminators
+        try:
+            if 'D' in chkpt:
+                chkpt['D'] = {k: v for k, v in chkpt['D'].items() if another_model.state_dict()[k].numel() == v.numel()}
+                another_model.load_state_dict(chkpt['D'], strict=False)
+            else: print('There is no Discriminator to load')
+        except KeyError as e:
+            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
+            raise KeyError(s) from e
 
+        # load optimizer if is a normal KD
+        if 'optimizer' in chkpt and chkpt['optimizer']:
+            optimizer1.load_state_dict(chkpt['optimizer'])
+            best_fitness = chkpt['best_fitness']
+        
+        # load optimizer from generator
+        if 'G_optim' in chkpt and chkpt['G_optim']:
+            optimizer1.load_state_dict(chkpt['G_optim'])
+            best_fitness = chkpt['best_fitness']
+        
+        # load optimizer from discriminator
+        if 'D_optim' in chkpt and chkpt['D_optim']:
+            optimizer2.load_state_dict(chkpt['D_optim'])
+            
         # load results
         if chkpt.get('training_results') is not None:
             with open(config['results_file'], 'w') as file:
@@ -558,4 +600,4 @@ def load_kd_checkpoints(config, teacher, student, mask, hint_model, optimizer, d
         del chkpt
         torch.cuda.empty_cache()
 
-    return start_epoch, best_fitness, teacher, student, mask, hint_model, optimizer
+    return start_epoch, best_fitness, teacher, student, mask, another_model, optimizer1, optimizer2

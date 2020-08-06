@@ -47,26 +47,27 @@ def train():
     elif config['student_darknet'] == 'soft':
         student = SoftDarknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     # Create Discriminators
-    hint_models = None
+    D_models = None
     if len(config['teacher_indexes']):
         D_models = Discriminator(config['teacher_indexes'], teacher, config['D_kernel_size']).to(device)
     
-    optimizer = create_optimizer(student, config)
-    if len(config['teacher_indexes']):
-        optimizer.add_param_group({"params": hint_models.parameters()})
+    G_optim = create_optimizer(student, config)
+    D_optim = create_optimizer(D_models, config, is_D=True)
 
     mask = None
-    if config['mask'] or config['mask_path'] is not None:
+    if ('mask' in config and config['mask']) or ('mask_path' in config and config['mask_path']):
+        print('Creating mask')
         mask = create_mask_LTH(teacher).to(device)
 
-    start_epoch, best_fitness, teacher, student, mask, hint_models, optimizer = load_kd_checkpoints(
+    start_epoch, best_fitness, teacher, student, mask, D_models, G_optim, D_optim = load_kd_checkpoints(
         config, 
         teacher, student, 
-        mask, hint_models,
-        optimizer, device
+        mask, D_models,
+        G_optim, D_optim, device
     )
 
     if mask is not None:
+        print('Applying mask in teacher')
         apply_mask_LTH(teacher, mask)
         del mask
         torch.cuda.empty_cache()

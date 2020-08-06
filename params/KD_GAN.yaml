@@ -1,13 +1,9 @@
 inherit_from: params/default.yaml
 hyp :
-    lr0: 0.001
-    mu: 0.7
-    ni: 0.5
-    margin: 0.00001
-    cls_function: softmax
-    giou_reg_loss: True
+    Dlr0 : 0.01
+    lr0 : 0.01
 
-cfg: cfg/pascal/Guobin_KD.cfg
+cfg: cfg/pascal/KD_GAN.cfg
 weights: ''
 arc : ''
 darknet : ''
@@ -16,14 +12,15 @@ teacher_cfg : cfg/pascal/yolov3.cfg
 teacher_weights: weights/voc_yolov3/size-multi_scale/2020_03_18/18_00_18/best.pt
 teacher_darknet: default
 teacher_arc: default
-teacher_indexes: [36]
+teacher_indexes: [81, 93, 105]
 mask_path: weights/voc_yolov3/size-multi_scale/2020_03_18/18_00_18/mask_1_prune.pt
 
 student_cfg : cfg/pascal/yolo-nano_leaky.cfg
 student_weights: ''
 student_darknet: default
 student_arc: default
-student_indexes: [12]
+student_indexes: [29, 39, 48]
 
 data : data/voc2012.data
+D_kernel_size: [1, 1]
 single_cls: False
