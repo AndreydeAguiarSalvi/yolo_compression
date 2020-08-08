@@ -189,6 +189,7 @@ def create_kd_argparser():
     parser.add_argument('--giou_reg_loss', default=True, type=lambda x: (str(x).lower() == 'true'), help='Use GIOU as regression loss. If False, it uses the L2 Loss.')
     # GAN KD parameters
     parser.add_argument('--Dlr0', type=float, help='initial Discriminator learning rate')
+    parser.add_argument('--second_stage', type=int, help='Epoch to finish the GAN training and start the bbox training')
     args = vars(parser.parse_args())
 
     return args
