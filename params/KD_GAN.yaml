@@ -23,4 +23,5 @@ student_indexes: [29, 39, 48]
 
 data : data/voc2012.data
 D_kernel_size: [1, 1]
+second_stage: 200
 single_cls: False

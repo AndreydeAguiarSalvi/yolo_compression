@@ -16,6 +16,7 @@ try:  # Mixed precision training https://github.com/NVIDIA/apex
 except:
     mixed_precision = False  # not installed
 
+ft = torch.cuda.FloatTensor
 
 def train():
     data = config['data']
@@ -53,6 +54,7 @@ def train():
     
     G_optim = create_optimizer(student, config)
     D_optim = create_optimizer(D_models, config, is_D=True)
+    GAN_criterion = torch.nn.BCELoss()
 
     mask = None
     if ('mask' in config and config['mask']) or ('mask_path' in config and config['mask_path']):
@@ -77,11 +79,12 @@ def train():
     elif config['xavier_uniform']:
         initialize_model(student, torch.nn.init.xavier_uniform_)
 
-    scheduler = create_scheduler(config, optimizer, start_epoch)
+    G_scheduler = create_scheduler(config, G_optim, start_epoch)
+    D_scheduler = create_scheduler(config, D_optim, start_epoch)
 
     # Mixed precision training https://github.com/NVIDIA/apex
     if mixed_precision:
-        student, optimizer = amp.initialize(student, optimizer, opt_level='O1', verbosity=0)
+        student, G_optim = amp.initialize(student, G_scheduler, opt_level='O1', verbosity=0)
 
     # Initialize distributed training
     if device.type != 'cpu' and torch.cuda.device_count() > 1 and torch.distributed.is_available():
@@ -136,9 +139,9 @@ def train():
                 prebias = False
 
             # Bias optimizer settings
-            optimizer.param_groups[2]['lr'] = ps[0]
-            if optimizer.param_groups[2].get('momentum') is not None:  # for SGD but not Adam
-                optimizer.param_groups[2]['momentum'] = ps[1]
+            G_optim.param_groups[2]['lr'] = ps[0]
+            if G_optim.param_groups[2].get('momentum') is not None:  # for SGD but not Adam
+                G_optim.param_groups[2]['momentum'] = ps[1]
 
         # Update image weights (optional)
         if trainloader.dataset.image_weights:
@@ -146,14 +149,15 @@ def train():
             image_weights = labels_to_image_weights(trainloader.dataset.labels, nc=nc, class_weights=w)
             trainloader.dataset.indices = random.choices(range(trainloader.dataset.n), weights=image_weights, k=trainloader.dataset.n)  # rand weighted idx
 
-        mloss = torch.zeros(5).to(device)  # mean losses
-        print(('\n' + '%10s' * 9) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'hint', 'total', 'targets', 'img_size'))
+        mloss = torch.zeros(6).to(device)  # mean losses
+        print(('\n' + '%10s' * 10) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'G_loss', 'D_loss', 'total', 'targets', 'img_size'))
         pbar = tqdm(enumerate(trainloader), total=nb)  # progress bar
         ####################
         # Start mini-batch #
         ####################
         for i, (imgs, targets, paths, _) in pbar: 
-        # for i, (imgs, targets, paths, _) in enumerate(trainloader): 
+            real_data_label = torch.ones(imgs.shape[0], 3)
+            fake_data_label = torch.zeros(imgs.shape[0], 3)
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
             targets = targets.to(device)
@@ -184,44 +188,86 @@ def train():
                 pred_std, fts_std = student(imgs, config['student_indexes'])
             else: pred_std = student(imgs)
 
-            if len(config['teacher_indexes']):
-                fts_guided = hint_models(fts_std)
+            
+            ###################################################
+            # Update D: maximize log(D(x)) + log(1 - D(G(z))) #
+            ###################################################
+            if epoch < config['second_stage']:
+                # Discriminate the real data
+                real_data_discrimination = D_models(fts_tch)
+                # Discriminate the fake data
+                fake_data_discrimination = D_models(fts_std)
+                
+                # Compute loss
+                D_loss_real = GAN_criterion(real_data_discrimination, real_data_label)
+                D_loss_fake = GAN_criterion(fake_data_discrimination, fake_data_label)
 
-            # Compute loss
-            if len(config['teacher_indexes']):
-                loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, fts_tch, fts_guided, teacher, student)
+                # Scale loss by nominal batch_size of 64
+                D_loss_real *= batch_size / 64
+                D_loss_fake *= batch_size / 64
+
+                # Compute gradient
+                D_loss_real.backward()
+                D_loss_fake.backward()
+
+                # Optimize accumulated gradient
+                if ni % accumulate == 0:
+                    D_optim.step()
+                    D_optim.zero_grad()
+            
+            else: D_loss_real, D_loss_fake = ft([.0]), ft([.0])
+
+            ###################################
+            # Update G: maximize log(D(G(z))) #
+            ###################################
+            if epoch < config['second_stage']:
+                # Since we already update D, perform another forward with fake batch through D
+                fake_data_discrimination = D_models(fts_std)
+                
+                # Compute loss
+                G_loss = GAN_criterion(fake_data_discrimination, real_data_label) # fake labels are real for generator cost
+                obj_detec_loss, loss_items = ft([.0]), ft([.0, .0, .0, .0])
+                
+                # Scale loss by nominal batch_size of 64
+                G_loss *= batch_size / 64
+                
+                # Compute gradient
+                G_loss.backward()
+
             else:
-                loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, [], [], teacher, student)
+                # Compute loss
+                G_loss = ft([.0])
+                obj_detec_loss, loss_items = compute_loss(pred_std, targets, student)
+        
+                # Scale loss by nominal batch_size of 64
+                obj_detec_loss *= batch_size / 64
+
+                # Compute gradient
+                obj_detec_loss.backward()
+
+            loss = obj_detec_loss + D_loss_real + D_loss_fake + G_loss
+            all_losses = torch.cat([ loss_items[:3], G_loss, D_loss_real+D_loss_fake, loss ]) 
             if not torch.isfinite(loss):
-                print('WARNING: non-finite loss, ending training ', loss_items)
+                print('WARNING: non-finite loss, ending training ', all_losses)
                 return results
-
-            # Scale loss by nominal batch_size of 64
-            loss *= batch_size / 64
-
-            # Compute gradient
-            if mixed_precision:
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
-            else:
-                loss.backward()
 
             # Optimize accumulated gradient
             if ni % accumulate == 0:
-                optimizer.step()
-                optimizer.zero_grad()
+                G_optim.step()
+                G_optim.zero_grad()
 
             # Print batch results
-            mloss = (mloss * i + loss_items) / (i + 1)  # update mean losses
+            mloss = (mloss * i + all_losses) / (i + 1)  # update mean losses
             mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
-            s = ('%10s' * 2 + '%10.3g' * 7) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
+            s = ('%10s' * 2 + '%10.3g' * 8) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
             pbar.set_description(s)
         ##################
         # End mini-batch #
         ##################
 
         # Update scheduler
-        scheduler.step()
+        G_scheduler.step()
+        D_scheduler.step()
         
         final_epoch = epoch + 1 == epochs
         if not config['notest'] or final_epoch:  # Calculate mAP
@@ -264,10 +310,10 @@ def train():
                     'training_results': f.read(),
                     'model': student.module.state_dict() if type(student) is nn.parallel.DistributedDataParallel 
                         else student.state_dict(),
-                    'hint': None if hint_models is None
-                        else hint_models.module.state_dict() if type(hint_models) is nn.parallel.DistributedDataParallel 
-                        else hint_models.state_dict(),
-                    'optimizer': None if final_epoch else optimizer.state_dict()}
+                    'D': D_models.state_dict(),
+                    'G_optim': None if final_epoch else G_optim.state_dict(),
+                    'D_optim': None if final_epoch else D_optim.state_dict()     
+                }
 
             # Save last checkpoint
             torch.save(chkpt, config['last'])
