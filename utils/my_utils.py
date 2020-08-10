@@ -180,13 +180,13 @@ def create_kd_argparser():
     parser.add_argument('--mask_path', type=str, help='There is a mask to load on another path')
     # KD parameters
     parser.add_argument('--params', type=str, default='params/KD_Guobin.yaml', help='json config to load the hyperparameters')
-    parser.add_argument('--teacher_indexes', nargs='*', default=[36], help='which features teacher will use to hint the student')
-    parser.add_argument('--student_indexes', nargs='*', default=[12], help='which features student will learn from teacher')
+    parser.add_argument('--teacher_indexes', nargs='*', help='which features teacher will use to hint the student')
+    parser.add_argument('--student_indexes', nargs='*', help='which features student will learn from teacher')
     parser.add_argument('--mu', type=float, help='Weight the hard and soft classification loss')
     parser.add_argument('--ni', type=float, help='Weight the teacher bounded regression loss. Default value specified by authors')
     parser.add_argument('--margin', type=float, help='Student need to have a bbox loss < bbox_t + margin')
     parser.add_argument('--cls_function', type=str, help='Fuction to apply in predictions before Soft Classification Loss')
-    parser.add_argument('--giou_reg_loss', default=True, type=lambda x: (str(x).lower() == 'true'), help='Use GIOU as regression loss. If False, it uses the L2 Loss.')
+    parser.add_argument('--giou_reg_loss', type=lambda x: (str(x).lower() == 'true'), help='Use GIOU as regression loss. If False, it uses the L2 Loss.')
     # GAN KD parameters
     parser.add_argument('--Dlr0', type=float, help='initial Discriminator learning rate')
     parser.add_argument('--second_stage', type=int, help='Epoch to finish the GAN training and start the bbox training')
