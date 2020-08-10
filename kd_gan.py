@@ -156,8 +156,8 @@ def train():
         # Start mini-batch #
         ####################
         for i, (imgs, targets, paths, _) in pbar: 
-            real_data_label = torch.ones(imgs.shape[0], 3)
-            fake_data_label = torch.zeros(imgs.shape[0], 3)
+            real_data_label = torch.ones(imgs.shape[0], device=device)
+            fake_data_label = torch.zeros(imgs.shape[0], device=device)
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
             targets = targets.to(device)
@@ -199,8 +199,12 @@ def train():
                 fake_data_discrimination = D_models(fts_std)
                 
                 # Compute loss
-                D_loss_real = GAN_criterion(real_data_discrimination, real_data_label)
-                D_loss_fake = GAN_criterion(fake_data_discrimination, fake_data_label)
+                for i, x in enumerate(real_data_discrimination):
+                    if i == 0: D_loss_real = GAN_criterion(x, real_data_label)
+                    else: D_loss_real += GAN_criterion(x, real_data_label)
+                for i, x in enumerate(fake_data_discrimination):
+                    if i == 0: D_loss_fake = GAN_criterion(x, fake_data_label)
+                    else: D_loss_fake += GAN_criterion(x, fake_data_label)
 
                 # Scale loss by nominal batch_size of 64
                 D_loss_real *= batch_size / 64
@@ -225,7 +229,9 @@ def train():
                 fake_data_discrimination = D_models(fts_std)
                 
                 # Compute loss
-                G_loss = GAN_criterion(fake_data_discrimination, real_data_label) # fake labels are real for generator cost
+                for i, x in enumerate(fake_data_discrimination):
+                    if i == 0: G_loss = GAN_criterion(x, real_data_label) # fake labels are real for generator cost
+                    else: G_loss += GAN_criterion(x, real_data_label)
                 obj_detec_loss, loss_items = ft([.0]), ft([.0, .0, .0, .0])
                 
                 # Scale loss by nominal batch_size of 64
