@@ -289,7 +289,7 @@ def train():
         # Write Tensorboard results
         if tb_writer:
             x = list(mloss) + list(results)
-            titles = ['GIoU', 'Objectness', 'Classification', 'Hint', 'Train loss',
+            titles = ['GIoU', 'Objectness', 'Classification', 'Generator Loss', 'Discriminator Loss', 'Train Loss',
                       'Precision', 'Recall', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification']
             for xi, title in zip(x, titles):
                 tb_writer.add_scalar(title, xi, epoch)
