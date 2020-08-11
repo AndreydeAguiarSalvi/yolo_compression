@@ -187,6 +187,7 @@ def train():
             ###################################################
             # Update D: maximize log(D(x)) + log(1 - D(G(z))) #
             ###################################################
+            D_loss_real, D_loss_fake = ft([.0]), ft([.0])
             if epoch < config['second_stage']:
                 # Run teacher
                 with torch.no_grad():
@@ -198,7 +199,6 @@ def train():
                 fake_data_discrimination = D_models(fts_std)
                 
                 # Compute loss
-                D_loss_real, D_loss_fake = ft([.0]), ft([.0])
                 for x in real_data_discrimination:
                     D_loss_real += GAN_criterion(x, real_data_label)
                 for x in fake_data_discrimination:
@@ -216,8 +216,6 @@ def train():
                 if ni % accumulate == 0:
                     D_optim.step()
                     D_optim.zero_grad()
-            
-            else: D_loss_real, D_loss_fake = ft([.0]), ft([.0])
 
             ###################################
             # Update G: maximize log(D(G(z))) #
@@ -254,10 +252,10 @@ def train():
                 # Compute gradient
                 obj_detec_loss.backward()
 
-            D_loss = D_loss_real.mean().item() + D_loss_fake.mean().item()
-            total_loss = obj_detec_loss.item() + D_loss + G_loss.mean().item()
-            all_losses = torch.cat([ loss_items[:3], G_loss.mean().item(), D_loss, total_loss ]) 
-            if not torch.isfinite(all_losses):
+            D_loss = D_loss_real + D_loss_fake
+            total_loss = obj_detec_loss + D_loss + G_loss
+            all_losses = torch.cat( [loss_items[:3], G_loss, D_loss, total_loss] ).detach() 
+            if not torch.isfinite(total_loss):
                 print('WARNING: non-finite loss, ending training ', all_losses)
                 return results
 
