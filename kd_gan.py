@@ -196,7 +196,7 @@ def train():
                 # Discriminate the real data
                 real_data_discrimination = D_models(fts_tch)
                 # Discriminate the fake data
-                fake_data_discrimination = D_models(fts_std)
+                fake_data_discrimination = D_models([x.detach() for x in fts_std])
                 
                 # Compute loss
                 for x in real_data_discrimination:
