@@ -178,13 +178,8 @@ def train():
                     ns = [math.ceil(x * sf / 32.) * 32 for x in imgs.shape[2:]]  # new shape (stretched to 32-multiple)
                     imgs = F.interpolate(imgs, size=ns, mode='bilinear', align_corners=False)
 
-            # Run teacher
-            with torch.no_grad():
-                if len(config['teacher_indexes']):
-                    pred_tch, fts_tch = teacher(imgs, config['teacher_indexes'])
-                else: pred_tch = teacher(imgs)
             # Run student
-            if len(config['student_indexes']):
+            if len(config['student_indexes']) and epoch < config['second_stage']:
                 pred_std, fts_std = student(imgs, config['student_indexes'])
             else: pred_std = student(imgs)
 
@@ -193,18 +188,21 @@ def train():
             # Update D: maximize log(D(x)) + log(1 - D(G(z))) #
             ###################################################
             if epoch < config['second_stage']:
+                # Run teacher
+                with torch.no_grad():
+                    _, fts_tch = teacher(imgs, config['teacher_indexes'])
+                
                 # Discriminate the real data
                 real_data_discrimination = D_models(fts_tch)
                 # Discriminate the fake data
                 fake_data_discrimination = D_models(fts_std)
                 
                 # Compute loss
-                for i, x in enumerate(real_data_discrimination):
-                    if i == 0: D_loss_real = GAN_criterion(x, real_data_label)
-                    else: D_loss_real += GAN_criterion(x, real_data_label)
-                for i, x in enumerate(fake_data_discrimination):
-                    if i == 0: D_loss_fake = GAN_criterion(x, fake_data_label)
-                    else: D_loss_fake += GAN_criterion(x, fake_data_label)
+                D_loss_real, D_loss_fake = ft([.0]), ft([.0])
+                for x in real_data_discrimination:
+                    D_loss_real += GAN_criterion(x, real_data_label)
+                for x in fake_data_discrimination:
+                    D_loss_fake += GAN_criterion(x, fake_data_label)
 
                 # Scale loss by nominal batch_size of 64
                 D_loss_real *= batch_size / 64
@@ -229,9 +227,9 @@ def train():
                 fake_data_discrimination = D_models(fts_std)
                 
                 # Compute loss
-                for i, x in enumerate(fake_data_discrimination):
-                    if i == 0: G_loss = GAN_criterion(x, real_data_label) # fake labels are real for generator cost
-                    else: G_loss += GAN_criterion(x, real_data_label)
+                G_loss = ft([.0])
+                for x in fake_data_discrimination:
+                    G_loss += GAN_criterion(x, real_data_label) # fake labels are real for generator cost
                 obj_detec_loss, loss_items = ft([.0]), ft([.0, .0, .0, .0])
                 
                 # Scale loss by nominal batch_size of 64
@@ -256,9 +254,10 @@ def train():
                 # Compute gradient
                 obj_detec_loss.backward()
 
-            loss = obj_detec_loss + D_loss_real + D_loss_fake + G_loss
-            all_losses = torch.cat([ loss_items[:3], G_loss, D_loss_real+D_loss_fake, loss ]) 
-            if not torch.isfinite(loss):
+            D_loss = D_loss_real.mean().item() + D_loss_fake.mean().item()
+            total_loss = obj_detec_loss.item() + D_loss + G_loss.mean().item()
+            all_losses = torch.cat([ loss_items[:3], G_loss.mean().item(), D_loss, total_loss ]) 
+            if not torch.isfinite(all_losses):
                 print('WARNING: non-finite loss, ending training ', all_losses)
                 return results
 
