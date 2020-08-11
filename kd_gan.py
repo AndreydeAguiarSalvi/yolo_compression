@@ -240,6 +240,11 @@ def train():
                 # Compute gradient
                 G_loss.backward()
 
+                # Optimize accumulated gradient
+                if ni % accumulate == 0:
+                    G_optim.step()
+                    G_optim.zero_grad()
+
             else:
                 # Compute loss
                 G_loss = ft([.0])
@@ -256,11 +261,6 @@ def train():
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', all_losses)
                 return results
-
-            # Optimize accumulated gradient
-            if ni % accumulate == 0:
-                G_optim.step()
-                G_optim.zero_grad()
 
             # Print batch results
             mloss = (mloss * i + all_losses) / (i + 1)  # update mean losses
