@@ -323,7 +323,7 @@ def train():
 
             # Save best checkpoint
             if best_fitness == fi:
-                torch.save(chkpt, config['best'])
+                torch.save(chkpt, config['best_gan'] if epoch < config['second_stage'] else config['best'])
 
             # Delete checkpoint
             del chkpt
@@ -371,6 +371,7 @@ if __name__ == '__main__':
     f.close()
 
     config['last'] = config['sub_working_dir'] + 'last.pt'
+    config['best_gan'] = config['sub_working_dir'] + 'best_gan.pt'
     config['best'] = config['sub_working_dir'] + 'best.pt'
     config['results_file'] = config['sub_working_dir'] + 'results.txt'
 
