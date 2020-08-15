@@ -683,7 +683,8 @@ class Discriminator(nn.Module):
                 cnv = nn.Conv2d(
                     in_channels = in_sizes[j],
                     out_channels = out_sizes[j],
-                    kernel_size = kernel
+                    kernel_size = kernel,
+                    padding = (0, 0) if kernel[0] == 1 else (3, 3)
                 )
                 dct.add_module(f'D-{i}__Layer-{j}', cnv)
                 dct.add_module(f'D-{i}__Norm-{j}', nn.BatchNorm2d(out_sizes[j], momentum=0.1))
