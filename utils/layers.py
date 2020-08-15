@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from collections import OrderedDict
@@ -145,7 +146,7 @@ class MyInception(nn.Module):
 
 
 def sigmoid(x):
-    return float(1./(1.+torch.exp(-x)))
+    return float(1./(1.+np.exp(-x)))
 
 
 class SoftMaskedConv2d(nn.Module):
