@@ -279,7 +279,6 @@ class Darknet(nn.Module):
 
     def forward(self, x, fts_indexes=[], verbose=False):
         img_size = x.shape[-2:]
-        fts_indexes = list(map(int, fts_indexes))
         yolo_out, out, fts = [], [], []
         verbose = False
         if verbose:
