@@ -696,8 +696,11 @@ class Discriminator(nn.Module):
             dct.add_module(f'D-{i}__Linear-1', nn.Linear(in_features=64*7*7, out_features=1024))
             dct.add_module(f'activation-{j+1}', nn.LeakyReLU(0.1, inplace=True))
 
-            dct.add_module(f'D-{i}__Linear-2', nn.Linear(in_features=1024, out_features=1))
-            dct.add_module(f'activation-{j+2}', nn.Sigmoid())
+            dct.add_module(f'D-{i}__Linear-2', nn.Linear(in_features=1024, out_features=128))
+            dct.add_module(f'activation-{j+2}', nn.LeakyReLU(0.1, inplace=True))
+
+            dct.add_module(f'D-{i}__Linear-3', nn.Linear(in_features=128, out_features=1))
+            dct.add_module(f'activation-{j+3}', nn.LeakyReLU(0.1, inplace=True))
 
             self.D.append(dct)
     

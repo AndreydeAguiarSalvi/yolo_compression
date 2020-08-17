@@ -122,6 +122,7 @@ def train():
     print('Starting training for %g epochs...' % epochs)
 
     teacher.train()
+    max_wo_best = 0
     ###############
     # Start epoch #
     ###############
@@ -149,8 +150,8 @@ def train():
             image_weights = labels_to_image_weights(trainloader.dataset.labels, nc=nc, class_weights=w)
             trainloader.dataset.indices = random.choices(range(trainloader.dataset.n), weights=image_weights, k=trainloader.dataset.n)  # rand weighted idx
 
-        mloss = torch.zeros(6).to(device)  # mean losses
-        print(('\n' + '%10s' * 10) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'G_loss', 'D_loss', 'total', 'targets', 'img_size'))
+        mloss = torch.zeros(9).to(device)  # mean losses
+        print(('\n' + '%10s' * 13) % ('Epoch', 'gpu_mem', 'GIoU', 'obj', 'cls', 'G_loss', 'D_loss', 'D_x', 'D_g_z1', 'D_g_z2', 'total', 'targets', 'img_size'))
         pbar = tqdm(enumerate(trainloader), total=nb)  # progress bar
         ####################
         # Start mini-batch #
@@ -187,7 +188,7 @@ def train():
             ###################################################
             # Update D: maximize log(D(x)) + log(1 - D(G(z))) #
             ###################################################
-            D_loss_real, D_loss_fake = ft([.0]), ft([.0])
+            D_loss_real, D_loss_fake, D_x, D_g_z1 = ft([.0]), ft([.0]), ft([.0]), ft([.0])
             if epoch < config['second_stage']:
                 # Run teacher
                 with torch.no_grad():
@@ -195,8 +196,10 @@ def train():
                 
                 # Discriminate the real data
                 real_data_discrimination = D_models(fts_tch)
+                for output in real_data_discrimination: D_x += output.mean().item() 
                 # Discriminate the fake data
                 fake_data_discrimination = D_models([x.detach() for x in fts_std])
+                for output in fake_data_discrimination: D_g_z1 += output.mean().item()
                 
                 # Compute loss
                 for x in real_data_discrimination:
@@ -220,12 +223,13 @@ def train():
             ###################################
             # Update G: maximize log(D(G(z))) #
             ###################################
+            G_loss, D_g_z2 = ft([.0]), ft([.0])
             if epoch < config['second_stage']:
                 # Since we already update D, perform another forward with fake batch through D
                 fake_data_discrimination = D_models(fts_std)
+                for output in fake_data_discrimination: D_g_z2 += output.mean().item()
                 
                 # Compute loss
-                G_loss = ft([.0])
                 for x in fake_data_discrimination:
                     G_loss += GAN_criterion(x, real_data_label) # fake labels are real for generator cost
                 obj_detec_loss, loss_items = ft([.0]), ft([.0, .0, .0, .0])
@@ -236,14 +240,8 @@ def train():
                 # Compute gradient
                 G_loss.backward()
 
-                # Optimize accumulated gradient
-                if ni % accumulate == 0:
-                    G_optim.step()
-                    G_optim.zero_grad()
-
             else:
                 # Compute loss
-                G_loss = ft([.0])
                 obj_detec_loss, loss_items = compute_loss(pred_std, targets, student)
         
                 # Scale loss by nominal batch_size of 64
@@ -252,9 +250,14 @@ def train():
                 # Compute gradient
                 obj_detec_loss.backward()
 
+            # Optimize accumulated gradient
+            if ni % accumulate == 0:
+                G_optim.step()
+                G_optim.zero_grad()
+
             D_loss = D_loss_real + D_loss_fake
             total_loss = obj_detec_loss + D_loss + G_loss
-            all_losses = torch.cat( [loss_items[:3], G_loss, D_loss, total_loss] ).detach() 
+            all_losses = torch.cat( [loss_items[:3], G_loss, D_loss, D_x, D_g_z1, D_g_z2, total_loss] ).detach() 
             if not torch.isfinite(total_loss):
                 print('WARNING: non-finite loss, ending training ', all_losses)
                 return results
@@ -262,7 +265,7 @@ def train():
             # Print batch results
             mloss = (mloss * i + all_losses) / (i + 1)  # update mean losses
             mem = '%.3gG' % (torch.cuda.memory_cached() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
-            s = ('%10s' * 2 + '%10.3g' * 8) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
+            s = ('%10s' * 2 + '%10.3g' * 11) % ('%g/%g' % (epoch, epochs - 1), mem, *mloss, len(targets), img_size)
             pbar.set_description(s)
         ##################
         # End mini-batch #
@@ -276,11 +279,11 @@ def train():
         if not config['notest'] or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and student.nc == 80
             results, maps = test.test(
-                cfg = config['cfg'], data = data, batch_size=batch_size,
+                cfg = config['cfg'], data = data, batch_size=int(batch_size/2),
                 img_size=img_size_test, model=student, 
-                conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
+                conf_thres=0.1 if epoch < config['second_stage'] else 0.001,
                 iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
-                dataloader=validloader, folder = config['sub_working_dir']
+                dataloader=None, folder = config['sub_working_dir']
             )    
 
         # Write epoch results
@@ -292,8 +295,11 @@ def train():
         # Write Tensorboard results
         if tb_writer:
             x = list(mloss) + list(results)
-            titles = ['GIoU', 'Objectness', 'Classification', 'Generator Loss', 'Discriminator Loss', 'Train Loss',
-                      'Precision', 'Recall', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification']
+            titles = [
+                'GIoU', 'Objectness', 'Classification', 'Generator Loss', 'Discriminator Loss', 
+                'D_x', 'D_g_z1', 'D_g_z2' 'Train Loss',
+                'Precision', 'Recall', 'mAP', 'F1', 'val GIoU', 'val Objectness', 'val Classification'
+            ]
             for xi, title in zip(x, titles):
                 tb_writer.add_scalar(title, xi, epoch)
 
@@ -301,6 +307,10 @@ def train():
         fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
         if fi > best_fitness:
             best_fitness = fi
+            max_wo_best = 0
+        else:
+            max_wo_best += 1
+            if max_wo_best == 15: print('Ending training due to early stop')
 
         # Save training results
         save = (not config['nosave']) or (final_epoch and not config['evolve'])
@@ -328,6 +338,8 @@ def train():
             # Delete checkpoint
             del chkpt
             torch.cuda.empty_cache()
+        
+        if max_wo_best == 15: break
     #############
     # End epoch #
     #############

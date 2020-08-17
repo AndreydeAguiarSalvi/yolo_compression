@@ -28,7 +28,7 @@ counter = 0
 def train(iteration, best_fitness, prebias, trainloader, validloader, config, scheduler, mask_scheduler, optimizer, mask_optim, tb_writer):
     config['last'] = config['sub_working_dir'] + 'last_it_{}.pt'.format(iteration)
     config['best'] = config['sub_working_dir'] + 'best_it_{}.pt'.format(iteration)
-    
+    max_wo_best = 0
     ###############
     # Start epoch #
     ###############
@@ -173,6 +173,10 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
         fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
         if fi > best_fitness:
             best_fitness = fi
+            max_wo_best = 0
+        else:
+            max_wo_best += 1
+            if max_wo_best == 15: print('Ending training due to early stop')
 
         # Save training results
         save = (not config['nosave']) or (final_epoch and not config['evolve'])
@@ -197,6 +201,8 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
             # Delete checkpoint
             del chkpt
             torch.cuda.empty_cache()
+        
+        if max_wo_best == 15: break
     #############
     # End epoch #
     #############

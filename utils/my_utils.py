@@ -413,11 +413,11 @@ def create_dataloaders(config):
     # Testloader
     validloader = DataLoader(
         LoadImagesAndLabels(
-            valid_path, img_size_test, batch_size * 2,
+            valid_path, img_size_test, batch_size,
             hyp = config['hyp'], rect = True, cache_labels = config['cache_labels'],
             cache_images = False
         ),
-        batch_size = batch_size * 2, num_workers = nw, pin_memory = True, collate_fn = dataset.collate_fn
+        batch_size = batch_size, num_workers = nw, pin_memory = True, collate_fn = dataset.collate_fn
     )
 
     return trainloader, validloader

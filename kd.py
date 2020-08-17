@@ -122,6 +122,7 @@ def train():
     print('Starting training for %g epochs...' % epochs)
 
     teacher.train()
+    max_wo_best = 0
     ###############
     # Start epoch #
     ###############
@@ -255,6 +256,10 @@ def train():
         fi = fitness(np.array(results).reshape(1, -1))  # fitness_i = weighted combination of [P, R, mAP, F1]
         if fi > best_fitness:
             best_fitness = fi
+            max_wo_best = 0
+        else:
+            max_wo_best += 1
+            if max_wo_best == 15: print('Ending training due to early stop')
 
         # Save training results
         save = (not config['nosave']) or (final_epoch and not config['evolve'])
@@ -282,6 +287,8 @@ def train():
             # Delete checkpoint
             del chkpt
             torch.cuda.empty_cache()
+        
+        if max_wo_best == 15: break
     #############
     # End epoch #
     #############
