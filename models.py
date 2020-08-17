@@ -700,7 +700,7 @@ class Discriminator(nn.Module):
             dct.add_module(f'activation-{j+2}', nn.LeakyReLU(0.1, inplace=True))
 
             dct.add_module(f'D-{i}__Linear-3', nn.Linear(in_features=128, out_features=1))
-            dct.add_module(f'activation-{j+3}', nn.LeakyReLU(0.1, inplace=True))
+            dct.add_module(f'activation-{j+3}', nn.Sigmoid())
 
             self.D.append(dct)
     
