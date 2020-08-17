@@ -196,10 +196,10 @@ def train():
                 
                 # Discriminate the real data
                 real_data_discrimination = D_models(fts_tch)
-                for output in real_data_discrimination: D_x += output.mean().item() 
+                for output in real_data_discrimination: D_x += output.mean().item() /3.
                 # Discriminate the fake data
                 fake_data_discrimination = D_models([x.detach() for x in fts_std])
-                for output in fake_data_discrimination: D_g_z1 += output.mean().item()
+                for output in fake_data_discrimination: D_g_z1 += output.mean().item() / 3.
                 
                 # Compute loss
                 for x in real_data_discrimination:
@@ -227,7 +227,7 @@ def train():
             if epoch < config['second_stage']:
                 # Since we already update D, perform another forward with fake batch through D
                 fake_data_discrimination = D_models(fts_std)
-                for output in fake_data_discrimination: D_g_z2 += output.mean().item()
+                for output in fake_data_discrimination: D_g_z2 += output.mean().item() /3.
                 
                 # Compute loss
                 for x in fake_data_discrimination:
