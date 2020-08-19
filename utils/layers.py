@@ -198,9 +198,11 @@ class SoftMaskedConv2d(nn.Module):
 # Adapted from https://github.com/liux0614/yolo_nano/blob/master/models/yolo_nano.py
 def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, activation='relu6'):
     act_ftn = None
+    if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
     if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
     elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    assert(activation == 'leaky' or activation == 'relu6')
+    elif activation == 'swish': act_ftn = Swish()
+    assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
     
     # 1x1 convolution without padding
     if bn == True:
@@ -219,9 +221,11 @@ def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, acti
 
 def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='relu6'):
     act_ftn = None
+    if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
     if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
     elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    assert(activation == 'leaky' or activation == 'relu6')
+    elif activation == 'swish': act_ftn = Swish()
+    assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
     
     # 3x3 convolution with padding=1
     if bn == True:
@@ -239,11 +243,12 @@ def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='relu
 
 
 def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1, activation='relu6'):
-    
     act_ftn = None
+    if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
     if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
     elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    assert(activation == 'leaky' or activation == 'relu6')
+    elif activation == 'swish': act_ftn = Swish()
+    assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
     
     return nn.Sequential(
         # pw
@@ -310,9 +315,11 @@ class FCA(nn.Module):
         self.reduction_ratio = reduction_ratio
 
         act_ftn = None
+        if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
         if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
         elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-        assert(activation == 'leaky' or activation == 'relu6')
+        elif activation == 'swish': act_ftn = Swish()
+        assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
 
         hidden_channels = channels // reduction_ratio
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
@@ -447,3 +454,90 @@ class View(nn.Module):
 
     def forward(self, x): # [Batch-size, flatten]
         return x.view(x.shape[0], -1) 
+
+# Adapted from https://github.com/d-li14/mobilenetv3.pytorch/blob/master/mobilenetv3.py
+def make_divisible(v, divisor, min_value=None):
+    """
+        This function is taken from the original tf repo.
+        It ensures that all layers have a channel number that is divisible by 8
+        It can be seen here:
+        https://github.com/tensorflow/models/blob/master/research/slim/nets/mobilenet/mobilenet.py
+        :param v:
+        :param divisor:
+        :param min_value:
+        :return:
+    """
+    if min_value is None:
+        min_value = divisor
+    new_v = max(min_value, int(v + divisor / 2) // divisor * divisor)
+    # Make sure that round down does not go down by more than 10%.
+    if new_v < 0.9 * v:
+        new_v += divisor
+    return new_v
+
+
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=4):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, make_divisible(channel // reduction, 8)),
+            nn.ReLU(inplace=True),
+            nn.Linear(make_divisible(channel // reduction, 8), channel),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y
+
+
+class MobileBottleneck(nn.Module):
+    def __init__(self, in_channels, hidden_dim, out_channels, kernel_size, stride, use_se, activation):
+        super(MobileBottleneck, self).__init__()
+        assert stride in [1, 2]
+
+        self.identity = stride == 1 and in_channels == out_channels
+        act_ftn = None
+        if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
+        if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
+        elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+        elif activation == 'swish': act_ftn = Swish()
+        assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
+
+        if in_channels == hidden_dim:
+            self.conv = nn.Sequential(
+                # dw
+                nn.Conv2d(hidden_dim, hidden_dim, kernel_size, stride, (kernel_size - 1) // 2, groups=hidden_dim, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                act_ftn,
+                # Squeeze-and-Excite
+                SELayer(hidden_dim) if use_se else nn.Identity(),
+                # pw-linear
+                nn.Conv2d(hidden_dim, out_channels, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(out_channels),
+            )
+        else:
+            self.conv = nn.Sequential(
+                # pw
+                nn.Conv2d(in_channels, hidden_dim, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                act_ftn,
+                # dw
+                nn.Conv2d(hidden_dim, hidden_dim, kernel_size, stride, (kernel_size - 1) // 2, groups=hidden_dim, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                # Squeeze-and-Excite
+                SELayer(hidden_dim) if use_se else nn.Identity(),
+                act_ftn,
+                # pw-linear
+                nn.Conv2d(hidden_dim, out_channels, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(out_channels),
+            )
+
+    def forward(self, x):
+        if self.identity:
+            return x + self.conv(x)
+        else:
+            return self.conv(x)

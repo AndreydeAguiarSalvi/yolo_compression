@@ -29,13 +29,13 @@ def create_modules(module_defs, img_size, arc):
             size = mdef['size']
             stride = mdef['stride'] if 'stride' in mdef else (mdef['stride_y'], mdef['stride_x'])
             if mdef['type'] == 'convolutional':
-                modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
-                                                    out_channels=filters,
-                                                    kernel_size=size,
-                                                    stride=stride,
-                                                    padding=(size - 1) // 2 if mdef['pad'] else 0,
-                                                    groups=mdef['groups'] if 'groups' in mdef else 1,
-                                                    bias=not bn))
+                modules.add_module('Conv2d', nn.Conv2d(
+                    in_channels=output_filters[-1],
+                    out_channels=filters, kernel_size=size, stride=stride,
+                    padding=(size - 1) // 2 if mdef['pad'] else 0,
+                    groups=mdef['groups'] if 'groups' in mdef else 1,
+                    bias=not bn)
+                )
             elif mdef['type'] == 'multibias':
                 n_bias = mdef['n_bias']
                 modules.add_module('Conv2d', MultiBiasConv(
@@ -111,6 +111,21 @@ def create_modules(module_defs, img_size, arc):
             modules.add_module('FCA', FCA(
                     channels=output_filters[-1],
                     reduction_ratio=red,
+                    activation=act
+                )
+            )
+
+        elif mdef['type'] == 'mobile':
+            filters = mdef['filters']
+            size = mdef['size']
+            stride = mdef['stride']
+            hidden = make_divisible(output_filters[-1] * mdef['expansion_ratio'], 8)
+            act = mdef['activation']
+            squeeze_and_excite = mdef['squeeze_excite']
+            modules.add_module('MobileBottleneck', MobileBottleneck(
+                    in_channels=output_filters[-1], hidden_dim=hidden,
+                    out_channels=filters, kernel_size=size,
+                    stride=stride, use_se=squeeze_and_excite, 
                     activation=act
                 )
             )
@@ -290,7 +305,7 @@ class Darknet(nn.Module):
             if mtype in [
                     'convolutional', 'multibias', 'multiconv_multibias', 
                     'halfconv', 'inception', 'upsample', 'maxpool',
-                    'PEP', 'EP', 'FCA'
+                    'PEP', 'EP', 'FCA', 'mobile'
                 ]:
                 x = module(x)
             elif mtype == 'shortcut':  # sum
@@ -684,7 +699,7 @@ class Discriminator(nn.Module):
                     in_channels = in_sizes[j],
                     out_channels = out_sizes[j],
                     kernel_size = kernel,
-                    padding = (0, 0) if kernel[0] == 1 else (3, 3)
+                    padding = (0, 0) if kernel[0] == 1 else (1, 1)
                 )
                 dct.add_module(f'D-{i}__Layer-{j}', cnv)
                 dct.add_module(f'D-{i}__Norm-{j}', nn.BatchNorm2d(out_sizes[j], momentum=0.1))

@@ -21,6 +21,8 @@ def parse_model_cfg(path):
             mdefs[-1]['type'] = line[1:-1].rstrip()
             if mdefs[-1]['type'] in ['convolutional', 'multibias', 'multiconv_multibias', 'halfconv', 'inception', 'softconv']:
                 mdefs[-1]['batch_normalize'] = 0  # pre-populate with zeros (may be overwritten later)
+            elif mdefs[-1]['type'] in ['mobile']:
+                mdefs[-1]['squeeze_excite'] = 0 # pre-populate with zeros (may be overwritten later)
         else:
             key, val = line.split("=")
             key = key.rstrip()
@@ -37,11 +39,16 @@ def parse_model_cfg(path):
                     mdefs[-1][key] = val  # return string
 
     # Check all fields are supported
-    supported = ['type', 'batch_normalize', 'filters', 'size', 'stride', 'pad', 'activation', 'layers', 'groups',
-                 'from', 'mask', 'anchors', 'classes', 'num', 'jitter', 'ignore_thresh', 'truth_thresh', 'random',
-                 'stride_x', 'stride_y', 'weights_type', 'weights_normalization', 'scale_x_y', 'beta_nms', 'nms_kind',
-                 'iou_loss', 'iou_normalizer', 'cls_normalizer', 'iou_thresh', 'n_bias', 'mask_initial_value',
-                 'x', 'reduction']
+    supported = [
+        'type', 'batch_normalize', 'filters', 'size', 'stride', 'pad', 'activation', 'layers', 'groups',
+        'from', 'mask', 'anchors', 'classes', 'num', 'jitter', 'ignore_thresh', 'truth_thresh', 'random',
+        'stride_x', 'stride_y', 'weights_type', 'weights_normalization', 'scale_x_y', 'beta_nms', 'nms_kind',
+        'iou_loss', 'iou_normalizer', 'cls_normalizer', 'iou_thresh', 
+        'n_bias', 
+        'mask_initial_value',
+        'x', 'reduction', 
+        'expansion_ratio', 'squeeze_excite'
+    ]
 
     f = []  # fields
     for x in mdefs[1:]:
