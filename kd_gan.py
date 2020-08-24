@@ -279,7 +279,7 @@ def train():
         if not config['notest'] or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and student.nc == 80
             results, maps = test.test(
-                cfg = config['cfg'], data = data, batch_size=2,
+                cfg = config['cfg'], data = data, batch_size=1,
                 img_size=img_size_test, model=student, 
                 conf_thres=0.1 if epoch < config['second_stage'] else 0.001,
                 iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
@@ -310,7 +310,7 @@ def train():
             max_wo_best = 0
         else:
             max_wo_best += 1
-            if max_wo_best == 15: print('Ending training due to early stop')
+            if max_wo_best == 20: print('Ending training due to early stop')
 
         # Save training results
         save = (not config['nosave']) or (final_epoch and not config['evolve'])
@@ -339,7 +339,7 @@ def train():
             del chkpt
             torch.cuda.empty_cache()
         
-        if max_wo_best == 15: break
+        if max_wo_best == 20: break
     #############
     # End epoch #
     #############

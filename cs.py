@@ -176,7 +176,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
             max_wo_best = 0
         else:
             max_wo_best += 1
-            if max_wo_best == 15: print('Ending training due to early stop')
+            if max_wo_best == 20: print('Ending training due to early stop')
 
         # Save training results
         save = (not config['nosave']) or (final_epoch and not config['evolve'])
@@ -202,7 +202,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
             del chkpt
             torch.cuda.empty_cache()
         
-        if max_wo_best == 15: break
+        if max_wo_best == 20: break
     #############
     # End epoch #
     #############
