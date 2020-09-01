@@ -179,7 +179,7 @@ def create_kd_argparser():
     parser.add_argument('--mask', action='store_true', help='There is a mask to load inside teacher checkpoint')
     parser.add_argument('--mask_path', type=str, help='There is a mask to load on another path')
     # KD parameters
-    parser.add_argument('--params', type=str, default='params/KD_Guobin.yaml', help='json config to load the hyperparameters')
+    parser.add_argument('--params', type=str, required=True, help='json config to load the hyperparameters')
     parser.add_argument('--teacher_indexes', nargs='*', type=int, help='which features teacher will use to hint the student')
     parser.add_argument('--student_indexes', nargs='*', type=int, help='which features student will learn from teacher')
     parser.add_argument('--mu', type=float, help='Weight the hard and soft classification loss')
