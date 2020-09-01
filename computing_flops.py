@@ -1,12 +1,12 @@
 import torch
 import argparse
 from thop import profile
-from models import Darknet, SparseYOLO, SoftDarknet
+from models import Darknet, SoftDarknet
 from utils.pruning import create_mask_LTH, apply_mask_LTH
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, help='Path to load the model.', required=True)
+parser.add_argument('--model', type=str, help='Path to load the model.')
 parser.add_argument('--darknet', type=str, help='Architecture to create.', required=True)
 parser.add_argument('--cfg', type=str, help='args file to create the model.')
 parser.add_argument('--mask', type=str, default=None, help='Path to load the mask, if existis.')
@@ -26,13 +26,13 @@ elif args['darknet'] == 'soft':
     model.ticket = True
     _ = model(x)
 
-
-checkpoint = torch.load(args['model'], map_location=device)
-try:
-    model.load_state_dict(checkpoint['model'])
-except:
-    print("model key don't found in checkpoint. Trying without model key")
-    model.load_state_dict(checkpoint)
+if args['model']:
+    checkpoint = torch.load(args['model'], map_location=device)
+    try:
+        model.load_state_dict(checkpoint['model'])
+    except:
+        print("model key don't found in checkpoint. Trying without model key")
+        model.load_state_dict(checkpoint)
 
 if (args['mask'] or args['embbed']):
     mask = create_mask_LTH(model)
