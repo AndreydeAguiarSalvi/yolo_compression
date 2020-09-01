@@ -199,16 +199,16 @@ def train():
                 
                 # Discriminate the real data
                 real_data_discrimination = D_models(fts_tch)
-                for output in real_data_discrimination: D_x += output.mean().item() /3.
+                for output in real_data_discrimination: D_x += output.mean().item() / 3.
                 # Discriminate the fake data
                 fake_data_discrimination = D_models([x.detach() for x in fts_std])
                 for output in fake_data_discrimination: D_g_z1 += output.mean().item() / 3.
                 
                 # Compute loss
                 for x in real_data_discrimination:
-                    D_loss_real += GAN_criterion(x, real_data_label)
+                    D_loss_real += GAN_criterion(x.view(-1), real_data_label)
                 for x in fake_data_discrimination:
-                    D_loss_fake += GAN_criterion(x, fake_data_label)
+                    D_loss_fake += GAN_criterion(x.view(-1), fake_data_label)
 
                 # Scale loss by nominal batch_size of 64
                 D_loss_real *= batch_size / 64
@@ -234,7 +234,7 @@ def train():
                 
                 # Compute loss
                 for x in fake_data_discrimination:
-                    G_loss += GAN_criterion(x, real_data_label) # fake labels are real for generator cost
+                    G_loss += GAN_criterion(x.view(-1), real_data_label) # fake labels are real for generator cost
                 obj_detec_loss, loss_items = ft([.0]), ft([.0, .0, .0, .0])
                 
                 # Scale loss by nominal batch_size of 64
