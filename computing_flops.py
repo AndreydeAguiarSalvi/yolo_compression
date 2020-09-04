@@ -1,7 +1,7 @@
 import torch
 import argparse
 from thop import profile
-from models import Darknet, SoftDarknet
+from models import *
 from utils.pruning import create_mask_LTH, apply_mask_LTH
 
 

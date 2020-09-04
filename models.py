@@ -525,6 +525,53 @@ def attempt_download(weights):
             raise Exception(msg)
 
 
+class SparseYOLO(nn.Module):
+    # YOLOv3 with sparse convolutions
+
+    def __init__(self, pruned_yolo):
+        super(SparseYOLO, self).__init__()
+
+        self.module_defs = pruned_yolo.module_defs
+        self.create_module_list(pruned_yolo)
+        self.yolo_layers = pruned_yolo.yolo_layers
+
+        # Darknet Header https://github.com/AlexeyAB/darknet/issues/2914#issuecomment-496675346
+        self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
+        self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
+        self.verbose = False
+
+    def fuse(self):
+        # Fuse Conv2d + BatchNorm2d layers throughout model
+        print('Fusing layers...')
+        fused_list = nn.ModuleList()
+        for a in list(self.children())[0]:
+            if isinstance(a, nn.Sequential):
+                for i, b in enumerate(a):
+                    if isinstance(b, nn.modules.batchnorm.BatchNorm2d):
+                        # fuse this bn layer with the previous conv2d layer
+                        conv = a[i - 1]
+                        fused = torch_utils.fuse_conv_and_bn(conv, b)
+                        a = nn.Sequential(fused, *list(a.children())[i + 1:])
+                        break
+            fused_list.append(a)
+        self.module_list = fused_list
+        self.info() if not ONNX_EXPORT else None  # yolov3-spp reduced from 225 to 152 layers
+
+    def info(self, verbose=False):
+        torch_utils.model_info(self, verbose)
+    
+    def create_module_list(self, pruned_yolo):
+        self.module_list = nn.ModuleList()
+
+        for module in pruned_yolo.module_list:
+            my_module = deepcopy(module)
+            if type(my_module) is nn.Sequential:
+                my_module[0] = SparseConv(my_module[0])
+            self.module_list.append(my_module)
+        
+        self.routs = pruned_yolo.routs
+
+
 class MaskedNet(nn.Module):
     def __init__(self):
         super(MaskedNet, self).__init__()
