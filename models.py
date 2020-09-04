@@ -87,33 +87,30 @@ def create_modules(module_defs, img_size, arc):
             x = mdef['x']
             stride = mdef['stride']
             act = mdef['activation']
-            modules.add_module('PEP', PEP(
+            modules = PEP(
                     input_channels=output_filters[-1],
                     output_channels=filters,
                     x=x, stride=stride, activation=act
                 )
-            )
         
         elif mdef['type'] == 'EP':
             filters = mdef['filters']
             stride = mdef['stride']
             act = mdef['activation']
-            modules.add_module('EP', EP(
+            modules = EP(
                     input_channels=output_filters[-1],
                     output_channels=filters,
                     stride=stride, activation=act
                 )
-            )
 
         elif mdef['type'] == 'FCA':
             red = mdef['reduction']
             act = mdef['activation']
-            modules.add_module('FCA', FCA(
+            modules = FCA(
                     channels=output_filters[-1],
                     reduction_ratio=red,
                     activation=act
                 )
-            )
 
         elif mdef['type'] == 'mobile':
             filters = mdef['filters']
@@ -122,13 +119,12 @@ def create_modules(module_defs, img_size, arc):
             hidden = make_divisible(output_filters[-1] * mdef['expansion_ratio'], 8)
             act = mdef['activation']
             squeeze_and_excite = mdef['squeeze_excite']
-            modules.add_module('MobileBottleneck', MobileBottleneck(
+            modules = MobileBottleneck(
                     in_channels=output_filters[-1], hidden_dim=hidden,
                     out_channels=filters, kernel_size=size,
                     stride=stride, use_se=squeeze_and_excite, 
                     activation=act
                 )
-            )
 
         elif mdef['type'] == 'maxpool':
             size = mdef['size']
