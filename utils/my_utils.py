@@ -441,17 +441,18 @@ def load_checkpoints(config, model, optimizer, device, try_download_function, da
                 "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
             raise KeyError(s) from e
 
-        # load optimizer
-        if chkpt['optimizer'] is not None:
-            optimizer.load_state_dict(chkpt['optimizer'])
-            best_fitness = chkpt['best_fitness']
+        if config['resume']:
+            # load optimizer
+            if chkpt['optimizer'] is not None:
+                optimizer.load_state_dict(chkpt['optimizer'])
+                best_fitness = chkpt['best_fitness']
 
-        # load results
-        if chkpt.get('training_results') is not None:
-            with open(config['results_file'], 'w') as file:
-                file.write(chkpt['training_results'])  # write results.txt
+            # load results
+            if chkpt.get('training_results') is not None:
+                with open(config['results_file'], 'w') as file:
+                    file.write(chkpt['training_results'])  # write results.txt
 
-        start_epoch = chkpt['epoch'] + 1
+            start_epoch = chkpt['epoch'] + 1
         del chkpt
         torch.cuda.empty_cache()
 
@@ -488,22 +489,23 @@ def load_checkpoints_mask(config, model, mask, optimizer, device, try_download_f
         except:
             print('Mask not found')
 
-        # load optimizer
-        if chkpt['optimizer'] is not None:
-            optimizer.load_state_dict(chkpt['optimizer'])
-            best_fitness = chkpt['best_fitness']
+        if config['resume']:
+            # load optimizer
+            if chkpt['optimizer'] is not None:
+                optimizer.load_state_dict(chkpt['optimizer'])
+                best_fitness = chkpt['best_fitness']
 
-        # load results
-        if chkpt.get('training_results') is not None:
-            with open(config['results_file'], 'w') as file:
-                file.write(chkpt['training_results'])  # write results.txt
+            # load results
+            if chkpt.get('training_results') is not None:
+                with open(config['results_file'], 'w') as file:
+                    file.write(chkpt['training_results'])  # write results.txt
 
-        try:
-            start_iteration = chkpt['iteration']
-        except:
-            print('Iteration not found. initializin on 0')
-            start_iteration = 0
-        start_epoch = chkpt['epoch'] + 1
+            try:
+                start_iteration = chkpt['iteration']
+            except:
+                print('Iteration not found. initializin on 0')
+                start_iteration = 0
+            start_epoch = chkpt['epoch'] + 1
         del chkpt
         torch.cuda.empty_cache()
 
@@ -558,48 +560,49 @@ def load_kd_checkpoints(config, teacher, student, mask, another_model, optimizer
                 "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
             raise KeyError(s) from e
         
-        # load hint models
-        try:
-            if 'hint' in chkpt:
-                chkpt['hint'] = {k: v for k, v in chkpt['hint'].items() if another_model.state_dict()[k].numel() == v.numel()}
-                another_model.load_state_dict(chkpt['hint'], strict=False)
-            else: print('There is no Hint Layer to load')
-        except KeyError as e:
-            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
-                "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
-            raise KeyError(s) from e
+        if config['resume']:
+            # load hint models
+            try:
+                if 'hint' in chkpt:
+                    chkpt['hint'] = {k: v for k, v in chkpt['hint'].items() if another_model.state_dict()[k].numel() == v.numel()}
+                    another_model.load_state_dict(chkpt['hint'], strict=False)
+                else: print('There is no Hint Layer to load')
+            except KeyError as e:
+                s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                    "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
+                raise KeyError(s) from e
 
-        # load discriminators
-        try:
-            if 'D' in chkpt:
-                chkpt['D'] = {k: v for k, v in chkpt['D'].items() if another_model.state_dict()[k].numel() == v.numel()}
-                another_model.load_state_dict(chkpt['D'], strict=False)
-            else: print('There is no Discriminator to load')
-        except KeyError as e:
-            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
-                "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
-            raise KeyError(s) from e
+            # load discriminators
+            try:
+                if 'D' in chkpt:
+                    chkpt['D'] = {k: v for k, v in chkpt['D'].items() if another_model.state_dict()[k].numel() == v.numel()}
+                    another_model.load_state_dict(chkpt['D'], strict=False)
+                else: print('There is no Discriminator to load')
+            except KeyError as e:
+                s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                    "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
+                raise KeyError(s) from e
 
-        # load optimizer if is a normal KD
-        if 'optimizer' in chkpt and chkpt['optimizer']:
-            optimizer1.load_state_dict(chkpt['optimizer'])
-            best_fitness = chkpt['best_fitness']
-        
-        # load optimizer from generator
-        if 'G_optim' in chkpt and chkpt['G_optim']:
-            optimizer1.load_state_dict(chkpt['G_optim'])
-            best_fitness = chkpt['best_fitness']
-        
-        # load optimizer from discriminator
-        if 'D_optim' in chkpt and chkpt['D_optim']:
-            optimizer2.load_state_dict(chkpt['D_optim'])
+            # load optimizer if is a normal KD
+            if 'optimizer' in chkpt and chkpt['optimizer']:
+                optimizer1.load_state_dict(chkpt['optimizer'])
+                best_fitness = chkpt['best_fitness']
             
-        # load results
-        if chkpt.get('training_results') is not None:
-            with open(config['results_file'], 'w') as file:
-                file.write(chkpt['training_results'])  # write results.txt
+            # load optimizer from generator
+            if 'G_optim' in chkpt and chkpt['G_optim']:
+                optimizer1.load_state_dict(chkpt['G_optim'])
+                best_fitness = chkpt['best_fitness']
+            
+            # load optimizer from discriminator
+            if 'D_optim' in chkpt and chkpt['D_optim']:
+                optimizer2.load_state_dict(chkpt['D_optim'])
+                
+            # load results
+            if chkpt.get('training_results') is not None:
+                with open(config['results_file'], 'w') as file:
+                    file.write(chkpt['training_results'])  # write results.txt
 
-        start_epoch = chkpt['epoch'] + 1
+            start_epoch = chkpt['epoch'] + 1
         del chkpt
         torch.cuda.empty_cache()
 
