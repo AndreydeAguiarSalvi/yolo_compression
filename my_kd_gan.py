@@ -250,15 +250,17 @@ def train():
                 # Compute gradient
                 G_loss.backward()
 
-            else:
-                # Compute loss
-                obj_detec_loss, loss_items = compute_loss(pred_std, targets, student)
-        
-                # Scale loss by nominal batch_size of 64
-                obj_detec_loss *= batch_size / 64
+            
+            # Compute loss
+            obj_detec_loss, loss_items = compute_loss(pred_std, targets, student)
+    
+            # Scale loss by nominal batch_size of 64
+            obj_detec_loss *= batch_size / 64
 
-                # Compute gradient
-                obj_detec_loss.backward()
+            if epoch < config['second_stage']: obj_detec_loss *= .5
+
+            # Compute gradient
+            obj_detec_loss.backward()
 
             # Optimize accumulated gradient
             if ni % accumulate == 0:
