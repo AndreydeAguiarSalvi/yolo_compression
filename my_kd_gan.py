@@ -287,14 +287,15 @@ def train():
         D_scheduler.step()
         
         final_epoch = epoch + 1 == epochs
+        torch.cuda.empty_cache()
         if not config['notest'] or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and student.nc == 80
             results, maps = test.test(
-                cfg = config['cfg'], data = data, batch_size=int(batch_size/2),
+                cfg = config['cfg'], data = data, batch_size=1,
                 img_size=img_size_test, model=student, 
                 conf_thres=0.001,
                 iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
-                dataloader=validloader, folder = config['sub_working_dir']
+                dataloader=None, folder = config['sub_working_dir']
             )    
 
         # Write epoch results
