@@ -256,7 +256,7 @@ def train():
             # Scale loss by nominal batch_size of 64
             obj_detec_loss *= batch_size / 64
 
-            if epoch < config['second_stage']: obj_detec_loss *= .5
+            if epoch < config['second_stage']: obj_detec_loss *= .01
 
             # Compute gradient
             obj_detec_loss.backward()
@@ -267,7 +267,7 @@ def train():
                 G_optim.zero_grad()
 
             D_loss = D_loss_real + D_loss_fake
-            total_loss = obj_detec_loss + D_loss + G_loss
+            total_loss = obj_detec_loss + D_loss + G_loss + obj_detec_loss
             all_losses = torch.cat( [loss_items[:3], G_loss, D_loss, D_x, D_g_z1, D_g_z2, total_loss] ).detach() 
             if not torch.isfinite(total_loss):
                 print('WARNING: non-finite loss, ending training ', all_losses)
