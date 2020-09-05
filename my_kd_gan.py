@@ -235,14 +235,13 @@ def train():
             G_loss, D_g_z2 = ft([.0]), ft([.0])
             if epoch < config['second_stage']:
                 # Since we already update D, perform another forward with fake batch through D
-                fake_data_discrimination = D_models(fts_std)
+                fake_data_discrimination = D_models([x.detach() for x in fts_std])
                 for output in fake_data_discrimination: D_g_z2 += output.mean().item() / 3.
                 
                 # Compute loss
                 real_data_label = torch.ones(imgs.shape[0], device=device)
                 for x in fake_data_discrimination:
                     G_loss += GAN_criterion(x.view(-1), real_data_label) # fake labels are real for generator cost
-                obj_detec_loss, loss_items = ft([.0]), ft([.0, .0, .0, .0])
                 
                 # Scale loss by nominal batch_size of 64
                 G_loss *= batch_size / 64
@@ -291,11 +290,11 @@ def train():
         if not config['notest'] or final_epoch:  # Calculate mAP
             is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and student.nc == 80
             results, maps = test.test(
-                cfg = config['cfg'], data = data, batch_size=1,
+                cfg = config['cfg'], data = data, batch_size=int(batch_size/2),
                 img_size=img_size_test, model=student, 
-                conf_thres=0.1 if epoch < config['second_stage'] else 0.001,
+                conf_thres=0.001,
                 iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
-                dataloader=None, folder = config['sub_working_dir']
+                dataloader=validloader, folder = config['sub_working_dir']
             )    
 
         # Write epoch results
