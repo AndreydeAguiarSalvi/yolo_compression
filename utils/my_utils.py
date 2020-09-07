@@ -274,12 +274,14 @@ def create_config(opt):
         for i in range(len(folders) - 1):
             config['sub_working_dir'] += folders[i] + '/'
     else:
+        splits = config['cfg'].split(os.sep)
+        dataset = splits[1]
+        model = splits[2].split('.')[0]
+        size = 'multi_scale' if opt['multi_scale'] else opt['img_size'][0] if opt['img_size'] else config['img_size'][0]
         sub_working_dir = '{}/{}/size-{}/{}'.format(
             config['working_dir'],
-            config['cfg'].split('/')[2].split('.')[0],
-            config['img_size'][0] if opt['multi_scale'] is False and opt['img_size'] is None 
-                else 'multi_scale' if opt['multi_scale'] is True else opt['img_size'][0],
-
+            dataset + '_' + model,
+            size,
             '{}_{}_{}/{}_{}_{}/'.format(
                 time.strftime("%Y", time.localtime()),
                 time.strftime("%m", time.localtime()),
