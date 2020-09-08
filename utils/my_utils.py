@@ -377,7 +377,7 @@ def add_to_optimizer(opt, model, optimizer):
 def initialize_model(model, function):
     
     for name, param in model.named_parameters():
-        if 'BatchNorm2d' not in name and 'bias' not in name:
+        if len(param.shape) > 1 and 'mask' not in name: 
             function(param)
 
 
