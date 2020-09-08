@@ -30,6 +30,10 @@ def create_train_argparser():
     parser.add_argument('--lrf', type=float, help='final learning rate')
     parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
     parser.add_argument('--weight_decay', type=float, help='weight decay for pg1 parameters')
+    parser.add_argument('--degrees', type=float, help='image rotation (+/- deg). Default = 1.98')
+    parser.add_argument('--translate', type=float, help='image translation (+/- fraction). Default = 0.05')
+    parser.add_argument('--scale', type=float, help='image scale (+/- gain). Default = 0.05')
+    parser.add_argument('--shear', type=float, help='image shear (+/- deg). Default = 0.641')
     # My additioned parameters
     parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
     parser.add_argument('--decay_steps', type=str)
@@ -104,6 +108,10 @@ def create_prune_argparser():
     parser.add_argument('--lrf', type=float, help='final learning rate')
     parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
     parser.add_argument('--weight_decay', type=float, help='weight decay for pg1 parameters')
+    parser.add_argument('--degrees', type=float, help='image rotation (+/- deg). Default = 1.98')
+    parser.add_argument('--translate', type=float, help='image translation (+/- fraction). Default = 0.05')
+    parser.add_argument('--scale', type=float, help='image scale (+/- gain). Default = 0.05')
+    parser.add_argument('--shear', type=float, help='image shear (+/- deg). Default = 0.641')
     # My additioned parameters
     parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
     parser.add_argument('--decay_steps', type=str)
@@ -165,6 +173,10 @@ def create_kd_argparser():
     parser.add_argument('--lrf', type=float, help='final learning rate')
     parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
     parser.add_argument('--weight_decay', type=float, help='weight decay for pg1 parameters')
+    parser.add_argument('--degrees', type=float, help='image rotation (+/- deg). Default = 1.98')
+    parser.add_argument('--translate', type=float, help='image translation (+/- fraction). Default = 0.05')
+    parser.add_argument('--scale', type=float, help='image scale (+/- gain). Default = 0.05')
+    parser.add_argument('--shear', type=float, help='image shear (+/- deg). Default = 0.641')
     # My additioned parameters
     parser.add_argument('--scheduler', type=str, help='kind of learning rate scheduler')
     parser.add_argument('--decay_steps', type=str)
@@ -314,7 +326,7 @@ def create_scheduler(opt, optimizer, start_epoch):
         if opt['exponential_ramp']:
             lf = lambda x: 10 ** (opt['hyp']['lrf'] * x / opt['epochs'])  # exp ramp
         elif opt['cosine_ramp']:
-            lf = lambda x: (1 + math.cos(x * math.pi / opt['epochs'])) / 2 * 0.99 + 0.01  # cosine https://arxiv.org/pdf/1812.01187.pdf
+            lf = lambda x: (((1 + math.cos(x * math.pi / opt['epochs'])) / 2) ** 1.0) * 0.95 + 0.05  # cosine https://arxiv.org/pdf/1812.01187.pdf
         else:
             lf = lambda x: 1 - 10 ** (opt['hyp']['lrf'] * (1 - x / opt['epochs']))  # inverse exp ramp
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
