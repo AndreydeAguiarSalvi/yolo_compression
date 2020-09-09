@@ -80,6 +80,8 @@ def train():
     ###################
     for it in range(start_iteration, config['iterations']):
         
+        config['last'] = config['sub_working_dir'] + 'last_it_{}.pt'.format(it)
+        config['best'] = config['sub_working_dir'] + 'best_it_{}.pt'.format(it)
         max_wo_best = 0
         ###############
         # Start epoch #
@@ -222,7 +224,7 @@ def train():
                 max_wo_best = 0
             else:
                 max_wo_best += 1
-                if max_wo_best == 15: print('Ending training due to early stop')
+                if max_wo_best == 25: print('Ending training due to early stop')
 
             # Save training results
             save = (not config['nosave']) or (final_epoch and not config['evolve'])
@@ -249,7 +251,7 @@ def train():
                 del chkpt
                 torch.cuda.empty_cache()
 
-            if max_wo_best == 15: break
+            if max_wo_best == 25: break
         #############
         # End epoch #
         #############
@@ -280,6 +282,7 @@ def train():
 
         optimizer = create_optimizer(model, config)
         start_epoch = 0
+        best_fitness = .0
         scheduler = create_scheduler(config, optimizer, start_epoch)
     #################
     # End Iteration #
@@ -323,8 +326,8 @@ if __name__ == '__main__':
         json.dump(config, f)
     f.close()
 
-    config['last'] = config['sub_working_dir'] + 'last.pt'
-    config['best'] = config['sub_working_dir'] + 'best.pt'
+    config['last'] = config['weights'] if 'last' in config['weights'] else config['sub_working_dir'] + 'last.pt'
+    config['best'] = config['weights'].replace('last', 'best') if 'last' in config['weights'] else config['sub_working_dir'] + 'best.pt'
     config['results_file'] = config['sub_working_dir'] + 'results.txt'
     config['weights'] = config['last'] if config['resume'] else config['weights']
 
