@@ -26,6 +26,10 @@ def create_train_argparser():
     parser.add_argument('--single_cls', action='store_true', help='train as single-class dataset')
     parser.add_argument('--var', type=float, help='debug variable')
     # hyp parameters
+    parser.add_argument('giou', type=float, default=3.54, help='GIoU gain loss')
+    parser.add_argument('obj', type=float, default=64.3, help='obj loss gain (*=img_size/320 if img_size != 320)')
+    parser.add_argument('cls', type=float, default=37.4, help='cls loss gain')
+    parser.add_argument('iou_t', type=float, default=0.225, help='IoU training threshold')
     parser.add_argument('--lr0', type=float, help='initial learning rate')
     parser.add_argument('--lrf', type=float, help='final learning rate')
     parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
@@ -105,6 +109,10 @@ def create_prune_argparser():
     parser.add_argument('--device', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
     # hyp parameters
+    parser.add_argument('giou', type=float, default=3.54, help='GIoU gain loss')
+    parser.add_argument('obj', type=float, default=64.3, help='obj loss gain (*=img_size/320 if img_size != 320)')
+    parser.add_argument('cls', type=float, default=37.4, help='cls loss gain')
+    parser.add_argument('iou_t', type=float, default=0.225, help='IoU training threshold')
     parser.add_argument('--lr0', type=float, help='initial learning rate')
     parser.add_argument('--lrf', type=float, help='final learning rate')
     parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
@@ -171,6 +179,10 @@ def create_kd_argparser():
     parser.add_argument('--device', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--adam', action='store_true', help='use adam optimizer')
     # hyp parameters
+    parser.add_argument('giou', type=float, default=3.54, help='GIoU gain loss')
+    parser.add_argument('obj', type=float, default=64.3, help='obj loss gain (*=img_size/320 if img_size != 320)')
+    parser.add_argument('cls', type=float, default=37.4, help='cls loss gain')
+    parser.add_argument('iou_t', type=float, default=0.225, help='IoU training threshold')
     parser.add_argument('--lr0', type=float, help='initial learning rate')
     parser.add_argument('--lrf', type=float, help='final learning rate')
     parser.add_argument('--momentum', type=float, help='momentum to Stochastic Gradient Descendent')
