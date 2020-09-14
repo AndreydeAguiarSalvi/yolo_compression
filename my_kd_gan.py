@@ -256,7 +256,7 @@ def train():
             # Scale loss by nominal batch_size of 64
             obj_detec_loss *= batch_size / 64
 
-            if epoch < config['second_stage']: obj_detec_loss *= .01
+            if epoch < config['second_stage']: obj_detec_loss *= .05
 
             # Compute gradient
             obj_detec_loss.backward()
