@@ -451,6 +451,33 @@ def create_dataloaders(config):
     return trainloader, validloader
 
 
+def guarantee_test(model, config, device, cfg, data, batch_size, img_size_test, validloader, final_epoch, test_function):
+    import torch
+    torch.cuda.empty_cache()
+
+    is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
+    try:
+        results, maps = test_function(
+            cfg = cfg, data = data, batch_size=batch_size,
+            img_size=img_size_test, model=model, 
+            conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
+            iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
+            dataloader=validloader, folder = config['sub_working_dir']
+        )
+    except:
+        model.to('cpu')
+        results, maps = test_function(
+            cfg = cfg, data = data, batch_size=batch_size,
+            img_size=img_size_test, model=model, 
+            conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
+            iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
+            dataloader=None, folder = config['sub_working_dir']
+        )
+        model.to(device)
+    
+    return results, maps
+
+
 def load_checkpoints(config, model, optimizer, device, try_download_function, darknet_load_function):
     import torch
     

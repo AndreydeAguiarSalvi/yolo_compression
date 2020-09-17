@@ -7,7 +7,7 @@ import test  # import test.py to get mAP after each epoch
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints_mask
+from utils.my_utils import create_prune_argparser, create_config, create_scheduler, create_optimizer, initialize_model, create_dataloaders, load_checkpoints_mask, guarantee_test
 from utils.pruning import sum_of_the_weights
 
 mixed_precision = True
@@ -144,13 +144,10 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
 
         final_epoch = epoch + 1 == config['epochs']
         if not config['notest'] or final_epoch:  # Calculate mAP
-            is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
-            results, maps = test.test(
-                cfg = cfg, data = data, batch_size=batch_size,
-                img_size=img_size_test, model=model, 
-                conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
-                iou_thres=0.6, save_json=final_epoch and is_coco,
-                dataloader=validloader, folder = config['sub_working_dir']
+            results, maps = guarantee_test(
+                model, config, device, cfg, data,
+                batch_size, img_size_test, validloader,
+                final_epoch, test.test
             )    
 
         # Write epoch results
