@@ -45,8 +45,10 @@ def apply_mask_LTH(model, mask):
 def create_mask_LTH(model): # Create mask as Lottery Tickets Hypothesis
     from collections import OrderedDict
     mask = OrderedDict()
+    nc = (model.module_defs[-1]['classes'] + 5) * 3
     for name, param in model.named_parameters():
-        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
+        if 'PEP' not in name and param.shape[0] == nc: pass # not create mask of last layer
+        elif 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
             name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
             mask[name_] = nn.Parameter( torch.ones_like(param), requires_grad = False )
 

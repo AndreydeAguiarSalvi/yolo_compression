@@ -29,6 +29,7 @@ def train(iteration, best_fitness, prebias, trainloader, validloader, config, sc
     config['last'] = config['sub_working_dir'] + 'last_it_{}.pt'.format(iteration)
     config['best'] = config['sub_working_dir'] + 'best_it_{}.pt'.format(iteration)
     max_wo_best = 0
+    global img_size
     ###############
     # Start epoch #
     ###############
@@ -306,6 +307,7 @@ if __name__ == '__main__':
     nb = len(trainloader)
     prebias = start_epoch == 0
     model.nc = nc  # attach number of classes to model
+    config['single_cls'] = nc == 1
     model.arc = config['arc']  # attach yolo architecture
     model.hyp = config['hyp']  # attach hyperparameters to model
     model.class_weights = labels_to_class_weights(trainloader.dataset.labels, nc).to(device)  # attach class weights
