@@ -291,9 +291,9 @@ def create_config(opt):
     # Create sub_working_dir
     if opt['resume']:
         if 'student_weights' in config:
-            if config['student_weights']: folders = config['student_weights'].split('/')
+            if config['student_weights']: folders = config['student_weights'].split(os.sep)
         else: 
-            if config['weights']: folders = config['weights'].split('/')
+            if config['weights']: folders = config['weights'].split(os.sep)
             else:
                 print("No weights right to resume")
                 exit()
@@ -301,13 +301,21 @@ def create_config(opt):
         for i in range(len(folders) - 1):
             config['sub_working_dir'] += folders[i] + '/'
     else:
-        splits = config['cfg'].split(os.sep)
-        dataset = splits[1]
-        model = splits[2].split('.')[0]
-        size = 'multi_scale' if opt['multi_scale'] else opt['img_size'][0] if opt['img_size'] else config['img_size'][0]
+        dataset, method, model, size = '', '', '', ''
+        
+        if 'coco' in config['data']: dataset = 'coco'
+        elif 'voc' in config['data']: dataset = 'pascal'
+        elif 'ExDark' in config['data']: dataset = 'exdark'
+
+        train_method = config['params'].split(os.sep)[-1].split('.')
+        if 'default' == train_method: method = 'train'
+        else: method = train_method
+
+        size = 'multi_scale' if config['multi_scale'] else config['img_size'][0]
+
         sub_working_dir = '{}/{}/size-{}/{}'.format(
             config['working_dir'],
-            dataset + '_' + model,
+            dataset + '_' + model + '_' + method,
             size,
             '{}_{}_{}/{}_{}_{}/'.format(
                 time.strftime("%Y", time.localtime()),

@@ -7,7 +7,6 @@ hyp :
     cls_function: softmax
     giou_reg_loss: True
 
-cfg: cfg/pascal/Guobin_KD.cfg
 weights: ''
 arc : ''
 darknet : ''

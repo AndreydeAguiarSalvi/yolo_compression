@@ -3,7 +3,6 @@ hyp :
     Dlr0 : 0.01
     lr0 : 0.01
 
-cfg: cfg/pascal/KD_GAN.cfg
 weights: ''
 arc : ''
 darknet : ''
