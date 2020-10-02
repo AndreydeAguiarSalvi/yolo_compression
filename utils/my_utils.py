@@ -307,7 +307,7 @@ def create_config(opt):
         elif 'voc' in config['data']: dataset = 'pascal'
         elif 'ExDark' in config['data']: dataset = 'exdark'
 
-        train_method = config['params'].split(os.sep)[-1].split('.')
+        train_method = config['params'].split(os.sep)[-1].split('.')[0]
         if 'default' == train_method: method = 'train'
         else: method = train_method
 
