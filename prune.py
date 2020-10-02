@@ -189,8 +189,8 @@ def train():
             final_epoch = epoch + 1 == epochs
             if not config['notest'] or final_epoch:  # Calculate mAP
                 results, maps = guarantee_test(
-                    model, config, device, cfg, data,
-                    batch_size, img_size_test, validloader,
+                    model, config, device, cfg, config['data'],
+                    config['batch_size'], img_size_test, validloader,
                     final_epoch, test.test
                 )
 
