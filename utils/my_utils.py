@@ -311,6 +311,10 @@ def create_config(opt):
         if 'default' == train_method: method = 'train'
         else: method = train_method
 
+        if config['student_cfg']:
+            model = config['student_cfg'].split(os.sep)[-1].split('.')[0]
+        else: model = config['cfg'].split(os.sep)[-1].split('.')[0]
+
         size = 'multi_scale' if config['multi_scale'] else config['img_size'][0]
 
         sub_working_dir = '{}/{}/size-{}/{}'.format(
