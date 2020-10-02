@@ -64,6 +64,7 @@ def train():
     nb = len(trainloader)
     prebias = start_epoch == 0
     model.nc = nc  # attach number of classes to model
+    config['single_cls'] = nc == 1
     model.arc = config['arc']  # attach yolo architecture
     model.hyp = config['hyp']  # attach hyperparameters to model
     model.class_weights = labels_to_class_weights(trainloader.dataset.labels, nc).to(device)  # attach class weights
