@@ -311,7 +311,7 @@ def create_config(opt):
         if 'default' == train_method: method = 'train'
         else: method = train_method
 
-        if config['student_cfg']:
+        if 'student_cfg' in config:
             model = config['student_cfg'].split(os.sep)[-1].split('.')[0]
         else: model = config['cfg'].split(os.sep)[-1].split('.')[0]
 
