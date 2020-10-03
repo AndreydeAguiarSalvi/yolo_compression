@@ -56,8 +56,10 @@ def create_mask_LTH(model): # Create mask as Lottery Tickets Hypothesis
 
 
 def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets Hypothesis locally
+    nc = (model.module_defs[-1]['classes'] + 5) * 3
     for name, param in model.named_parameters():
-        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
+        conv_before_yolo = 'PEP' not in name and param.shape[0] == nc
+        if not conv_before_yolo and 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
             name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
             # Locally number of neurons to be prunned
             n_pruned_neurons = math.floor(torch.sum(mask[name_]) * percentage_of_pruning)
@@ -78,8 +80,10 @@ def IMP_LOCAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets 
 
 def IMP_GLOBAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets Hypothesis globally
     valid_values = torch.Tensor(0).cuda()
+    nc = (model.module_defs[-1]['classes'] + 5) * 3
     for name, param in model.named_parameters():
-        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
+        conv_before_yolo = 'PEP' not in name and param.shape[0] == nc
+        if not conv_before_yolo and 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
             name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
             # Getting all the available values to possibly be pruned
             valid_values = torch.cat( ( valid_values, torch.masked_select(param, mask[name_].data.byte()) ) )
@@ -94,7 +98,8 @@ def IMP_GLOBAL(model, mask, percentage_of_pruning): # Implements Lottery Tickets
     higher_of_smallest = smallest_values.values[-1]
 
     for name, param in model.named_parameters():
-        if 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
+        conv_before_yolo = 'PEP' not in name and param.shape[0] == nc
+        if not conv_before_yolo and 'bias' not in name and 'bn' not in name and 'BatchNorm' not in name:
             name_ = name.replace('.', '-') # ParameterDict and ModuleDict does not allows '.' as key
             # Create the new mask
             with torch.no_grad():
