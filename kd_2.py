@@ -203,7 +203,7 @@ def train():
 
                             targets_tch = torch.cat([targets_tch, l])
 
-                targets_tch.to(device)
+                targets_tch = targets_tch.to(device)
                 
             # Run student
             pred_std, fts_std = student(imgs, config['student_indexes'])
