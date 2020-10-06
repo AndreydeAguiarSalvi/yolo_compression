@@ -112,7 +112,7 @@ def train():
     teacher.arc = config['teacher_arc']
 
     student.hyp = config['hyp']  # attach hyperparameters to student
-    mu = torch.cuda.FloatTensor(config['hyp']['mu']) # mu variable to weight the hard and soft lreg, lcls and lconf
+    mu = torch.cuda.FloatTensor([config['hyp']['mu']]) # mu variable to weight the hard and soft lreg, lcls and lconf
     
     student.class_weights = labels_to_class_weights(trainloader.dataset.labels, nc).to(device)  # attach class weights
     teacher.class_weights = student.class_weights
