@@ -186,12 +186,23 @@ def train():
                 inf_out, _, fts_tch = teacher(imgs, config['teacher_indexes'])
                 bboxes_tch = non_max_suppression(inf_out, conf_thres=.3, iou_thres=0.6)
                 targets_tch = torch.Tensor()
-                for i, *xyxy, _, cls_tch in enumerate(bboxes_tch):
-                    l = torch.Tensor([len(xyxy, 6)])
-                    l[:, 0] = i
-                    l[:, 1] = cls_tch
-                    l[:, 2:] = xyxy
-                    torch.cat([targets_tch, l])
+                # creating labels from teacher outputs
+                for i, detections in enumerate(bboxes_tch): # a list of detections per image
+                    if detections is not None and len(detections): 
+                        for *xyxy, _, cls_tch in detections: # ignoring the confidence
+                            xyxy = torch.Tensor(xyxy)
+                            if len(xyxy.shape) == 1: xyxy = xyxy.view(-1, *xyxy.shape)
+                            l = torch.Tensor(len(xyxy), 6)
+                            # the boxes are unormalized. If not multi_scale, width != height
+                            xyxy[:, (0, 2)] /= imgs.shape[2]
+                            xyxy[:, (1, 3)] /= imgs.shape[3]
+
+                            l[:, 0] = i # the i-th image
+                            l[:, 1] = cls_tch # classes
+                            l[:, 2:] = xyxy2xywh(xyxy) # bboxes in darknet format
+
+                            targets_tch = torch.cat([targets_tch, l])
+
                 targets_tch.to(device)
                 
             # Run student
