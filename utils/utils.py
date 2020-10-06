@@ -345,7 +345,7 @@ class FocalLoss(nn.Module):
             return loss
 
 
-def compute_loss(p, targets, model):  # predictions, targets, model
+def compute_loss(p, targets, model, no_detach=False):  # predictions, targets, model
     ft = torch.cuda.FloatTensor if p[0].is_cuda else torch.Tensor
     lcls, lbox, lobj = ft([0]), ft([0]), ft([0])
     tcls, tbox, indices, anchor_vec = build_targets(model, targets)
@@ -433,6 +433,7 @@ def compute_loss(p, targets, model):  # predictions, targets, model
             lcls *= 3 / ng / model.nc
             lbox *= 3 / ng
 
+    if no_detach: return lbox, lobj, lcls
     loss = lbox + lobj + lcls
     return loss, torch.cat((lbox, lobj, lcls, loss)).detach()
 
