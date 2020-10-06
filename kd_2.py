@@ -8,7 +8,7 @@ import torch.nn as nn
 from models import *
 from utils.datasets import *
 from utils.utils import *
-from utils.my_utils import create_kd_argparser, create_config, create_scheduler, create_optimizer, add_to_optimizer, initialize_model, create_dataloaders, load_kd_checkpoints
+from utils.my_utils import create_kd_argparser, create_config, create_scheduler, create_optimizer, add_to_optimizer, initialize_model, create_dataloaders, load_kd_checkpoints, guarantee_test
 from utils.pruning import create_mask_LTH, apply_mask_LTH
 
 mixed_precision = True
@@ -38,6 +38,7 @@ def train():
     train_path = data_dict['train']
     test_path = data_dict['valid']
     nc = int(data_dict['classes'])  # number of classes
+    config['single_cls'] = nc == 1
 
     # Initialize Teacher
     if config['teacher_darknet'] == 'default':
@@ -259,15 +260,11 @@ def train():
         scheduler.step()
         
         final_epoch = epoch + 1 == epochs
-        torch.cuda.empty_cache()
         if not config['notest'] or final_epoch:  # Calculate mAP
-            is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and student.nc == 80
-            results, maps = test.test(
-                cfg = config['cfg'], data = data, batch_size=int(batch_size/2),
-                img_size=img_size_test, model=student, 
-                conf_thres=0.001,  # 0.001 if opt.evolve or (final_epoch and is_coco) else 0.01,
-                iou_thres=0.6, save_json=final_epoch and is_coco, single_cls=config['single_cls'],
-                dataloader=None, folder = config['sub_working_dir']
+            results, maps = guarantee_test(
+                student, config, device, config['cfg'], data,
+                batch_size, img_size_test, validloader,
+                final_epoch, test.test
             )    
 
         # Write epoch results
