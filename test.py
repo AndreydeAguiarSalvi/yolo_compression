@@ -129,11 +129,11 @@ def test(cfg,
             try:
                 output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres)
             except:
-                inf_out.to('cpu')
+                inf_out = inf_out.to('cpu')
                 output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres)
                 for e in output: 
                     if isinstance(e, torch.tensor): e.to(device)
-                output.to(device)
+                output = output.to(device)
             t1 += torch_utils.time_synchronized() - t
 
         # Statistics per image
