@@ -262,12 +262,14 @@ def train():
         final_epoch = epoch + 1 == epochs
         if not config['notest'] or final_epoch:  # Calculate mAP
             teacher = teacher.to('cpu')
+            hint_models = hint_models.to('cpu')
             results, maps = guarantee_test(
                 student, config, device, config['cfg'], data,
                 batch_size, img_size_test, validloader,
                 final_epoch, test.test
             )
             teacher = teacher.to(device)
+            hint_models = hint_models.to(device)
 
         # Write epoch results
         with open(config['results_file'], 'a') as f:
