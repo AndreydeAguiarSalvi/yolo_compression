@@ -465,10 +465,10 @@ def create_dataloaders(config):
 
 def guarantee_test(model, config, device, cfg, data, batch_size, img_size_test, validloader, final_epoch, test_function):
     import torch
-    torch.cuda.empty_cache()
-
     is_coco = any([x in data for x in ['coco.data', 'coco2014.data', 'coco2017.data']]) and model.nc == 80
+
     try:
+        torch.cuda.empty_cache()
         results, maps = test_function(
             cfg = cfg, data = data, batch_size=batch_size,
             img_size=img_size_test, model=model, 
@@ -478,6 +478,7 @@ def guarantee_test(model, config, device, cfg, data, batch_size, img_size_test, 
         )
     except:
         try:
+            torch.cuda.empty_cache()
             results, maps = test_function(
                 cfg = cfg, data = data, batch_size=1,
                 img_size=img_size_test, model=model, 
