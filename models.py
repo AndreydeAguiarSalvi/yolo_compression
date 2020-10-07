@@ -721,9 +721,6 @@ class HintModel(nn.Module):
             y.append(module(x))
         return y
 
-    def to(self, device):
-        for module in self.hint_layers: module = module.to(device)
-        
 
 class Discriminator(nn.Module):
 
