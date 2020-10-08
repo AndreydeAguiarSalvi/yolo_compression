@@ -126,12 +126,7 @@ def test(cfg,
 
             # Run NMS
             t = torch_utils.time_synchronized()
-            try:
-                output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres)
-            except:
-                inf_out = inf_out.to('cpu')
-                output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres)
-                for i in range(len(output)): output[i] = output[i].to(device)
+            output = non_max_suppression(inf_out, conf_thres=conf_thres, iou_thres=iou_thres)
             t1 += torch_utils.time_synchronized() - t
 
         # Statistics per image
