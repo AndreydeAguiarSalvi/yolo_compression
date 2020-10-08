@@ -225,7 +225,7 @@ def train():
             lhint = torch.cuda.FloatTensor([.0])
             for (hint, guided) in zip(fts_tch, fts_guided):
                 lhint += HINT(guided, hint) # Equation 6
-            loss = lbox + lcls + lcls + lhint
+            loss = lbox + lobj + lcls + lhint
             loss_items = torch.cat((lbox, lobj, lcls, lhint, loss)).detach()
 
             if not torch.isfinite(loss):
