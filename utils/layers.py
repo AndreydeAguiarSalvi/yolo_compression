@@ -476,6 +476,24 @@ def make_divisible(v, divisor, min_value=None):
     return new_v
 
 
+class h_sigmoid(nn.Module):
+    def __init__(self, inplace=True):
+        super(h_sigmoid, self).__init__()
+        self.relu = nn.ReLU6(inplace=inplace)
+
+    def forward(self, x):
+        return self.relu(x + 3) / 6
+
+
+class h_swish(nn.Module):
+    def __init__(self, inplace=True):
+        super(h_swish, self).__init__()
+        self.sigmoid = h_sigmoid(inplace=inplace)
+
+    def forward(self, x):
+        return x * self.sigmoid(x)
+
+
 class SELayer(nn.Module):
     def __init__(self, channel, reduction=4):
         super(SELayer, self).__init__()
@@ -504,7 +522,7 @@ class MobileBottleneck(nn.Module):
         if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
         if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
         elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-        elif activation == 'swish': act_ftn = Swish()
+        elif activation == 'swish': act_ftn = h_swish()
         assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
 
         if in_channels == hidden_dim:
