@@ -51,12 +51,14 @@ def train():
         student = SoftDarknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     # Create Hint Layers
     hint_models = None
-    if len(config['teacher_indexes']):
+    if len(config['teacher_indexes']) and len(config['teacher_indexes']) == len(config['student_indexes']):
         hint_models = HintModel(config, teacher, student).to(device)
+    else:
+        print(f"Erro with teacher and student indexes\nTeacher: {config['teacher_indexes']}\tStudent: {config['student_indexes']}")
+        exit()
     
     optimizer = create_optimizer(student, config)
-    if len(config['teacher_indexes']):
-        add_to_optimizer(config, hint_models, optimizer)        
+    add_to_optimizer(config, hint_models, optimizer)        
 
     mask = None
     if ('mask' in config and config['mask']) or ('mask_path' in config and config['mask_path']):
@@ -158,7 +160,6 @@ def train():
         # Start mini-batch #
         ####################
         for i, (imgs, targets, paths, _) in pbar: 
-        # for i, (imgs, targets, paths, _) in enumerate(trainloader): 
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
             targets = targets.to(device)
@@ -181,22 +182,16 @@ def train():
 
             # Run teacher
             with torch.no_grad():
-                if len(config['teacher_indexes']):
-                    pred_tch, fts_tch = teacher(imgs, config['teacher_indexes'])
-                else: pred_tch = teacher(imgs)
+                pred_tch, fts_tch = teacher(imgs, config['teacher_indexes'])
+                
             # Run student
-            if len(config['student_indexes']):
-                pred_std, fts_std = student(imgs, config['student_indexes'])
-            else: pred_std = student(imgs)
+            pred_std, fts_std = student(imgs, config['student_indexes'])
 
-            if len(config['teacher_indexes']):
-                fts_guided = hint_models(fts_std)
+            # Run hint layers
+            fts_guided = hint_models(fts_std)
 
             # Compute loss
-            if len(config['teacher_indexes']):
-                loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, fts_tch, fts_guided, teacher, student)
-            else:
-                loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, [], [], teacher, student)
+            loss, loss_items = compute_kd_loss(pred_tch, pred_std, targets, fts_tch, fts_guided, teacher, student)
             if not torch.isfinite(loss):
                 print('WARNING: non-finite loss, ending training ', loss_items)
                 return results

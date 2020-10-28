@@ -185,7 +185,7 @@ def train():
             # Run teacher
             with torch.no_grad():
                 inf_out, _, fts_tch = teacher(imgs, config['teacher_indexes'])
-                bboxes_tch = non_max_suppression(inf_out, conf_thres=.3, iou_thres=0.6)
+                bboxes_tch = non_max_suppression(inf_out, conf_thres=.1, iou_thres=0.6)
                 targets_tch = torch.Tensor()
                 # creating labels from teacher outputs
                 for i, detections in enumerate(bboxes_tch): # a list of detections per image
