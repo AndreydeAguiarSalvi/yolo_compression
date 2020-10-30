@@ -505,7 +505,7 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
             if h['giou_reg_loss']:
                 lgiou_s = (1. - giou_s).mean()
                 lgiou_t = (1. - giou_t).mean()
-                lbox_hard += lgiou_s if lgiou_s + margin > lgiou_t else .0
+                lbox_hard += lgiou_s if lgiou_s + margin > lgiou_t else ft([0])
             else:
                 lreg_s = L2(pbox_s.t(), tbox_s[i].t())
                 lreg_t = L2(pbox_t.t(), tbox_t[i].t())
@@ -522,7 +522,7 @@ def compute_kd_loss(p_teacher, p_student, targets, fts_hint, fts_guided, model_t
                 # w_c: class weight used in Eq: 3
                 w_c = torch.ones_like(ps_s[:, 5:]) # weighted classification
                 # w_c[range(nb), ~tcls_t[i]] = 1.5 # YOLO does not classify the background
-                if h['cls_function'] == 'sigmoid':
+                if h['cls_function'] == 'sigmoid': # default now
                     P_t = nn.functional.sigmoid(ps_t[:, 5:])
                     P_s = nn.functional.sigmoid(ps_s[:, 5:])
                 elif h['cls_function'] == 'softmax':

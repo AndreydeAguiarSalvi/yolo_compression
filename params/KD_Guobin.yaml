@@ -4,7 +4,7 @@ hyp :
     mu: 0.7
     ni: 0.5
     margin: 0.00001
-    cls_function: softmax
+    cls_function: sigmoid
     giou_reg_loss: True
 
 weights: ''
