@@ -17,6 +17,7 @@ try:  # Mixed precision training https://github.com/NVIDIA/apex
 except:
     mixed_precision = False  # not installed
 
+ft = torch.cuda.FloatTensor
 
 def train():
     data = config['data']
@@ -113,7 +114,10 @@ def train():
     teacher.arc = config['teacher_arc']
 
     student.hyp = config['hyp']  # attach hyperparameters to student
-    mu = torch.cuda.FloatTensor([config['hyp']['mu']]) # mu variable to weight the hard and soft lreg, lcls and lconf
+    teacher.hyp
+    mu = ft([h['mu']]) # mu variable to weight the hard lcls and soft lcls in Eq: 2 (value not informed)
+    ni = ft([h['ni']]) # ni variable to weight the teacher bounded regression loss.
+    margin = ft([h['margin']]) # m variable used as margin in teacher bounded regression loss. (value not informed)
     
     student.class_weights = labels_to_class_weights(trainloader.dataset.labels, nc).to(device)  # attach class weights
     teacher.class_weights = student.class_weights
@@ -161,7 +165,6 @@ def train():
         # Start mini-batch #
         ####################
         for i, (imgs, targets, paths, _) in pbar: 
-        # for i, (imgs, targets, paths, _) in enumerate(trainloader): 
             ni = i + nb * epoch  # number integrated batches (since train start)
             imgs = imgs.to(device).float() / 255.0  # uint8 to float32, 0 - 255 to 0.0 - 1.0
             targets = targets.to(device)
@@ -184,7 +187,8 @@ def train():
 
             # Run teacher
             with torch.no_grad():
-                inf_out, _, fts_tch = teacher(imgs, config['teacher_indexes'])
+                inf_out, tch_train_output, fts_tch = teacher(imgs, config['teacher_indexes'])
+                tch_loss = compute_loss(tch_train_output, targets, teacher, True)
                 bboxes_tch = non_max_suppression(inf_out, conf_thres=.1, iou_thres=0.6)
                 targets_tch = torch.Tensor()
                 # creating labels from teacher outputs
@@ -219,9 +223,10 @@ def train():
             soft_loss = compute_loss(pred_std, targets_tch, student, True)
             
             # Loss = Loss Hard + Loss Soft
-            lbox = mu * hard_loss[0] + (1. - mu) * soft_loss[0]
-            lobj = mu * hard_loss[1] + (1. - mu) * soft_loss[1] 
-            lcls = mu * hard_loss[2] + (1. - mu) * soft_loss[2] 
+            upper_bound_lreg = hard_loss[0] if hard_loss[0] + margin > tch_loss[0] else ft([.0])
+            lbox =  hard_loss[0] + ni * upper_bound_lreg # Equation 4
+            lobj = hard_loss[1]
+            lcls = mu * hard_loss[2] + (1. - mu) * soft_loss[2] # Equation 2
             lhint = torch.cuda.FloatTensor([.0])
             for (hint, guided) in zip(fts_tch, fts_guided):
                 lhint += HINT(guided, hint) # Equation 6
