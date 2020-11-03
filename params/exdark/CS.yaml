@@ -1,10 +1,10 @@
-inherit_from: params/default.yaml
+inherit_from: params/exdark/default.yaml
 epochs : 300
 iterations : 3
 batch_size : 8
 accumulate: 8
-cfg : cfg/pascal/yolov3_soft_orig-output.cfg
-data : data/voc2012.data
+cfg : cfg/exdark/yolov3_soft_orig-output.cfg
+data : data/ExDark_train.data
 weights : ''
 prune_kind : CS
 pruning_time : 0

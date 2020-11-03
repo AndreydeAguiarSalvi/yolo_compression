@@ -1,0 +1,15 @@
+inherit_from: params/pascal/default.yaml
+epochs : 300
+iterations : 3
+batch_size : 8
+accumulate: 8
+cfg : cfg/pascal/yolov3_soft_orig-output.cfg
+data : data/voc2012.data
+weights : ''
+prune_kind : CS
+pruning_time : 0
+reseting : 10
+final_temperature : 200.0
+mask_lr : 0.1
+mask_momentum : 0.9
+lambda : 0.00000001

@@ -1,4 +1,4 @@
-inherit_from: params/default.yaml
+inherit_from: params/pascal/default.yaml
 epochs : 300
 iterations : 100 # default value in paper
 batch_size : 8

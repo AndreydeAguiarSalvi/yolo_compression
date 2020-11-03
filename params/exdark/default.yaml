@@ -4,7 +4,7 @@ hyp :
     cls_pw: 1.0 
     obj: 64.3  
     obj_pw: 1.0 
-    iou_t: 0.225
+    iou_t: 0.2
     lr0: 0.01
     lrf: -4.0  
     momentum: 0.937
@@ -13,18 +13,18 @@ hyp :
     hsv_h: 0.0138  
     hsv_s: 0.678  
     hsv_v: 0.36  
-    degrees: 1.98  
-    translate: 0.05 
-    scale: 0.05  
-    shear: 0.641  
+    degrees: 0.0
+    translate: 0.0 
+    scale: 0.0  
+    shear: 0.0  
 epochs : 300
 batch_size : 8
 accumulate: 8
-cfg : cfg/coco/yolov3-spp.cfg
-data : data/coco2014.data
+cfg : cfg/exdark/yolov3.cfg
+data : data/ExDark_train.data
 img_size : [416]
 bucket : ''
-weights : weights/yolov3-spp-ultralytics.pt
+weights : ''
 arc : default
 darknet : default
 name : ''

@@ -1,0 +1,28 @@
+inherit_from: params/exdark/default.yaml
+hyp :
+    lr0: 0.001
+    mu: 0.7
+    ni: 0.5
+    margin: 0.00001
+    cls_function: sigmoid
+    giou_reg_loss: True
+
+weights: ''
+arc : ''
+darknet : ''
+
+teacher_cfg : cfg/exdark/yolov3.cfg
+teacher_weights: weights/exdark_yolov3_IMP/size-multi_scale/2020_10_03/18_56_33/best_it_0.pt
+teacher_darknet: default
+teacher_arc: default
+teacher_indexes: [36]
+mask_path: ''
+
+student_cfg : cfg/exdark/yolo-nano_leaky.cfg
+student_weights: ''
+student_darknet: default
+student_arc: default
+student_indexes: [12]
+
+data : data/ExDark_train.data
+single_cls: False

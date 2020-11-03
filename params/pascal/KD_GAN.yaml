@@ -1,4 +1,4 @@
-inherit_from: params/default.yaml
+inherit_from: params/pascal/default.yaml
 hyp :
     Dlr0 : 0.01
     lr0 : 0.01
