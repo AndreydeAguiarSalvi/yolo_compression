@@ -605,8 +605,11 @@ def load_kd_checkpoints(config, teacher, student, mask, another_model, optimizer
 
     # load teacher
     try:
-        chkpt['model'] = {k: v for k, v in chkpt['model'].items() if teacher.state_dict()[k].numel() == v.numel()}
-        teacher.load_state_dict(chkpt['model'], strict=False)
+        try:
+            chkpt['model'] = {k: v for k, v in chkpt['model'].items() if teacher.state_dict()[k].numel() == v.numel()}
+            teacher.load_state_dict(chkpt['model'], strict=False)
+        except:
+            teacher.load_state_dict(chkpt, strict=False)
     except KeyError as e:
         s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
             "See https://github.com/ultralytics/yolov3/issues/657" % (config['weights'], config['cfg'], config['weights'])
