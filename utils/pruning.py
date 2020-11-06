@@ -2,7 +2,7 @@ import math
 import torch
 import numpy as np
 import torch.nn as nn
-from layers import SynFlowLinear, SynFlowConv2d, SynFlowBatchNorm1d, SynFlowBatchNorm2d, SynFlowIdentity1d, SynFlowIdentity2d
+from utils.layers import SynFlowLinear, SynFlowConv2d, SynFlowBatchNorm1d, SynFlowBatchNorm2d, SynFlowIdentity1d, SynFlowIdentity2d
 
 ####################
 # Generall Methods #
