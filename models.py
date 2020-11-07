@@ -439,6 +439,27 @@ def load_darknet_weights(self, weights, cutoff=-1):
             ptr += nw
 
 
+@torch.no_grad()
+def load_from_old_version(model, checkpoint):
+    
+    # converting the dict with name, params to a list of params
+    if 'model' in checkpoint:
+        checkpoint = checkpoint['model']
+    chkpt_params = [value for key, value in checkpoint.items()]
+    j = 0 # counter to chkpt_params
+
+    # iterating over params of model
+    for i, (mdf, module) in enumerate(model.module_defs, model.module_list):
+        # enter inside whether mdef have parameters
+        if mdf['type'] in [
+                            'convolutional', 'multibias', 'multiconv_multibias', 
+                            'halfconv', 'inception', 'PEP', 'EP', 'FCA', 'mobile'
+                        ]:
+            for _, param in module.named_parameters():
+                param.data.copy_(chkpt_params[j])
+                j += 1
+
+
 def save_weights(self, path='model.weights', cutoff=-1):
     # Converts a PyTorch model to Darket format (*.pt to *.weights)
     # Note: Does not work if model.fuse() is applied
