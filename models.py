@@ -446,18 +446,14 @@ def load_from_old_version(model, checkpoint):
     if 'model' in checkpoint:
         checkpoint = checkpoint['model']
     chkpt_params = [value for key, value in checkpoint.items()]
-    j = 0 # counter to chkpt_params
+    # chkpt_names = [key for key, value in checkpoint.items()]
 
-    # iterating over params of model
-    for i, (mdf, module) in enumerate(model.module_defs, model.module_list):
-        # enter inside whether mdef have parameters
-        if mdf['type'] in [
-                            'convolutional', 'multibias', 'multiconv_multibias', 
-                            'halfconv', 'inception', 'PEP', 'EP', 'FCA', 'mobile'
-                        ]:
-            for _, param in module.named_parameters():
-                param.data.copy_(chkpt_params[j])
-                j += 1
+    # iterating over states of the model
+    # states includes means from BatchNorms,
+    # which are not learnable and not exists in 
+    # model.named_parameters()
+    for i, item in enumerate(model.state_dict()):
+        model.state_dict()[item].data.copy_(chkpt_params[i])
 
 
 def save_weights(self, path='model.weights', cutoff=-1):
