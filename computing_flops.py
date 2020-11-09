@@ -7,7 +7,6 @@ from utils.pruning import create_mask_LTH, apply_mask_LTH
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, help='Path to load the model.')
-parser.add_argument('--darknet', type=str, help='Architecture to create.', required=True)
 parser.add_argument('--cfg', type=str, help='args file to create the model.')
 parser.add_argument('--mask', type=str, default=None, help='Path to load the mask, if existis.')
 parser.add_argument('--embbed', action='store_true', help='To load the mask from the same checkpoint of model.')
@@ -19,17 +18,20 @@ device = torch.device(args['device'])
 x = torch.Tensor(1, 3, 416, 416).to(device)
 
 # Initialize model
-if args['darknet'] == 'default':
-    model = Darknet(args['cfg']).to(device)
-elif args['darknet'] == 'soft':
+if 'soft' in args['model'] or 'soft' in args['cfg']:
     model = SoftDarknet(args['cfg']).to(device)
     model.ticket = True
     _ = model(x)
+else:
+    model = Darknet(args['cfg']).to(device)    
 
 if args['model']:
     checkpoint = torch.load(args['model'], map_location=device)
     try:
-        model.load_state_dict(checkpoint['model'])
+        try:
+            model.load_state_dict(checkpoint['model'])
+        except:
+            model.load_state_dict(checkpoint)
     except:
         print("model key don't found in checkpoint. Trying without model key")
         model.load_state_dict(checkpoint)
@@ -40,7 +42,7 @@ if (args['mask'] or args['embbed']):
     else: mask.load_state_dict(checkpoint['mask'])
     apply_mask_LTH(model, mask)
 
-if not (args['mask'] or args['embbed']): total_ops, total_params = profile(model, (x,), verbose=True)
+if not (args['mask'] or args['embbed'] or 'soft' in args['model']): total_ops, total_params = profile(model, (x,), verbose=True)
 else:
     sparse = SparseYOLO(model).to(device)
     total_ops, total_params = profile(sparse, (x, ), verbose=True)
