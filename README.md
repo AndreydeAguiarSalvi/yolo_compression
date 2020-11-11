@@ -22,6 +22,15 @@ Python 3.7 or later with all of the `pip install -U -r requirements.txt` package
 Even more, install [THOP](https://github.com/Lyken17/pytorch-OpCounter) to count the MACs
 pip install --upgrade git+https://github.com/Lyken17/pytorch-OpCounter.git
 
+# Other Details
+I am now focused on completing my master's (scheduled for March, 2020). With this task completed, I will bring you the final results of the work and examples of how to run this repository.
+Basically, run 
+* train.py to perform a normal training,
+* prune.py to perform pruning with LTH or CS, depending on the params
+* my_kd.py to perform classical KD with YOLOv3 and YOLO Mobile (model of my own) or YOLO Nano
+* my_kd_gan.py to perform my adapted GAN based KD
+In utils/my_utils.py, you can see the argument parser, to see all the available parameters
+
 # References
 % YOLOv3
 @misc{redmon2018yolov3,
@@ -36,6 +45,7 @@ pip install --upgrade git+https://github.com/Lyken17/pytorch-OpCounter.git
 }
 
 % LTH with Latte Reseting
+
 @misc{frankle2019stabilizing,
     author = "Frankle, Jonathan and Dziugaite, Gintare Karolina and Roy, Daniel M. and Carbin, Michael",
     title = "Stabilizing the Lottery Ticket Hypothesis",
@@ -83,7 +93,7 @@ pip install --upgrade git+https://github.com/Lyken17/pytorch-OpCounter.git
     pages = "742--751",
     numpages = "10",
     location = "Long Beach, California, USA",
-    series = "NIPSâ€™17"
+    series = "NIPS’17"
 }
 
 % KD with GAN
