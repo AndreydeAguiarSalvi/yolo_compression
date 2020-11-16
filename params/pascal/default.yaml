@@ -32,3 +32,4 @@ device : ''
 working_dir : /A/andrey/yolo/master/weights
 scheduler : lambda
 gamma : 0.8
+early_stop: 75
