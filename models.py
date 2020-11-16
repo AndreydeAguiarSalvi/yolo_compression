@@ -446,14 +446,18 @@ def load_from_old_version(model, checkpoint):
     if 'model' in checkpoint:
         checkpoint = checkpoint['model']
     chkpt_params = [value for key, value in checkpoint.items()]
-    # chkpt_names = [key for key, value in checkpoint.items()]
+    chkpt_names = [key for key, value in checkpoint.items()]
 
     # iterating over states of the model
     # states includes means from BatchNorms,
     # which are not learnable and not exists in 
     # model.named_parameters()
-    for i, item in enumerate(model.state_dict()):
-        model.state_dict()[item].data.copy_(chkpt_params[i])
+    try:
+        for i, item in enumerate(model.state_dict()):
+            model.state_dict()[item].data.copy_(chkpt_params[i])
+    except:
+        print(f"Error between {item} -> {model.state_dict()[item].shape} and {chkpt_names[i]} -> {chkpt_params[i].shape}")
+        exit()
 
 
 def save_weights(self, path='model.weights', cutoff=-1):
@@ -583,7 +587,7 @@ class SparseYOLO(nn.Module):
         for module in pruned_yolo.module_list:
             my_module = deepcopy(module)
             if type(my_module) is nn.Sequential:
-                if len(my_module[0]): # route has no len
+                if len(my_module): # route has no len
                     my_module[0] = SparseConv(my_module[0])
             self.module_list.append(my_module)
         
