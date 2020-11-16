@@ -1,8 +1,15 @@
 # Introduction
 
-This directory contains my PyTorch YOLOv3 study about pruning. **It is freely available for redistribution under the GPL-3.0 license**. 
-This work was based on the code of [YOLOv3 Ultralytics](https://github.com/ultralytics/yolov3)
+This repository contains my master's (ongoing) work on model compression techniques at YOLOv3. **It is freely available for redistribution under the GPL-3.0 license**. 
+This repository is based on [YOLOv3 Ultralytics](https://github.com/ultralytics/yolov3).
 
+Currently evaluated approaches:
+* Lottery Tickets Hypothesis (Iterative Magnitude based Pruning)
+* Continuous Sparsification (Iterative Gradient based Pruning)
+* Knowledge Distillation (classical approach)
+* Generative Adversarial Network (GAN) based Knowledge Distillation
+* Neural Architecture Search (NAS) from MobileNet V3
+* NAS from YOLO Nano
 
 # Requirements
 
@@ -15,145 +22,98 @@ Python 3.7 or later with all of the `pip install -U -r requirements.txt` package
 Even more, install [THOP](https://github.com/Lyken17/pytorch-OpCounter) to count the MACs
 pip install --upgrade git+https://github.com/Lyken17/pytorch-OpCounter.git
 
-# Training
+# Other Details
+I am now focused on completing my master's (scheduled for March, 2020). With this task completed, I will bring you the final results of the work and examples of how to run this repository.
+Basically, run 
+* train.py to perform a normal training,
+* prune.py to perform pruning with LTH or CS, depending on the params
+* my_kd.py to perform classical KD with YOLOv3 and YOLO Mobile (model of my own) or YOLO Nano
+* my_kd_gan.py to perform my adapted GAN based KD
+In utils/my_utils.py, you can see the argument parser, to see all the available parameters
 
-**Start Training:** `python3 train.py` to begin training after downloading COCO data with `data/get_coco_dataset.sh`. Each epoch trains on 117,263 images from the train and validate COCO sets, and tests on 5000 images from the COCO validate set.
+# References
+% YOLOv3
+@misc{redmon2018yolov3,
+    author = "Redmon, Joseph and Farhadi, Ali",
+    title = "YOLOv3: An Incremental Improvement",
+    year = "2018",
+    eprint = "1804.02767",
+    archivePrefix = "arXiv",
+    primaryClass = "cs.CV",
+    url = "https://arxiv.org/abs/1804.02767",
+    urlaccessdate = "05/11/2020"
+}
 
-**Resume Training:** `python3 train.py --resume` to resume training from `weights/last.pt`.
+% LTH with Latte Reseting
 
-**Plot Training:** `from utils import utils; utils.plot_results()` plots training results from `coco_16img.data`, `coco_64img.data`, 2 example datasets available in the `data/` folder, which train and test on the first 16 and 64 images of the COCO2014-trainval dataset.
+@misc{frankle2019stabilizing,
+    author = "Frankle, Jonathan and Dziugaite, Gintare Karolina and Roy, Daniel M. and Carbin, Michael",
+    title = "Stabilizing the Lottery Ticket Hypothesis",
+    year = "2019",
+    eprint = "1903.01611",
+    archivePrefix = "arXiv",
+    primaryClass = "cs.LG",
+    url = "https://arxiv.org/abs/1903.01611",
+    urlaccessdate = "07/24/2020"
+}
 
+% CS
+@misc{savarese2019winning,
+    author = "Savarese, Pedro and Silva, Hugo and Maire, Michael",
+    title = "Winning the Lottery with Continuous Sparsification",
+    year = "2019",
+    eprint = "1912.04427",
+    archivePrefix = "arXiv",
+    primaryClass = "cs.LG",
+    url = "https://arxiv.org/abs/1912.04427",
+    urlaccessdate = "06/14/2020"
+}
 
-## Image Augmentation
+% YOLO Nano
+@misc{alex2019yolo,
+    author = "Wong, Alexander and Famuori, Mahmoud and Shafiee, Mohammad Javad and Li, Francis and Chwyl, Brendan and Chung, Jonathan",
+    title = "YOLO Nano: a Highly Compact You Only Look Once Convolutional Neural Network for Object Detection",
+    year = "2019",
+    eprint = "1910.01271",
+    archivePrefix = "arXiv",
+    primaryClass = "cs.CV",
+    url = "https://arxiv.org/abs/1910.01271",
+    urlaccessdate = "07/20/2020"
+}
 
-`datasets.py` applies random OpenCV-powered (https://opencv.org/) augmentation to the input images in accordance with the following specifications. Augmentation is applied **only** during training, not during inference. Bounding boxes are automatically tracked and updated with the images. 416 x 416 examples pictured below.
+% KD on Faster
+@inproceedings{guobin_2017,
+    author = "Chen, Guobin and Choi, Wongun and Yu, Xiang and Han, Tony and Chandraker, Manmohan",
+    title = "Learning Efficient Object Detection Models with Knowledge Distillation",
+    year = "2017",
+    isbn = "9781510860964",
+    publisher = "Curran Associates Inc.",
+    address = "Red Hook, NY, USA",
+    booktitle = "Proceedings of the 31st International Conference on Neural Information Processing Systems",
+    pages = "742--751",
+    numpages = "10",
+    location = "Long Beach, California, USA",
+    series = "NIPS�17"
+}
 
-Augmentation | Description
---- | ---
-Translation | +/- 10% (vertical and horizontal)
-Rotation | +/- 5 degrees
-Shear | +/- 2 degrees (vertical and horizontal)
-Scale | +/- 10%
-Reflection | 50% probability (horizontal-only)
-H**S**V Saturation | +/- 50%
-HS**V** Intensity | +/- 50%
+% KD with GAN
+@ARTICLE{wang_2020,
+    author = "{Wang}, W. and {Hong}, W. and {Wang}, F. and {Yu}, J.",
+    journal = "IEEE Access",
+    title = "GAN-Knowledge Distillation for One-Stage Object Detection",
+    year = "2020",
+    volume = "8",
+    number = "",
+    pages = "60719-60727",
+    month = "Mar"
+}
 
-
-## Speed
-
-https://cloud.google.com/deep-learning-vm/  
-**Machine type:** preemptible [n1-standard-16](https://cloud.google.com/compute/docs/machine-types) (16 vCPUs, 60 GB memory)   
-**CPU platform:** Intel Skylake  
-**GPUs:** K80 ($0.20/hr), T4 ($0.35/hr), V100 ($0.83/hr) CUDA with [Nvidia Apex](https://github.com/NVIDIA/apex) FP16/32  
-**HDD:** 1 TB SSD  
-**Dataset:** COCO train 2014 (117,263 images)  
-**Model:** `yolov3-spp.cfg`  
-**Command:**  `python3 train.py --img 416 --batch 32 --accum 2`
-
-GPU |n| `--batch --accum` | img/s | epoch<br>time | epoch<br>cost
---- |--- |--- |--- |--- |---
-K80    |1| 32 x 2 | 11  | 175 min  | $0.58
-T4     |1<br>2| 32 x 2<br>64 x 1 | 41<br>61 | 48 min<br>32 min | $0.28<br>$0.36
-V100   |1<br>2| 32 x 2<br>64 x 1 | 122<br>**178** | 16 min<br>**11 min** | **$0.23**<br>$0.31
-2080Ti |1<br>2| 32 x 2<br>64 x 1 | 81<br>140 | 24 min<br>14 min | -<br>-
-
-# Inference
-
-`detect.py` runs inference on any sources:
-
-```bash
-python3 detect.py --source ...
-```
-
-- Image:  `--source file.jpg`
-- Video:  `--source file.mp4`
-- Directory:  `--source dir/`
-- Webcam:  `--source 0`
-- RTSP stream:  `--source rtsp://170.93.143.139/rtplive/470011e600ef003a004ee33696235daa`
-- HTTP stream:  `--source http://wmccpinetop.axiscam.net/mjpg/video.mjpg`
-
-To run a specific models:
-
-**YOLOv3:** `python3 detect.py --cfg cfg/yolov3.cfg --weights yolov3.weights`  
-
-**YOLOv3-tiny:** `python3 detect.py --cfg cfg/yolov3-tiny.cfg --weights yolov3-tiny.weights`  
-
-**YOLOv3-SPP:** `python3 detect.py --cfg cfg/yolov3-spp.cfg --weights yolov3-spp.weights`  
-
-
-# Pretrained Weights
-
-Download from: [https://drive.google.com/open?id=1LezFG5g3BCW6iYaV89B2i64cqEUZD7e0](https://drive.google.com/open?id=1LezFG5g3BCW6iYaV89B2i64cqEUZD7e0)
-
-## Darknet Conversion
-
-```bash
-$ git clone https://github.com/ultralytics/yolov3 && cd yolov3
-
-# convert darknet cfg/weights to pytorch model
-$ python3  -c "from models import *; convert('cfg/yolov3-spp.cfg', 'weights/yolov3-spp.weights')"
-Success: converted 'weights/yolov3-spp.weights' to 'converted.pt'
-
-# convert cfg/pytorch model to darknet weights
-$ python3  -c "from models import *; convert('cfg/yolov3-spp.cfg', 'weights/yolov3-spp.pt')"
-Success: converted 'weights/yolov3-spp.pt' to 'converted.weights'
-```
-
-# mAP
-
-```bash
-$ python3 test.py --cfg yolov3-spp.cfg --weights yolov3-spp-ultralytics.pt
-```
-
-- mAP@0.5 run at `--iou-thr 0.5`, mAP@0.5...0.95 run at `--iou-thr 0.7`
-- Darknet results: https://arxiv.org/abs/1804.02767
-
-<i></i>                      |Size |COCO mAP<br>@0.5...0.95 |COCO mAP<br>@0.5 
----                          | ---         | ---         | ---
-YOLOv3-tiny<br>YOLOv3<br>YOLOv3-SPP<br>**[YOLOv3-SPP-ultralytics](https://drive.google.com/open?id=1UcR-zVoMs7DH5dj3N1bswkiQTA4dmKF4)** |320 |14.0<br>28.7<br>30.5<br>**36.6** |29.1<br>51.8<br>52.3<br>**56.0**
-YOLOv3-tiny<br>YOLOv3<br>YOLOv3-SPP<br>**[YOLOv3-SPP-ultralytics](https://drive.google.com/open?id=1UcR-zVoMs7DH5dj3N1bswkiQTA4dmKF4)** |416 |16.0<br>31.2<br>33.9<br>**40.4** |33.0<br>55.4<br>56.9<br>**60.2**
-YOLOv3-tiny<br>YOLOv3<br>YOLOv3-SPP<br>**[YOLOv3-SPP-ultralytics](https://drive.google.com/open?id=1UcR-zVoMs7DH5dj3N1bswkiQTA4dmKF4)** |512 |16.6<br>32.7<br>35.6<br>**41.6** |34.9<br>57.7<br>59.5<br>**61.7**
-YOLOv3-tiny<br>YOLOv3<br>YOLOv3-SPP<br>**[YOLOv3-SPP-ultralytics](https://drive.google.com/open?id=1UcR-zVoMs7DH5dj3N1bswkiQTA4dmKF4)** |608 |16.6<br>33.1<br>37.0<br>**42.1** |35.4<br>58.2<br>60.7<br>**61.7**
-
-```bash
-$ python3 test.py --cfg yolov3-spp.cfg --weights yolov3-spp-ultralytics.pt --img 608
-Namespace(batch_size=32, cfg='cfg/yolov3-spp.cfg', conf_thres=0.001, data='data/coco2014.data', device='', img_size=608, iou_thres=0.6, save_json=True, single_cls=False, task='test', weights='weights/yolov3-spp-ultralytics.pt')
-Using CUDA device0 _CudaDeviceProperties(name='Tesla V100-SXM2-16GB', total_memory=16130MB)
-              Class    Images   Targets         P         R   mAP@0.5        F1: 100%|█████| 157/157 [02:46<00:00,  1.06s/it]
-                 all     5e+03  3.51e+04     0.822     0.433     0.611     0.551
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.419
- Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.618
- Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.448
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.247
- Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.462
- Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.534
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.341
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.557
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.606
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.440
- Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.649
- Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.735
-```
-
-# Reproduce Our Results
-
-This command trains `yolov3-spp.cfg` from scratch to our mAP above. Training takes about one week on a 2080Ti.
-```bash
-$ python3 train.py --weights '' --cfg yolov3-spp.cfg --epochs 273 --batch 16 --accum 4 --multi_scale
-```
-<img src="https://user-images.githubusercontent.com/26833433/70661588-76bbca00-1c19-11ea-86f9-23350d8c3193.png" width="900">
-
-# Reproduce Our Environment
-
-To access an up-to-date working environment (with all dependencies including CUDA/CUDNN, Python and PyTorch preinstalled), consider a:
-
-- **GCP** Deep Learning VM with $300 free credit offer: See our [GCP Quickstart Guide](https://github.com/ultralytics/yolov3/wiki/GCP-Quickstart) 
-- **Google Colab Notebook** with 12 hours of free GPU time: [Google Colab Notebook](https://colab.research.google.com/drive/1G8T-VFxQkjDe4idzN8F-hbIBqkkkQnxw)
-- **Docker Image** from https://hub.docker.com/r/ultralytics/yolov3. See [Docker Quickstart Guide](https://github.com/ultralytics/yolov3/wiki/Docker-Quickstart) 
-# Citation
-
-[![DOI](https://zenodo.org/badge/146165888.svg)](https://zenodo.org/badge/latestdoi/146165888)
-
-# Contact
-
-**Issues should be raised directly in the repository.** For additional questions or comments please email Glenn Jocher at glenn.jocher@ultralytics.com or visit us at https://contact.ultralytics.com.
+% MobileNet V3
+@InProceedings{Howard_2019_ICCV,
+    author = {Howard, Andrew and Sandler, Mark and Chu, Grace and Chen, Liang-Chieh and Chen, Bo and Tan, Mingxing and Wang, Weijun and Zhu, Yukun and Pang, Ruoming and Vasudevan, Vijay and Le, Quoc V. and Adam, Hartwig},
+    title = {Searching for MobileNetV3},
+    booktitle = {International Conference on Computer Vision (ICCV)},
+    month = {Oct},
+    year = {2019},
+    pages = {1314--1324}
+}
