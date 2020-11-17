@@ -48,7 +48,7 @@ def create_train_argparser():
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
     parser.add_argument('--params', type=str, default='params/default.yaml', help='json config to load the hyperparameters')
     parser.add_argument('--seed', type=int, default=0, help='seed to function init_seeds')
-    parser.add_argument('--early_stop', type=int, default=75, help='how many epochs to earlie stop. If 0, no earlie stop.')
+    parser.add_argument('--early_stop', type=int, default=75, help='how many epochs to early stop. If 0, no early stop.')
     args = vars(parser.parse_args())
 
     return args
@@ -130,7 +130,7 @@ def create_prune_argparser():
     parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
     parser.add_argument('--seed', type=int, default=0, help='seed to function init_seeds')
-    parser.add_argument('--early_stop', type=int, default=75, help='how many epochs to earlie stop. If 0, no earlie stop.')
+    parser.add_argument('--early_stop', type=int, default=75, help='how many epochs to early stop. If 0, no early stop.')
     # Pruning parameters
     parser.add_argument('--iterations', type=int, help='One iteration have X epochs. Prune and reseting at the final of each iteration, except the last')
     parser.add_argument('--reseting', type=int, help='Save backup in each iteration on epoch X for reseting')
@@ -200,7 +200,7 @@ def create_kd_argparser():
     parser.add_argument('--xavier_norm', action='store_true', help='initialize model with xavier normal function')
     parser.add_argument('--gamma', type=float, help='gamma used in learning rate decay')
     parser.add_argument('--seed', type=int, default=0, help='seed to function init_seeds')
-    parser.add_argument('--early_stop', type=int, default=75, help='how many epochs to earlie stop. If 0, no earlie stop.')
+    parser.add_argument('--early_stop', type=int, default=75, help='how many epochs to early stop. If 0, no early stop.')
     # Teacher parameters
     parser.add_argument('--mask', action='store_true', help='There is a mask to load inside teacher checkpoint')
     parser.add_argument('--mask_path', type=str, help='There is a mask to load on another path')
