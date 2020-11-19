@@ -114,7 +114,7 @@ def train():
     teacher.arc = config['teacher_arc']
 
     student.hyp = config['hyp']  # attach hyperparameters to student
-    teacher.hyp
+    teacher.hyp = config['hyp']  # attach hyperparameters to student
     mu = ft([h['mu']]) # mu variable to weight the hard lcls and soft lcls in Eq: 2 (value not informed)
     ni = ft([h['ni']]) # ni variable to weight the teacher bounded regression loss.
     margin = ft([h['margin']]) # m variable used as margin in teacher bounded regression loss. (value not informed)
