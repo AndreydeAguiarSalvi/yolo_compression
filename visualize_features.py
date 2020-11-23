@@ -19,8 +19,10 @@ def compute_grad(model, dataloader, args):
             mask = grad_cam(x, args['head'], args['anchor'], args['index'])
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
-            name += f"_{args['head']}_{args['anchor']}.{ext}"
-            show_cam_on_image(x[0].cpu().numpy().transpose(1, 2, 0), mask, name)
+            grad_name += f"_{args['head']}_{args['anchor']}.{ext}"
+            # Saving results
+            show_cam_on_image(x[0].cpu().numpy().transpose(1, 2, 0), mask, args['output']+os.sep+grad_name+ext)
+            cv2.imwrite(args['output']+os.sep+name+ext, np.uint8(255 * x[0].cpu().numpy().transpose(1, 2, 0)))
 
 
 if __name__ == '__main__':
