@@ -62,7 +62,7 @@ class GradCam:
             indexes = torch.nonzero( output[head] == torch.max(output[head][0, anchor, ..., 5+index]) )
             id_a, id_b, id_c, id_d, id_e = indexes[0]
 
-        one_hot = torch.zeros((1, *output[head].size()), device=self.device, dtype=torch.float32)
+        one_hot = torch.zeros((*output[head].size()), device=self.device, dtype=torch.float32)
         one_hot[id_a, id_b, id_c, id_d, id_e] = 1
         one_hot.requires_grad_(True)
         one_hot = torch.sum(one_hot * output[head])

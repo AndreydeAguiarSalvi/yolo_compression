@@ -14,15 +14,16 @@ def compute_grad(model, dataloader, args):
         imgs = imgs.to(args['device']).float() / 255.0 
 
         for img, path in zip(imgs, paths):
-            x = torch.Tensor(1, *img.shape)
+            x = torch.stack([img])
 
-            mask = grad_cam(x, args['head'], args['anchor'], args['index'])
+            mask = grad_cam(x, args['head'], args['anchor'], args['class'])
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
-            grad_name += f"_{args['head']}_{args['anchor']}.{ext}"
+            grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
+            orig_name = f"{args['output']}{os.sep}{name}.{ext}"
             # Saving results
-            show_cam_on_image(x[0].cpu().numpy().transpose(1, 2, 0), mask, args['output']+os.sep+grad_name+ext)
-            cv2.imwrite(args['output']+os.sep+name+ext, np.uint8(255 * x[0].cpu().numpy().transpose(1, 2, 0)))
+            show_cam_on_image(x[0].cpu().numpy().transpose(1, 2, 0), mask, grad_name)
+            cv2.imwrite(orig_name, np.uint8(255 * x[0].cpu().numpy().transpose(1, 2, 0)))
 
 
 if __name__ == '__main__':
@@ -74,7 +75,7 @@ if __name__ == '__main__':
         )
 
         dataloader = DataLoader(
-            dataset, batch_size=args['batch_size'],
+            dataset, batch_size=args['batch_size'], shuffle=False,
             num_workers=min([os.cpu_count(), args['batch_size'], 8]),
             pin_memory=True, collate_fn=dataset.collate_fn
         )
