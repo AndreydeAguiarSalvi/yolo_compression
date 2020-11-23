@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--cfg', type=str, default='cfg/pascal/yolov3.cfg', help='*.cfg path')
     parser.add_argument('--weights', type=str, default='weights/voc_yolov3/size-multi_scale/2020_03_16/13_19_34/model_it_1.pt', help='path to weights file')
-    parser.add_argument('--data', type=str, default='data/voc2012.dat', help='.data pointing images to load')
+    parser.add_argument('--data', type=str, default='data/voc2012.data', help='.data pointing images to load')
     parser.add_argument('--source', type=str, default='', help='source')  # input file/folder
     parser.add_argument('--output', type=str, default='output', help='output folder')  # output folder
     parser.add_argument('--img_size', type=int, default=416, help='inference size (pixels)')
@@ -52,11 +52,11 @@ if __name__ == '__main__':
     if args['weights'].endswith('.pt'):  # pytorch format
         try:
             try:
-                model.load_state_dict(torch.load(args['weights'], map_location=device)['model'])
+                model.load_state_dict(torch.load(args['weights'], map_location=args['device'])['model'])
             except:
-                model.load_state_dict(torch.load(args['weights'], map_location=device))
+                model.load_state_dict(torch.load(args['weights'], map_location=args['device']))
         except:
-            load_from_old_version( model, torch.load(args['weights'], map_location=device) )
+            load_from_old_version( model, torch.load(args['weights'], map_location=args['device']) )
     else:  # darknet format
         load_darknet_weights(model, args['weights'])
 
