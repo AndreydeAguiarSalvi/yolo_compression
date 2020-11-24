@@ -22,8 +22,9 @@ def compute_grad(model, dataloader, args):
             grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
             orig_name = f"{args['output']}{os.sep}{name}.{ext}"
             # Saving results
-            show_cam_on_image(x[0].cpu().numpy().transpose(1, 2, 0), mask, grad_name)
-            cv2.imwrite(orig_name, np.uint8(255 * x[0].cpu().numpy().transpose(1, 2, 0)))
+            x = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
+            show_cam_on_image(x, mask, grad_name)
+            cv2.imwrite(orig_name, np.uint8(255 * x))
 
 
 if __name__ == '__main__':
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     if args['source']:
         dataloader = LoadImages(args['source'], img_size=args['img_size'])
     elif args['data']:
-        data = parse_data_cfg(data)
+        data = parse_data_cfg(args['data'])
         path = data['test'] if 'test' in data else data['valid']  # path to test images
         dataset = LoadImagesAndLabels(
             path, args['img_size'], args['batch_size'], rect=args['rect'], 
