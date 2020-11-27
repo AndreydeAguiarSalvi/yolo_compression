@@ -95,6 +95,7 @@ class YOLOGradCam:
     def __init__(self, model, target_layer):
         self.model = model
         self.model.eval()
+        self.target_layer = target_layer
         self.device = next(iter(model.parameters())).device
         self.gradients = []
 
