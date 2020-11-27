@@ -4,22 +4,31 @@ from models import *
 from utils.utils import *
 from utils.datasets import *
 from torch.utils.data import DataLoader
-from utils.gradcam import GradCam, show_cam_on_image
+from utils.gradcam import GradCam, YOLOGradCam, show_cam_on_image
 
 def compute_grad(model, dataloader, args):
 
-    grad_cam = GradCam(model, [model.yolo_layers[args['head']]-1])
+    if args['yolo_loss']: grad_cam = YOLOGradCam(model, [model.yolo_layers[args['head']]-1])
+    else: grad_cam =GradCam(model, [model.yolo_layers[args['head']]-1])
 
-    for imgs, _, paths, _ in tqdm(dataloader):
+    for imgs, labels, paths, _ in tqdm(dataloader):
         imgs = imgs.to(args['device']).float() / 255.0 
 
-        for img, path in zip(imgs, paths):
+        for img, label, path in zip(imgs, labels, paths):
             x = torch.stack([img])
-
-            mask = grad_cam(x, args['head'], args['anchor'], args['class'])
+            if args['yolo_loss']:
+                y = torch.stack([labels[label]])
+                mask = grad_cam(x, y)
+            else:
+                mask = grad_cam(x, args['head'], args['anchor'], args['class'])
+            
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
-            grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
+            if args['yolo_loss']:
+                grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{'all'}.{ext}"
+            else:
+                grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
+                
             orig_name = f"{args['output']}{os.sep}{name}.{ext}"
             # Saving results
             x = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
@@ -41,6 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('--head', type=int, default=0, help='YOLO head to evaluate')
     parser.add_argument('--anchor', type=int, default=0, help='YOLO anchor to evaluate')
     parser.add_argument('--class', type=int, default=None, help='Class to evaluate the features. If None, the hightest prediction will be used')
+    parser.add_argument('--yolo_loss', action='store_true', help='use the original YOLO loss instead of the GradCam based')
     args = vars(parser.parse_args())
     args['device'] = 'cuda:'+args['device'] if args['device'].isdigit() else 'cpu'
     print(args)
