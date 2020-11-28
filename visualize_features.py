@@ -15,6 +15,7 @@ hyp = {
     'obj_pw': 1.0,
     'iou_t': 0.2
 }
+j = 0
 
 def compute_grad(model, dataloader, args):
 
@@ -25,29 +26,27 @@ def compute_grad(model, dataloader, args):
         imgs = imgs.to(args['device']).float() / 255.0 
         labels = labels.to(args['device'])
 
-        for i, (img, path) in enumerate(zip(imgs, paths)):
+        for img, path in zip(imgs, paths):
             x = torch.stack([img])
-            try:
-                if args['yolo_loss']:
-                    id = labels[:, 0] == i
-                    mask = grad_cam(x, labels[id])
-                else:
-                    mask = grad_cam(x, args['head'], args['anchor'], args['class'])
+            if args['yolo_loss']:
+                id = labels[:, 0] == j
+                j += 1
+                mask = grad_cam(x, labels[id])
+            else:
+                mask = grad_cam(x, args['head'], args['anchor'], args['class'])
+            
+            ext = path.split('.')[-1]
+            name = path.split(os.sep)[-1].split('.')[0]
+            if args['yolo_loss']:
+                grad_name = f"{args['output']}{os.sep}{name}_{'all'}_{'all'}.{ext}"
+            else:
+                grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
                 
-                ext = path.split('.')[-1]
-                name = path.split(os.sep)[-1].split('.')[0]
-                if args['yolo_loss']:
-                    grad_name = f"{args['output']}{os.sep}{name}_{'all'}_{'all'}.{ext}"
-                else:
-                    grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
-                    
-                orig_name = f"{args['output']}{os.sep}{name}.{ext}"
-                # Saving results
-                x = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
-                show_cam_on_image(x, mask, grad_name)
-                cv2.imwrite(orig_name, np.uint8(255 * x))
-            except:
-                print(f"An error occurred handling the image {path}")
+            orig_name = f"{args['output']}{os.sep}{name}.{ext}"
+            # Saving results
+            x = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
+            show_cam_on_image(x, mask, grad_name)
+            cv2.imwrite(orig_name, np.uint8(255 * x))
 
 
 if __name__ == '__main__':
