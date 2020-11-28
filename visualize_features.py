@@ -27,24 +27,27 @@ def compute_grad(model, dataloader, args):
 
         for i, (img, path) in enumerate(zip(imgs, paths)):
             x = torch.stack([img])
-            if args['yolo_loss']:
-                id = labels[:, 0] == i
-                mask = grad_cam(x, labels[id])
-            else:
-                mask = grad_cam(x, args['head'], args['anchor'], args['class'])
-            
-            ext = path.split('.')[-1]
-            name = path.split(os.sep)[-1].split('.')[0]
-            if args['yolo_loss']:
-                grad_name = f"{args['output']}{os.sep}{name}_{'all'}_{'all'}.{ext}"
-            else:
-                grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
+            try:
+                if args['yolo_loss']:
+                    id = labels[:, 0] == i
+                    mask = grad_cam(x, labels[id])
+                else:
+                    mask = grad_cam(x, args['head'], args['anchor'], args['class'])
                 
-            orig_name = f"{args['output']}{os.sep}{name}.{ext}"
-            # Saving results
-            x = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
-            show_cam_on_image(x, mask, grad_name)
-            cv2.imwrite(orig_name, np.uint8(255 * x))
+                ext = path.split('.')[-1]
+                name = path.split(os.sep)[-1].split('.')[0]
+                if args['yolo_loss']:
+                    grad_name = f"{args['output']}{os.sep}{name}_{'all'}_{'all'}.{ext}"
+                else:
+                    grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
+                    
+                orig_name = f"{args['output']}{os.sep}{name}.{ext}"
+                # Saving results
+                x = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
+                show_cam_on_image(x, mask, grad_name)
+                cv2.imwrite(orig_name, np.uint8(255 * x))
+            except:
+                print(f"An error occurred handling the image {path}")
 
 
 if __name__ == '__main__':
