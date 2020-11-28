@@ -1,4 +1,5 @@
 import os
+import math
 import argparse
 from models import *
 from utils.utils import *
@@ -24,10 +25,11 @@ def compute_grad(model, dataloader, args):
         imgs = imgs.to(args['device']).float() / 255.0 
         labels = labels.to(args['device'])
 
-        for img, path in zip(imgs, paths):
+        for i, (img, path) in enumerate(zip(imgs, paths)):
             x = torch.stack([img])
             if args['yolo_loss']:
-                mask = grad_cam(x, labels)
+                id = labels[:, 0] == i
+                mask = grad_cam(x, labels[id])
             else:
                 mask = grad_cam(x, args['head'], args['anchor'], args['class'])
             
@@ -70,8 +72,8 @@ if __name__ == '__main__':
     model = Darknet(args['cfg']).to(args['device'])
     model.hyp = hyp
     model.nc = 20 if 'voc' in args['data'] else 12
-    print(f"model with {model.nc} classes")
     model.arc = 'default'
+    model.gr = 1 - (1 + math.cos(math.pi)) / 2  # GIoU <-> 1.0 loss ratio
     # Load args['weights']
     attempt_download(args['weights'])
     if args['weights'].endswith('.pt'):  # pytorch format
