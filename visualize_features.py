@@ -15,12 +15,12 @@ hyp = {
     'obj_pw': 1.0,
     'iou_t': 0.2
 }
-j = 0
 
 def compute_grad(model, dataloader, args):
 
     if args['yolo_loss']: grad_cam = YOLOGradCam(model, [model.yolo_layers[args['head']]-1])
     else: grad_cam =GradCam(model, [model.yolo_layers[args['head']]-1])
+    j = 0
 
     for imgs, labels, paths, _ in tqdm(dataloader):
         imgs = imgs.to(args['device']).float() / 255.0 
@@ -38,7 +38,7 @@ def compute_grad(model, dataloader, args):
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
             if args['yolo_loss']:
-                grad_name = f"{args['output']}{os.sep}{name}_{'all'}_{'all'}.{ext}"
+                grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{'all'}.{ext}"
             else:
                 grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
                 
