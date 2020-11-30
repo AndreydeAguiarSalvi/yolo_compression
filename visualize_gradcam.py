@@ -55,7 +55,6 @@ if __name__ == '__main__':
     parser.add_argument('--head', type=int, default=0, help='YOLO head to evaluate')
     parser.add_argument('--anchor', type=int, default=0, help='YOLO anchor to evaluate')
     parser.add_argument('--class', type=int, default=None, help='Class to evaluate the features. If None, the hightest prediction will be used')
-    parser.add_argument('--yolo_loss', action='store_true', help='use the original YOLO loss instead of the GradCam based')
     args = vars(parser.parse_args())
     print(args)
 
