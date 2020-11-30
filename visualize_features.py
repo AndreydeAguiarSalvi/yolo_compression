@@ -5,6 +5,7 @@ from models import *
 from utils.utils import *
 from utils.datasets import *
 from torch.utils.data import DataLoader
+from utils.torch_utils import select_device
 from utils.gradcam import GradCam, YOLOGradCam, show_cam_on_image
 
 hyp = {
@@ -23,8 +24,8 @@ def compute_grad(model, dataloader, args):
     j = 0
 
     for imgs, labels, paths, _ in tqdm(dataloader):
-        imgs = imgs.to(args['device']).float() / 255.0 
-        labels = labels.to(args['device'])
+        imgs = imgs.to(device).float() / 255.0 
+        labels = labels.to(device)
 
         for img, path in zip(imgs, paths):
             x = torch.stack([img])
@@ -68,10 +69,12 @@ if __name__ == '__main__':
     args['device'] = 'cuda:'+args['device'] if args['device'].isdigit() else 'cpu'
     print(args)
 
+    device = select_device(device, apex=False, batch_size=args['batch_size'])
+
     #########
     # Model #
     #########
-    model = Darknet(args['cfg']).to(args['device'])
+    model = Darknet(args['cfg']).to(device)
     model.hyp = hyp
     model.nc = 20 if 'voc' in args['data'] else 12
     model.arc = 'default'
@@ -81,11 +84,11 @@ if __name__ == '__main__':
     if args['weights'].endswith('.pt'):  # pytorch format
         try:
             try:
-                model.load_state_dict(torch.load(args['weights'], map_location=args['device'])['model'])
+                model.load_state_dict(torch.load(args['weights'], map_location=device)['model'])
             except:
-                model.load_state_dict(torch.load(args['weights'], map_location=args['device']))
+                model.load_state_dict(torch.load(args['weights'], map_location=device))
         except:
-            load_from_old_version( model, torch.load(args['weights'], map_location=args['device']) )
+            load_from_old_version( model, torch.load(args['weights'], map_location=device) )
     else:  # darknet format
         load_darknet_weights(model, args['weights'])
 
