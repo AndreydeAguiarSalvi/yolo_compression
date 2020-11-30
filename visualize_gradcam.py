@@ -6,7 +6,7 @@ from utils.utils import *
 from utils.datasets import *
 from torch.utils.data import DataLoader
 from utils.torch_utils import select_device
-from utils.gradcam import GradCam, YOLOGradCam, show_cam_on_image
+from utils.gradcam import GradCam, show_cam_on_image
 
 hyp = {
     'giou': 3.54,
@@ -19,8 +19,7 @@ hyp = {
 
 def compute_grad(model, dataloader, args):
 
-    if args['yolo_loss']: grad_cam = YOLOGradCam(model, [model.yolo_layers[args['head']]-1])
-    else: grad_cam =GradCam(model, [model.yolo_layers[args['head']]-1])
+    grad_cam = GradCam(model, [model.yolo_layers[args['head']]-1])
     j = 0
 
     for imgs, labels, paths, _ in tqdm(dataloader):
@@ -29,19 +28,11 @@ def compute_grad(model, dataloader, args):
 
         for img, path in zip(imgs, paths):
             x = torch.stack([img])
-            if args['yolo_loss']:
-                id = labels[:, 0] == j
-                j += 1
-                mask = grad_cam(x, labels[id])
-            else:
-                mask = grad_cam(x, args['head'], args['anchor'], args['class'])
+            mask = grad_cam(x, args['head'], args['anchor'], args['class'])
             
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
-            if args['yolo_loss']:
-                grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{'all'}.{ext}"
-            else:
-                grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
+            grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
                 
             orig_name = f"{args['output']}{os.sep}{name}.{ext}"
             # Saving results
