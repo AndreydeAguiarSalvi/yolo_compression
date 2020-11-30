@@ -66,10 +66,9 @@ if __name__ == '__main__':
     parser.add_argument('--class', type=int, default=None, help='Class to evaluate the features. If None, the hightest prediction will be used')
     parser.add_argument('--yolo_loss', action='store_true', help='use the original YOLO loss instead of the GradCam based')
     args = vars(parser.parse_args())
-    args['device'] = 'cuda:'+args['device'] if args['device'].isdigit() else 'cpu'
     print(args)
 
-    device = select_device(device, apex=False, batch_size=args['batch_size'])
+    device = select_device(args['device'], apex=False, batch_size=args['batch_size'])
 
     #########
     # Model #
