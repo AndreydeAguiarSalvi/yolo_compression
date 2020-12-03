@@ -1,4 +1,4 @@
 classes=20
-train=../../PASCALVOC2012/trainremaining.txt
-valid=../../PASCALVOC2012/val.txt
+train=../PASCALVOC2012/trainremaining.txt
+valid=../PASCALVOC2012/val.txt
 names=data/voc.names
