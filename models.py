@@ -608,10 +608,7 @@ class SparseYOLO(nn.Module):
                     'halfconv', 'softconv', 'inception', 'upsample', 'maxpool',
                     'PEP', 'EP', 'FCA', 'mobile'
                 ]:
-                if mtype == 'softconv': 
-                    x1 = module[0](x, self.temp, self.ticket)
-                    x = module[1:](x1)
-                else: x = module(x)
+                x = module(x)
             elif mtype == 'shortcut':  # sum
                 if verbose:
                     l = [i - 1] + module.layers  # layers
