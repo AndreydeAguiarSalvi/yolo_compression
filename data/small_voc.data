@@ -1,0 +1,3 @@
+classes=20
+test=../PASCALVOC2007/small.txt
+names=data/voc.names
