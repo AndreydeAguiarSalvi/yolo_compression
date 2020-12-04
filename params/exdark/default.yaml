@@ -29,7 +29,7 @@ arc : default
 darknet : default
 name : ''
 device : ''
-working_dir : /A/andrey/yolo/master/weights
+working_dir : /A/andrey/yolo_compression/weights
 scheduler : lambda
 gamma : 0.8
 early_stop: 75
