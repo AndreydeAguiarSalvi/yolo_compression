@@ -33,9 +33,8 @@ def compute_grad(model, dataloader, args):
             
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
-            grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}"
-            if args['layer']: grad_name += f"_{args['layer']}"
-            grad_name += f".{ext}"
+            subf = args['layer'] if args['layer'] else 'self'
+            grad_name = f"{args['output']}{os.sep}{subf}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
             
             orig_name = f"{args['output']}{os.sep}{name}.{ext}"
             # Saving results
