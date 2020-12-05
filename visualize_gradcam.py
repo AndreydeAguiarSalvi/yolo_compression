@@ -18,9 +18,10 @@ hyp = {
 }
 
 def compute_grad(model, dataloader, args):
-
-    grad_cam = GradCam(model, [model.yolo_layers[args['head']]-1])
-    j = 0
+    
+    if args['layer']: layer = [args['layer']]
+    else: layer = [model.yolo_layers[args['head']]-1]
+    grad_cam = GradCam(model, layer)
 
     for imgs, labels, paths, _ in tqdm(dataloader):
         imgs = imgs.to(device).float() / 255.0 
@@ -32,8 +33,10 @@ def compute_grad(model, dataloader, args):
             
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
-            grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
-                
+            grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}"
+            if args['layer']: grad_name += f"_{args['layer']}"
+            grad_name += f".{ext}"
+            
             orig_name = f"{args['output']}{os.sep}{name}.{ext}"
             # Saving results
             x = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
@@ -54,6 +57,7 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
     parser.add_argument('--head', type=int, default=0, help='YOLO head to evaluate')
     parser.add_argument('--anchor', type=int, default=0, help='YOLO anchor to evaluate')
+    parser.add_argument('--layer', type=int, default=None, help='layer to get the features and create the gradcam. If None, the gradcam is created over the self head-anchor')
     parser.add_argument('--class', type=int, default=None, help='Class to evaluate the features. If None, the hightest prediction will be used')
     args = vars(parser.parse_args())
     print(args)
