@@ -33,8 +33,7 @@ def compute_grad(model, dataloader, args):
             
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
-            subf = args['layer'] if args['layer'] else 'self'
-            grad_name = f"{args['output']}{os.sep}{subf}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
+            grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
             
             orig_name = f"{args['output']}{os.sep}{name}.{ext}"
             # Saving results
@@ -103,7 +102,9 @@ if __name__ == '__main__':
             pin_memory=True, collate_fn=dataset.collate_fn
         )
 
-    if not os.path.exists(args['output']):
-        os.makedirs(args['output'])
+    subf = args['layer'] if args['layer'] else 'self'
+    if not os.path.exists(args['output'] + os.sep + subf):
+        os.makedirs(args['output'] + os.sep + subf)
+    args['output'] += os.sep + subf
     
     compute_grad(model, dataloader, args)
