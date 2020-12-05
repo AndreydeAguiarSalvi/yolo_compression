@@ -8,14 +8,6 @@ from torch.utils.data import DataLoader
 from utils.torch_utils import select_device
 from utils.gradcam import GradCam, show_cam_on_image
 
-hyp = {
-    'giou': 3.54,
-    'cls': 37.4,
-    'cls_pw': 1.0,
-    'obj': 64.3,
-    'obj_pw': 1.0,
-    'iou_t': 0.2
-}
 
 def compute_grad(model, dataloader, args):
     
@@ -66,10 +58,6 @@ if __name__ == '__main__':
     # Model #
     #########
     model = Darknet(args['cfg']).to(device)
-    model.hyp = hyp
-    model.nc = 20 if 'voc' in args['data'] else 12
-    model.arc = 'default'
-    model.gr = 1 - (1 + math.cos(math.pi)) / 2  # GIoU <-> 1.0 loss ratio
     # Load args['weights']
     attempt_download(args['weights'])
     if args['weights'].endswith('.pt'):  # pytorch format
@@ -102,7 +90,7 @@ if __name__ == '__main__':
             pin_memory=True, collate_fn=dataset.collate_fn
         )
 
-    subf = args['layer'] if args['layer'] else 'self'
+    subf = str(args['layer']) if args['layer'] else 'self'
     if not os.path.exists(args['output'] + os.sep + subf):
         os.makedirs(args['output'] + os.sep + subf)
     args['output'] += os.sep + subf
