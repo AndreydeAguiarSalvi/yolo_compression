@@ -89,3 +89,27 @@ class GradCam:
         cam = cam - torch.min(cam)
         cam = cam / torch.max(cam)
         return cam.cpu().numpy()
+
+
+class GuidedBackpropReLU(Function):
+
+    @staticmethod
+    def forward(self, input):
+        positive_mask = (input > 0).type_as(input)
+        output = torch.addcmul(torch.zeros(input.size()).type_as(input), input, positive_mask)
+        self.save_for_backward(input, output)
+        return output
+
+    @staticmethod
+    def backward(self, grad_output):
+        input, output = self.saved_tensors
+        grad_input = None
+
+        positive_mask_1 = (input > 0).type_as(grad_output)
+        positive_mask_2 = (grad_output > 0).type_as(grad_output)
+        grad_input = torch.addcmul(torch.zeros(input.size()).type_as(input),
+                                   torch.addcmul(torch.zeros(input.size()).type_as(input), grad_output,
+                                                 positive_mask_1), positive_mask_2)
+
+        return grad_input
+
