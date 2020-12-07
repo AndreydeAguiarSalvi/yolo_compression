@@ -2,6 +2,7 @@
 # The original code does't work with YOLO
 # This is an adaptation from https://github.com/jacobgil/pytorch-grad-cam to work with YOLO
 # The original code assumes that the models have two functions: features and classifier
+# Paper: https://arxiv.org/pdf/1610.02391v1.pdf
 
 import cv2
 import torch
@@ -113,3 +114,42 @@ class GuidedBackpropReLU(Function):
 
         return grad_input
 
+
+class GuidedBackpropReLUModel:
+    def __init__(self, model):
+        self.model = model
+        self.model.eval()
+        self.device = next(iter(model)).device
+
+        def recursive_relu_apply(module_top):
+            for idx, module in module_top._modules.items():
+                recursive_relu_apply(module)
+                if module.__class__.__name__ == 'LeakyReLU':
+                    module_top._modules[idx] = GuidedBackpropReLU.apply
+                
+        # replace LeakyReLU with GuidedBackpropReLU
+        recursive_relu_apply(self.model)
+
+    def forward(self, input):
+        return self.model(input)
+
+    def __call__(self, input, head=0, anchor=0, index=None):
+        output = self.forward(input)
+
+        if index == None:           # [3times [bs, anchors, grid, grid, xywh + classes] ]
+            indexes = torch.nonzero( output[head] == torch.max(output[head][0, anchor, ..., 5:]) )
+            id_a, id_b, id_c, id_d, id_e = indexes[0]
+        else:
+            indexes = torch.nonzero( output[head] == torch.max(output[head][0, anchor, ..., 5+index]) )
+            id_a, id_b, id_c, id_d, id_e = indexes[0]
+
+        one_hot = torch.zeros((*output[head].size()), device=self.device, dtype=torch.float32)
+        one_hot[id_a, id_b, id_c, id_d, id_e] = 1
+        one_hot.requires_grad_(True)
+        one_hot = torch.sum(one_hot * output[head])
+        one_hot.backward(retain_graph=True)
+
+        output = input.grad.cpu().data.numpy()
+        output = output[0, :, :, :]
+
+        return output
