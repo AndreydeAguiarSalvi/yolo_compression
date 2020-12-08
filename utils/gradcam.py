@@ -119,7 +119,7 @@ class GuidedBackpropReLUModel:
     def __init__(self, model):
         self.model = model
         self.model.eval()
-        self.device = next(iter(model)).device
+        self.device = next(iter(model.parameters())).device
 
         def recursive_relu_apply(module_top):
             for idx, module in module_top._modules.items():
@@ -134,7 +134,7 @@ class GuidedBackpropReLUModel:
         return self.model(input)
 
     def __call__(self, input, head=0, anchor=0, index=None):
-        output = self.forward(input)
+        _, output = self.forward(input)
 
         if index == None:           # [3times [bs, anchors, grid, grid, xywh + classes] ]
             indexes = torch.nonzero( output[head] == torch.max(output[head][0, anchor, ..., 5:]) )
@@ -148,7 +148,7 @@ class GuidedBackpropReLUModel:
         one_hot.requires_grad_(True)
         one_hot = torch.sum(one_hot * output[head])
         one_hot.backward(retain_graph=True)
-
+        
         output = input.grad.cpu().data.numpy()
         output = output[0, :, :, :]
 
