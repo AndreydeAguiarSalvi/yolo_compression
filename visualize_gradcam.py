@@ -6,7 +6,7 @@ from utils.utils import *
 from utils.datasets import *
 from torch.utils.data import DataLoader
 from utils.torch_utils import select_device
-from utils.gradcam import GradCam, show_cam_on_image
+from utils.gradcam import GradCam, GuidedBackpropReLUModel, show_cam_on_image, deprocess_image
 
 
 def compute_grad(model, dataloader, args):
@@ -14,6 +14,7 @@ def compute_grad(model, dataloader, args):
     if args['layer']: layer = [args['layer']]
     else: layer = [model.yolo_layers[args['head']]-1]
     grad_cam = GradCam(model, layer)
+    gb_model = GuidedBackpropReLUModel(model)
 
     for imgs, labels, paths, _ in tqdm(dataloader):
         imgs = imgs.to(device).float() / 255.0 
@@ -21,17 +22,21 @@ def compute_grad(model, dataloader, args):
 
         for img, path in zip(imgs, paths):
             x = torch.stack([img])
+            ###########
+            # Gradcam #
+            ###########
             mask = grad_cam(x, args['head'], args['anchor'], args['class'])
-            
+            # names
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
             grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
-            
             orig_name = f"{args['output']}{os.sep}{name}.{ext}"
             # Saving results
             x = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
             show_cam_on_image(x, mask, grad_name)
             cv2.imwrite(orig_name, np.uint8(255 * x))
+
+            
 
 
 if __name__ == '__main__':

@@ -11,6 +11,24 @@ from torch.autograd import Function
 import torchvision.transforms as Transforms
 from utils.utils import compute_loss
 
+def show_cam_on_image(img, mask, path):
+    heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
+    heatmap = np.float32(heatmap) / 255
+    cam = heatmap + np.float32(img)
+    cam = cam / np.max(cam)
+    cv2.imwrite(path, np.uint8(255 * cam))
+
+
+def deprocess_image(img, normalization=True):
+    if normalization:
+        img = img - torch.mean(img)
+        img = img / (torch.std(img) + 1e-5)
+        img = img * 0.1
+        img = img + 0.5
+    img = torch.clip(img, 0, 1)
+    return np.uint8(img*255)
+
+
 class ModelOutputs():
     """ Class for making a forward pass, and getting:
     1. The network output.
@@ -35,14 +53,6 @@ class ModelOutputs():
             item.register_hook(self.save_gradient)
 
         return fts, train_out
-
-
-def show_cam_on_image(img, mask, path):
-    heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
-    heatmap = np.float32(heatmap) / 255
-    cam = heatmap + np.float32(img)
-    cam = cam / np.max(cam)
-    cv2.imwrite(path, np.uint8(255 * cam))
 
 
 class GradCam:
