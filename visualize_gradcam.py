@@ -1,5 +1,6 @@
 import os
 import math
+import copy
 import argparse
 from models import *
 from utils.utils import *
@@ -14,7 +15,7 @@ def compute_grad(model, dataloader, args):
     if args['layer']: layer = [args['layer']]
     else: layer = [model.yolo_layers[args['head']]-1]
     grad_cam = GradCam(model, layer)
-    gb_model = GuidedBackpropReLUModel(model)
+    gb_model = GuidedBackpropReLUModel(copy.deepcopy(model))
 
     for imgs, labels, paths, _ in tqdm(dataloader):
         imgs = imgs.to(device).float() / 255.0 
@@ -34,7 +35,7 @@ def compute_grad(model, dataloader, args):
             # Saving results
             x_ = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
             show_cam_on_image(x_, mask, grad_name)
-            cv2.imwrite(orig_name, np.uint8(255 * x))
+            cv2.imwrite(orig_name, np.uint8(255 * x_))
 
             ##################
             # GuidedBackprop #

@@ -21,11 +21,11 @@ def show_cam_on_image(img, mask, path):
 
 def deprocess_image(img, normalization=True):
     if normalization:
-        img = img - torch.mean(img)
-        img = img / (torch.std(img) + 1e-5)
+        img = img - np.mean(img)
+        img = img / (np.std(img) + 1e-5)
         img = img * 0.1
         img = img + 0.5
-    img = torch.clip(img, 0, 1)
+    img = np.clip(img, 0, 1)
     return np.uint8(img*255)
 
 
