@@ -29,14 +29,27 @@ def compute_grad(model, dataloader, args):
             # names
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
-            grad_name = f"{args['output']}{os.sep}{name}_{args['head']}_{args['anchor']}.{ext}"
+            grad_name = f"{args['output']}{os.sep}_grad_{name}_{args['head']}_{args['anchor']}.{ext}"
             orig_name = f"{args['output']}{os.sep}{name}.{ext}"
             # Saving results
-            x = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
-            show_cam_on_image(x, mask, grad_name)
+            x_ = cv2.cvtColor(x[0].cpu().numpy().transpose(1, 2, 0), cv2.COLOR_RGB2BGR)
+            show_cam_on_image(x_, mask, grad_name)
             cv2.imwrite(orig_name, np.uint8(255 * x))
 
-            
+            ##################
+            # GuidedBackprop #
+            ##################
+            x.requires_grad = True
+            gb = gb_model(x, args['head'], args['anchor'], args['class'])
+            gb = gb.transpose((1, 2, 0))
+            cam_mask = cv2.merge([mask, mask, mask])
+            cam_gb = deprocess_image(cam_mask*gb)
+            gb = deprocess_image(gb)
+            # Saving results
+            gb_name = f"{args['output']}{os.sep}_gb_{name}_{args['head']}_{args['anchor']}.{ext}"
+            cam_name = f"{args['output']}{os.sep}_cam-gb_{name}_{args['head']}_{args['anchor']}.{ext}"
+            cv2.imwrite(gb_name, gb)
+            cv2.imwrite(cam_name, cam_gb)
 
 
 if __name__ == '__main__':
