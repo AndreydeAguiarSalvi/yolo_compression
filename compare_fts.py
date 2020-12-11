@@ -1,5 +1,6 @@
 import os
 import cv2
+import tqdm
 import argparse
 import numpy as np
 
@@ -28,7 +29,7 @@ def show_images(original_pth: list, teacher_pth: list, reduced_pth: list, studen
 def save_images(original_pth: list, teacher_pth: list, reduced_pth: list, student_pth: list, path_to: str):
     if not os.path.exists(path_to): os.makedirs(path_to)
     j = 0
-    for i, (tch, red, std) in enumerate(zip(teacher_pth, reduced_pth, student_pth)):
+    for i, (tch, red, std) in tqdm.tqdm(enumerate((zip(teacher_pth, reduced_pth, student_pth)))):
         if i != 0 and i % 8 == 0: j += 1
         img1 = cv2.imread(original_pth[j])
         img2 = cv2.imread(tch)
@@ -75,9 +76,9 @@ if __name__ == "__main__":
     parser.add_argument('--visualize', action='store_true', help='only visualize the images. Otherwise, it will be saved')
     args = vars(parser.parse_args())
 
-    teacher_pth = load_paths(args['root'], args['teacher'], args['visu'], args['loss'])
+    teacher_pth = load_paths(args['root'], args['teacher'] + os.sep, args['visu'], args['loss'])
     reduced_pth = load_paths(args['root'], args['reduced'] + os.sep, args['visu'], args['loss'])
-    student_pth = load_paths(args['root'], args['student'], args['visu'], args['loss'])
+    student_pth = load_paths(args['root'], args['student'] + os.sep, args['visu'], args['loss'])
     original_pth = get_original_imgs(teacher_pth)
     
     if args['visualize']: show_images(original_pth, teacher_pth, reduced_pth, student_pth)
