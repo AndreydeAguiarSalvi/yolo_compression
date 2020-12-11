@@ -28,10 +28,9 @@ def show_images(original_pth: list, teacher_pth: list, reduced_pth: list, studen
 
 def save_images(original_pth: list, teacher_pth: list, reduced_pth: list, student_pth: list, path_to: str):
     if not os.path.exists(path_to): os.makedirs(path_to)
-    j = 0
-    for i, (tch, red, std) in tqdm.tqdm(enumerate((zip(teacher_pth, reduced_pth, student_pth)))):
-        if i != 0 and i % 8 == 0: j += 1
-        img1 = cv2.imread(original_pth[j])
+    
+    for i, (orig, tch, red, std) in tqdm.tqdm(enumerate((zip(original_pth, teacher_pth, reduced_pth, student_pth)))):
+        img1 = cv2.imread(orig)
         img2 = cv2.imread(tch)
         img3 = cv2.imread(red)
         img4 = cv2.imread(std)
