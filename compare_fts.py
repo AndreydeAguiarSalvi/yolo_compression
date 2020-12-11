@@ -7,7 +7,7 @@ import numpy as np
 
 def show_images(original_pth: list, teacher_pth: list, reduced_pth: list, student_pth: list):
     
-    for i, (orig, tch, red, std) in enumerate(zip(original_pth, teacher_pth, reduced_pth, student_pth)):
+    for orig, tch, red, std in zip(original_pth, teacher_pth, reduced_pth, student_pth):
         img1 = cv2.imread(orig)
         img2 = cv2.imread(tch)
         img3 = cv2.imread(red)
@@ -28,7 +28,7 @@ def show_images(original_pth: list, teacher_pth: list, reduced_pth: list, studen
 def save_images(original_pth: list, teacher_pth: list, reduced_pth: list, student_pth: list, path_to: str):
     if not os.path.exists(path_to): os.makedirs(path_to)
     
-    for i, (orig, tch, red, std) in tqdm.tqdm(enumerate((zip(original_pth, teacher_pth, reduced_pth, student_pth)))):
+    for orig, tch, red, std in tqdm.tqdm(zip(original_pth, teacher_pth, reduced_pth, student_pth)):
         img1 = cv2.imread(orig)
         img2 = cv2.imread(tch)
         img3 = cv2.imread(red)
