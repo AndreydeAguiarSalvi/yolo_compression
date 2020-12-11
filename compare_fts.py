@@ -5,34 +5,24 @@ import numpy as np
 
 
 def show_images(original_pth: list, teacher_pth: list, reduced_pth: list, student_pth: list):
+    j = 0
     for i, (tch, red, std) in enumerate(zip(teacher_pth, reduced_pth, student_pth)):
-        img1 = cv2.imread(original_pth[i % 9])
+        if i != 0 and i % 8 == 0: j += 1
+        img1 = cv2.imread(original_pth[j])
         img2 = cv2.imread(tch)
         img3 = cv2.imread(red)
         img4 = cv2.imread(std)
         stacked = np.concatenate((img1, img2, img3, img4), axis=1)
         window_name = tch.split(os.sep)[-1]
         print(stacked.shape, window_name)
-        
-        # cv2.namedWindow("Window", cv2.WINDOW_KEEPRATIO)
-        # cv2.imshow("Window", stacked)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
 
-        # cv2.namedWindow("Window", cv2.WINDOW_KEEPRATIO)
-        # cv2.imshow("Window", stacked)
-        # while cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) >= 1:
-        #     keyCode = cv2.waitKey(10000)
-        #     if (keyCode & 0xFF) == ord('q'):
-        #         cv2.destroyAllWindows()
-        #         break
-        cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
-        cv2.moveWindow(window_name, 0, 0)
+        cv2.namedWindow(window_name, cv2.WINDOW_KEEPRATIO)
         cv2.imshow(window_name, stacked)
-        key = cv2.waitKey(10000) #pauses for 10 seconds before fetching next image
-        if key == 27:#if ESC is pressed, exit loop
-            cv2.destroyAllWindows()
-            break
+        while cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) >= 1:
+            keyCode = cv2.waitKey(10000)
+            if (keyCode & 0xFF) == ord('q'):
+                cv2.destroyAllWindows()
+                break
 
 
 def load_paths(r: str, model: str, visu: str, loss: str) -> list:
