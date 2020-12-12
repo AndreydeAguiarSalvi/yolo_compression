@@ -319,7 +319,7 @@ class FCA(nn.Module):
         if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
         elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
         elif activation == 'swish': act_ftn = Swish()
-        elif activation == 'hswish': act_ftn = nn.Hardswish(inplace=True)
+        elif activation == 'hswish': act_ftn = h_swish()
         assert(activation in ['relu', 'relu6', 'leaky', 'swish', 'hswish'])
 
         hidden_channels = channels // reduction_ratio
@@ -524,7 +524,7 @@ class MobileBottleneck(nn.Module):
         if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
         elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
         elif activation == 'swish': act_ftn = Swish()
-        elif activation == 'hswish': act_ftn = nn.Hardswish(inplace=True)
+        elif activation == 'hswish': act_ftn = h_swish()
         assert(activation in ['relu', 'relu6', 'leaky', 'swish', 'hswish'])
 
         if in_channels == hidden_dim:
