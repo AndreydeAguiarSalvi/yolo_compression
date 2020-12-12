@@ -319,7 +319,8 @@ class FCA(nn.Module):
         if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
         elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
         elif activation == 'swish': act_ftn = Swish()
-        assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
+        elif activation == 'hswish': act_ftn = nn.Hardswish(inplace=True)
+        assert(activation in ['relu', 'relu6', 'leaky', 'swish', 'hswish'])
 
         hidden_channels = channels // reduction_ratio
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
@@ -522,8 +523,9 @@ class MobileBottleneck(nn.Module):
         if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
         if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
         elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-        elif activation == 'swish': act_ftn = h_swish()
-        assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
+        elif activation == 'swish': act_ftn = Swish()
+        elif activation == 'hswish': act_ftn = nn.Hardswish(inplace=True)
+        assert(activation in ['relu', 'relu6', 'leaky', 'swish', 'hswish'])
 
         if in_channels == hidden_dim:
             self.conv = nn.Sequential(
