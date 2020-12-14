@@ -206,8 +206,10 @@ def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, acti
     if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
     if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
     elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+    elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
     elif activation == 'swish': act_ftn = Swish()
-    assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
+    elif activation == 'hswish': act_ftn = HardSwish()
+    assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
     
     # 1x1 convolution without padding
     if bn == True:
@@ -229,8 +231,10 @@ def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='relu
     if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
     if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
     elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+    elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
     elif activation == 'swish': act_ftn = Swish()
-    assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
+    elif activation == 'hswish': act_ftn = HardSwish()
+    assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
     
     # 3x3 convolution with padding=1
     if bn == True:
@@ -252,8 +256,10 @@ def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1, activa
     if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
     if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
     elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+    elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
     elif activation == 'swish': act_ftn = Swish()
-    assert(activation in ['relu', 'relu6', 'leaky', 'swish'])
+    elif activation == 'hswish': act_ftn = HardSwish()
+    assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
     
     return nn.Sequential(
         # pw
@@ -323,9 +329,10 @@ class FCA(nn.Module):
         if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
         if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
         elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+        elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
         elif activation == 'swish': act_ftn = Swish()
-        elif activation == 'hswish': act_ftn = h_swish()
-        assert(activation in ['relu', 'relu6', 'leaky', 'swish', 'hswish'])
+        elif activation == 'hswish': act_ftn = HardSwish()
+        assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
 
         hidden_channels = channels // reduction_ratio
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
@@ -482,24 +489,6 @@ def make_divisible(v, divisor, min_value=None):
     return new_v
 
 
-class h_sigmoid(nn.Module):
-    def __init__(self, inplace=True):
-        super(h_sigmoid, self).__init__()
-        self.relu = nn.ReLU6(inplace=inplace)
-
-    def forward(self, x):
-        return self.relu(x + 3) / 6
-
-
-class h_swish(nn.Module):
-    def __init__(self, inplace=True):
-        super(h_swish, self).__init__()
-        self.sigmoid = h_sigmoid(inplace=inplace)
-
-    def forward(self, x):
-        return x * self.sigmoid(x)
-
-
 class SELayer(nn.Module):
     def __init__(self, channel, reduction=4):
         super(SELayer, self).__init__()
@@ -525,12 +514,16 @@ class MobileBottleneck(nn.Module):
 
         self.identity = stride == 1 and in_channels == out_channels
         act_ftn = None
+        '''
+            Default activations from MobileNet V3: relu and hswish
+        '''
         if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
         if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
         elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+        elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
         elif activation == 'swish': act_ftn = Swish()
         elif activation == 'hswish': act_ftn = HardSwish()
-        assert(activation in ['relu', 'relu6', 'leaky', 'swish', 'hswish'])
+        assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
 
         if in_channels == hidden_dim:
             self.conv = nn.Sequential(

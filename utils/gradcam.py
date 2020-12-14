@@ -134,7 +134,7 @@ class GuidedBackpropReLUModel:
         def recursive_relu_apply(module_top):
             for idx, module in module_top._modules.items():
                 recursive_relu_apply(module)
-                if module.__class__.__name__ in ['LeakyReLU', 'ReLU', 'ReLU6', 'Swish', 'Sigmoid', 'Hardswish']:
+                if module.__class__.__name__ in ['LeakyReLU', 'ReLU', 'ReLU6', 'Sigmoid', 'Swish', 'HardSwish']:
                     module_top._modules[idx] = GuidedBackpropReLU.apply
                 
         # replace LeakyReLU with GuidedBackpropReLU
