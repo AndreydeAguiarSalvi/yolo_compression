@@ -67,6 +67,11 @@ class Mish(nn.Module):  # https://github.com/digantamisra98/Mish
 ################
 # My Additions #
 ################
+class HardSwish(nn.Module):
+    def forward(self, x):
+        return x.mul_(torch.relu(x+3.)/6.)
+
+
 class MultiBiasConv(nn.Module):
     def __init__(self, in_channels, out_channels, n_bias, kernel_size=(3, 3), stride=1, pad=0):
         super(MultiBiasConv, self).__init__()
@@ -524,7 +529,7 @@ class MobileBottleneck(nn.Module):
         if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
         elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
         elif activation == 'swish': act_ftn = Swish()
-        elif activation == 'hswish': act_ftn = h_swish()
+        elif activation == 'hswish': act_ftn = HardSwish()
         assert(activation in ['relu', 'relu6', 'leaky', 'swish', 'hswish'])
 
         if in_channels == hidden_dim:

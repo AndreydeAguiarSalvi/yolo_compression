@@ -79,8 +79,12 @@ def create_modules(module_defs, img_size, arc):
                 # modules.add_module('activation', nn.PReLU(num_parameters=1, init=0.10))
             elif mdef['activation'] == 'relu':
                 modules.add_module('activation', nn.ReLU(inplace=True))
+            elif mdef['activation'] == 'relu6':
+                modules.add_module('activation', nn.ReLU6(inplace=True))
             elif mdef['activation'] == 'swish':
                 modules.add_module('activation', Swish())
+            elif mdef['activation'] == 'hswish':
+                modules.add_module('activation', HardSwish())
 
         elif mdef['type'] == 'PEP':
             filters = mdef['filters']
