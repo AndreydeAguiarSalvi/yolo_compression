@@ -81,5 +81,5 @@ if __name__ == "__main__":
     
     if args['visualize']: show_images(original_pth, teacher_pth, reduced_pth, student_pth)
     else: 
-        path_to = 'output' + os.sep + f"{args['teacher']}_{args['reduced']}_{args['student']}" + os.sep + args['visu']
+        path_to = args['root'] + os.sep + f"{args['teacher']}_{args['reduced']}_{args['student']}" + os.sep + args['visu']
         save_images(original_pth, teacher_pth, reduced_pth, student_pth, path_to)
