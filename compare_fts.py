@@ -43,7 +43,7 @@ def load_paths(r: str, model: str, visu: str, loss: str) -> list:
     result = []
     for root, _, files in os.walk(r):
         for f in files:
-            if model in root and visu in f and loss in root:
+            if model in root and visu in f and loss in root and 'group' not in root:
                 result.append(root + os.sep + f)
     result.sort()
     return result
@@ -81,5 +81,5 @@ if __name__ == "__main__":
     
     if args['visualize']: show_images(original_pth, teacher_pth, reduced_pth, student_pth)
     else: 
-        path_to = args['root'] + os.sep + f"{args['teacher']}_{args['reduced']}_{args['student']}" + os.sep + args['visu']
+        path_to = args['root'] + os.sep + 'groups' + os.sep + f"{args['teacher']}_{args['reduced']}_{args['student']}" + os.sep + args['visu']
         save_images(original_pth, teacher_pth, reduced_pth, student_pth, path_to)
