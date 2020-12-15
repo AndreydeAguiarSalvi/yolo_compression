@@ -21,7 +21,7 @@ epochs : 300
 batch_size : 8
 accumulate: 8
 cfg : cfg/pascal/yolov3.cfg
-data : data/coco2014.data
+data : data/voc2012.data
 img_size : [416]
 bucket : ''
 weights : ''
