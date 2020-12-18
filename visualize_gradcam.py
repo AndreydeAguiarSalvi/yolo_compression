@@ -21,12 +21,19 @@ def compute_grad(model, dataloader, args):
         imgs = imgs.to(device).float() / 255.0 
         labels = labels.to(device)
 
-        for img, path in zip(imgs, paths):
+        for i, (img, path) in enumerate(zip(imgs, paths)):
             x = torch.stack([img])
             ###########
             # Gradcam #
             ###########
-            mask = grad_cam(x, args['head'], args['anchor'], args['class'])
+            target = None
+            if args['class']: target = args['class']
+            elif args['h_obj']:
+                l = labels[labels[:, 0] == i, :]
+                area = l[:, 4] * l[:, 5]
+                target = l[torch.argmax(area), 1]
+
+            mask = grad_cam(x, args['head'], args['anchor'], target)
             # names
             ext = path.split('.')[-1]
             name = path.split(os.sep)[-1].split('.')[0]
@@ -41,7 +48,7 @@ def compute_grad(model, dataloader, args):
             # GuidedBackprop #
             ##################
             x.requires_grad = True
-            gb = gb_model(x, args['head'], args['anchor'], args['class'])
+            gb = gb_model(x, args['head'], args['anchor'], target)
             gb = gb.transpose((1, 2, 0))
             cam_mask = cv2.merge([mask, mask, mask])
             cam_gb = deprocess_image(cam_mask*gb)
@@ -57,17 +64,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--cfg', type=str, default='cfg/pascal/yolov3.cfg', help='*.cfg path')
     parser.add_argument('--weights', type=str, default='weights/voc_yolov3/size-multi_scale/2020_03_16/13_19_34/model_it_1.pt', help='path to weights file')
-    parser.add_argument('--data', type=str, default='data/voc2012.data', help='.data pointing images to load')
+    parser.add_argument('--data', type=str, default='data/small_voc.data', help='.data pointing images to load')
     parser.add_argument('--source', type=str, default='', help='source')  # input file/folder
     parser.add_argument('--output', type=str, default='output', help='output folder')  # output folder
     parser.add_argument('--img_size', type=int, default=416, help='inference size (pixels)')
-    parser.add_argument('--batch_size', type=int, default=32, help='number of images per mini-batch')
+    parser.add_argument('--batch_size', type=int, default=16, help='number of images per mini-batch')
     parser.add_argument('--rect', action='store_true', help='rectangular inference')
     parser.add_argument('--device', default='', help='device id (i.e. 0 or 0,1) or cpu')
     parser.add_argument('--head', type=int, default=0, help='YOLO head to evaluate')
     parser.add_argument('--anchor', type=int, default=0, help='YOLO anchor to evaluate')
-    parser.add_argument('--layer', type=int, default=None, help='layer to get the features and create the gradcam. If None, the gradcam is created over the self head-anchor')
+    parser.add_argument('--layer', type=int, default=None, help='layer to get the features and create the gradcam. If None, the gradcam is created over the self pre-YOLO Head layer')
     parser.add_argument('--class', type=int, default=None, help='Class to evaluate the features. If None, the hightest prediction will be used')
+    parser.add_argument('--h_obj', action='store_ture', help='if True, it uses the class from the bigger object in the scene.')
     args = vars(parser.parse_args())
     print(args)
 
@@ -109,7 +117,7 @@ if __name__ == '__main__':
             pin_memory=True, collate_fn=dataset.collate_fn
         )
 
-    subf = str(args['layer']) if args['layer'] else 'self'
+    subf = str(args['layer']) if args['layer'] else 'bigger' if args['h_obj'] else 'self'
     if not os.path.exists(args['output'] + os.sep + subf):
         os.makedirs(args['output'] + os.sep + subf)
     args['output'] += os.sep + subf
