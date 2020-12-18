@@ -192,7 +192,7 @@ def train():
                 bboxes_tch = non_max_suppression(inf_out, conf_thres=.1, iou_thres=0.6)
                 targets_tch = torch.Tensor()
                 # creating labels from teacher outputs
-                for i, detections in enumerate(bboxes_tch): # a list of detections per image
+                for j, detections in enumerate(bboxes_tch): # a list of detections per image
                     if detections is not None and len(detections): 
                         for *xyxy, _, cls_tch in detections: # ignoring the confidence
                             xyxy = torch.Tensor(xyxy)
@@ -202,7 +202,7 @@ def train():
                             xyxy[:, (0, 2)] /= imgs.shape[2]
                             xyxy[:, (1, 3)] /= imgs.shape[3]
 
-                            l[:, 0] = i # the i-th image
+                            l[:, 0] = j # the j-th image
                             l[:, 1] = cls_tch # classes
                             l[:, 2:] = xyxy2xywh(xyxy) # bboxes in darknet format
 
