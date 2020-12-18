@@ -18,9 +18,7 @@ Python 3.7 or later with all of the `pip install -U -r requirements.txt` package
 - `torch >= 1.3`
 - `opencv-python`
 - `Pillow`
-
-Even more, install [THOP](https://github.com/Lyken17/pytorch-OpCounter) to count the MACs
-pip install --upgrade git+https://github.com/Lyken17/pytorch-OpCounter.git
+- [THOP](https://github.com/Lyken17/pytorch-OpCounter) to count the MACs
 
 # Other Details
 I am now focused on completing my master's (scheduled for March, 2020). With this task completed, I will bring you the final results of the work and examples of how to run this repository.
