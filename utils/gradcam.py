@@ -72,7 +72,7 @@ class GradCam:
             indexes = torch.nonzero( output[head] == torch.max(output[head][0, anchor, ..., 5:]) )
             id_a, id_b, id_c, id_d, id_e = indexes[0]
         else:
-            indexes = torch.nonzero( output[head] == torch.max(output[head][0, anchor, ..., 5+index]) )
+            indexes = torch.nonzero( output[head] == torch.max(output[head][0, anchor, ..., int(5+index)]) )
             id_a, id_b, id_c, id_d, id_e = indexes[0]
 
         one_hot = torch.zeros((*output[head].size()), device=self.device, dtype=torch.float32)
@@ -150,7 +150,7 @@ class GuidedBackpropReLUModel:
             indexes = torch.nonzero( output[head] == torch.max(output[head][0, anchor, ..., 5:]) )
             id_a, id_b, id_c, id_d, id_e = indexes[0]
         else:
-            indexes = torch.nonzero( output[head] == torch.max(output[head][0, anchor, ..., 5+index]) )
+            indexes = torch.nonzero( output[head] == torch.max(output[head][0, anchor, ..., int(5+index)]) )
             id_a, id_b, id_c, id_d, id_e = indexes[0]
 
         one_hot = torch.zeros((*output[head].size()), device=self.device, dtype=torch.float32)
