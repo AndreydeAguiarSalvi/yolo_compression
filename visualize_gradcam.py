@@ -75,7 +75,7 @@ if __name__ == '__main__':
     parser.add_argument('--anchor', type=int, default=0, help='YOLO anchor to evaluate')
     parser.add_argument('--layer', type=int, default=None, help='layer to get the features and create the gradcam. If None, the gradcam is created over the self pre-YOLO Head layer')
     parser.add_argument('--class', type=int, default=None, help='Class to evaluate the features. If None, the hightest prediction will be used')
-    parser.add_argument('--h_obj', action='store_ture', help='if True, it uses the class from the bigger object in the scene.')
+    parser.add_argument('--h_obj', action='store_true', help='if True, it uses the class from the bigger object in the scene.')
     args = vars(parser.parse_args())
     print(args)
 
