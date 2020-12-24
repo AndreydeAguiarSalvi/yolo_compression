@@ -24,7 +24,6 @@ def train():
     epochs = config['epochs']  # 500200 batches at bs 64, 117263 images = 273 epochs
     batch_size = config['batch_size']
     accumulate = config['accumulate']  # effective bs = batch_size * accumulate = 16 * 4 = 64
-    weights = config['weights']  # initial training weights
 
     # Initialize
     init_seeds(config['seed'])
@@ -36,13 +35,12 @@ def train():
 
     # Configure run
     data_dict = parse_data_cfg(data)
-    train_path = data_dict['train']
-    test_path = data_dict['valid']
     nc = 1 if config['single_cls'] else int(data_dict['classes'])  # number of classes
 
     # Initialize model
     if config['darknet'] == 'default':
-        model = Darknet(cfg, arc=config['arc']).to(device)
+        if 'nano' in cfg: model = YOLO_Nano(cfg).to(device)
+        else: model = Darknet(cfg, arc=config['arc']).to(device)
     elif config['darknet'] == 'soft':
         model = SoftDarknet(cfg, arc=config['arc']).to(device)
     optimizer = create_optimizer(model, config)

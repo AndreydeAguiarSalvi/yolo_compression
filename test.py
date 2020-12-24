@@ -46,7 +46,8 @@ def test(cfg,
             masks = [m.mask for m in model.mask_modules]
             print(f"Evaluating model with {compute_removed_weights(masks)} parameters removed.")
         else:
-            model = Darknet(cfg=cfg).to(device)
+            if 'nano' in cfg: model = YOLO_Nano(cfg).to(device)
+            else: model = Darknet(cfg=cfg).to(device)
 
         if mask or mask_weight:
             from utils.pruning import sum_of_the_weights, apply_mask_LTH, create_mask_LTH
@@ -63,12 +64,9 @@ def test(cfg,
         attempt_download(weights)
         if weights.endswith('.pt'):  # pytorch format
             try:
-                try:
-                    model.load_state_dict(torch.load(weights, map_location=device)['model'])
-                except:
-                    model.load_state_dict(torch.load(weights, map_location=device))
+                model.load_state_dict(torch.load(weights, map_location=device)['model'])
             except:
-                load_from_old_version( model, torch.load(weights, map_location=device) )
+                model.load_state_dict(torch.load(weights, map_location=device))
         else:  # darknet format
             load_darknet_weights(model, weights)
 
