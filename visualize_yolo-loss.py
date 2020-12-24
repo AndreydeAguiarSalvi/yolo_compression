@@ -107,12 +107,9 @@ if __name__ == "__main__":
     attempt_download(args['weights'])
     if args['weights'].endswith('.pt'):  # pytorch format
         try:
-            try:
-                model.load_state_dict(torch.load(args['weights'], map_location=device)['model'])
-            except:
-                model.load_state_dict(torch.load(args['weights'], map_location=device))
+            model.load_state_dict(torch.load(args['weights'], map_location=device)['model'])
         except:
-            load_from_old_version( model, torch.load(args['weights'], map_location=device) )
+            model.load_state_dict(torch.load(args['weights'], map_location=device))
     else:  # darknet format
         load_darknet_weights(model, args['weights'])
 

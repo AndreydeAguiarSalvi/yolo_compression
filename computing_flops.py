@@ -23,15 +23,16 @@ if 'soft' in args['model'] or 'soft' in args['cfg']:
     model.ticket = True
     _ = model(x)
 else:
-    model = Darknet(args['cfg']).to(device)    
+    if 'nano' in args['cfg']: model = YOLO_Nano(args['cfg']).to(device)
+    else: Darknet(args['cfg']).to(device)    
 
 if args['model']:
     checkpoint = torch.load(args['model'], map_location=device)
     try:
         try:
             model.load_state_dict(checkpoint['model'])
-        except:
-            model.load_state_dict(checkpoint)
+        except:        
+            model.load_state_dict(checkpoint) 
     except:
         print("model key don't found in checkpoint. Trying without model key")
         model.load_state_dict(checkpoint)
