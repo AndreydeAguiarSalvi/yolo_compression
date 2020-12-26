@@ -46,8 +46,10 @@ def train():
         teacher = SoftDarknet(cfg=config['teacher_cfg'], arc=config['teacher_arc']).to(device)
     # Initialize Student
     if config['student_darknet'] == 'default':
-        if 'nano' in config['student_darknet']: student = YOLO_Nano(config['student_darknet']).to(device)
-        else: student = Darknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
+        if 'nano' in config['student_cfg']: 
+            print('Using a YOLO Nano arc')
+            student = YOLO_Nano(config['student_cfg']).to(device)
+        else: student = Darknet(cfg=config['student_cfg']).to(device)
     elif config['student_darknet'] == 'soft':
         student = SoftDarknet(cfg=config['student_cfg'], arc=config['student_arc']).to(device)
     # Create Discriminators
