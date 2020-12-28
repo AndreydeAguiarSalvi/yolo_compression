@@ -84,7 +84,8 @@ if __name__ == '__main__':
     #########
     # Model #
     #########
-    model = Darknet(args['cfg']).to(device)
+    if 'nano' in args['cfg']: model = YOLO_Nano(args['cfg']).to(device)
+    else: model = Darknet(args['cfg']).to(device)
     # Load args['weights']
     attempt_download(args['weights'])
     if args['weights'].endswith('.pt'):  # pytorch format

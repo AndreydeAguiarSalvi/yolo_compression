@@ -98,7 +98,8 @@ if __name__ == "__main__":
     #########
     # Model #
     #########
-    model = Darknet(args['cfg']).to(device)
+    if 'nano' in args['cfg']: model = YOLO_Nano(args['cfg']).to(device)
+    else: model = Darknet(args['cfg']).to(device)
     model.hyp = hyp
     model.nc = 20 if 'voc' in args['data'] else 12
     model.arc = 'default'
