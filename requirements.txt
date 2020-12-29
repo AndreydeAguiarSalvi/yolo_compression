@@ -1,9 +1,9 @@
 # pip install -U -r requirements.txt
-numpy == 1.17.1
-Cython
-opencv-python >= 4.1
-torch
-torchvision
+numpy == 1.19.2
+Cython == 0.29.14
+opencv-python == 4.2.0
+torch == 1.7.1
+torchvision == 0.8.2
 matplotlib
 pycocotools
 tqdm
