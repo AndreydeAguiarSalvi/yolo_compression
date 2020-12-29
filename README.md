@@ -14,8 +14,8 @@ Currently evaluated approaches:
 # Requirements
 
 Python 3.7 or later with all of the `pip install -U -r requirements.txt` packages including:
-- `numpy = 1.17 (version 1.18 raises bugs on COCOAPI)`
-- `torch >= 1.3`
+- `numpy = 1.19 (version 1.18 raises bugs on COCOAPI)`
+- `torch >= 1.7`
 - `opencv-python`
 - `Pillow`
 - [THOP](https://github.com/Lyken17/pytorch-OpCounter) to count the MACs
