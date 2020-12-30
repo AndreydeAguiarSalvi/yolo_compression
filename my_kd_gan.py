@@ -188,6 +188,8 @@ def train():
             # Run student
             if len(config['student_indexes']) and epoch < config['second_stage']:
                 pred_std, fts_std = student(imgs, config['student_indexes'])
+                if 'nano' in config['student_cfg']: # YOLO Nano outputs in the reversed order
+                    fts_std.reverse()
             else: pred_std = student(imgs)
 
             

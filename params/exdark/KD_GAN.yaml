@@ -17,7 +17,7 @@ student_cfg : cfg/exdark/yolo-nano_leaky.cfg
 student_weights: ''
 student_darknet: default
 student_arc: default
-student_indexes: [29, 39, 48]
+student_indexes: [44, 41, 38]
 
 data : data/ExDark_train.data
 D_kernel_size: [1, 1]
