@@ -4,6 +4,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 from collections import OrderedDict
 ONNX_EXPORT = False
+relu6 = torch.nn.ReLU6(inplace=True)
+
+# TODO: My activation functions
+# Inversed Leaky6:
+#   -.1x    if x < 0
+#   x       if x < 6
+#   6       otherwise
+# 
+# Super-Sigmoid:
+#   -ln(-x+1)   if x < 0
+#   ln(x+1)     otherwise
+# 
+# Super-TanH:
+#   e^(x+1) - 2.75  if x < 0
+#   2.75 - e^(-x+1) otherwise
 
 class weightedFeatureFusion(nn.Module):  # weighted sum of 2 or more layers https://arxiv.org/abs/1911.09070
     def __init__(self, layers, weight=False):
@@ -69,7 +84,7 @@ class Mish(nn.Module):  # https://github.com/digantamisra98/Mish
 ################
 class HardSwish(nn.Module):
     def forward(self, x):
-        return x.mul_(torch.relu(x+3.)/6.)
+        return x.mul_(relu6(x+3.)/6.)
 
 
 class MultiBiasConv(nn.Module):
