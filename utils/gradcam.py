@@ -11,6 +11,8 @@ from torch.autograd import Function
 import torchvision.transforms as Transforms
 from utils.utils import compute_loss
 
+relu6 = torch.nn.ReLU6(inplace=True)
+
 def show_cam_on_image(img, mask, path):
     heatmap = cv2.applyColorMap(np.uint8(255 * mask), cv2.COLORMAP_JET)
     heatmap = np.float32(heatmap) / 255
@@ -102,50 +104,104 @@ class GradCam:
         return cam.cpu().numpy()
 
 
-class GuidedBackpropReLU(Function):
+def generic_backward(conv_output, grad_output):
+    positive_mask_1 = (conv_output > 0).type_as(grad_output)
+    positive_mask_2 = (grad_output > 0).type_as(grad_output)
+    grad_input = torch.addcmul(torch.zeros(conv_output.size()).type_as(conv_output),
+                                torch.addcmul(torch.zeros(conv_output.size()).type_as(conv_output), grad_output,
+                                                positive_mask_1), positive_mask_2)
+    return grad_input
 
+class GuidedBackpropLeakyReLU(Function):
     @staticmethod
-    def forward(self, input):
-        positive_mask = (input > 0).type_as(input)
-        output = torch.addcmul(torch.zeros(input.size()).type_as(input), input, positive_mask)
-        self.save_for_backward(input, output)
+    def forward(self, input_img):
+        output = torch.where(input_img > 0, input_img, 0.1*input_img)
+        self.save_for_backward(input_img, output)
         return output
 
     @staticmethod
     def backward(self, grad_output):
-        input, output = self.saved_tensors
-        grad_input = None
+        conv_output, fcn_output = self.saved_tensors
 
-        positive_mask_1 = (input > 0).type_as(grad_output)
-        positive_mask_2 = (grad_output > 0).type_as(grad_output)
-        grad_input = torch.addcmul(torch.zeros(input.size()).type_as(input),
-                                   torch.addcmul(torch.zeros(input.size()).type_as(input), grad_output,
-                                                 positive_mask_1), positive_mask_2)
+        return generic_backward(conv_output, grad_output)
 
-        return grad_input
+
+class GuidedBackpropReLU(Function):
+    @staticmethod
+    def forward(self, input_img):
+        positive_mask = (input_img > 0).type_as(input_img)
+        output = torch.addcmul(torch.zeros(input_img.size()).type_as(input_img), input_img, positive_mask)
+        self.save_for_backward(input_img, output)
+        return output
+
+    @staticmethod
+    def backward(self, grad_output):
+        conv_output, fcn_output = self.saved_tensors
+
+        return generic_backward(conv_output, grad_output)
+
+
+class GuidedBackpropReLU6(Function):
+    @staticmethod
+    def forward(self, input_img):
+        device = input_img.device
+        zero = torch.tensor([.0], device=device)
+        six = torch.tensor([6.], device=device)
+        positive_values = torch.where(input_img > 0, input_img, zero)
+        output = torch.where(positive_values < 6, positive_values, six)
+        self.save_for_backward(input_img, output)
+        return output
+
+    @staticmethod
+    def backward(self, grad_output):
+        conv_output, fcn_output = self.saved_tensors
+
+        return generic_backward(conv_output, grad_output)
 
 
 class GuidedBackpropSigmoid(Function):
-
     @staticmethod
-    def forward(self, input):
-        positive_mask = (input >= -3).type_as(input)
-        output = torch.addcmul(torch.zeros(input.size()).type_as(input), input, positive_mask)
-        self.save_for_backward(input, output)
+    def forward(self, input_img):
+        output = torch.sigmoid(input_img)
+        self.save_for_backward(input_img, output)
         return output
 
     @staticmethod
     def backward(self, grad_output):
-        input, output = self.saved_tensors
+        conv_output, fcn_output = self.saved_tensors
         grad_input = None
 
-        positive_mask_1 = (input >= -3).type_as(grad_output)
-        positive_mask_2 = (grad_output > 0).type_as(grad_output)
-        grad_input = torch.addcmul(torch.zeros(input.size()).type_as(input),
-                                   torch.addcmul(torch.zeros(input.size()).type_as(input), grad_output,
-                                                 positive_mask_1), positive_mask_2)
-
+        positive_mask = (grad_output > 0).type_as(grad_output)
+        grad_input = torch.addcmul(torch.zeros(conv_output.size()).type_as(conv_output), grad_output, positive_mask)
         return grad_input
+
+
+class GuidedBackpropSwish(Function):
+    @staticmethod
+    def forward(self, input_img):
+        output = input_img * torch.sigmoid(input_img)
+        self.save_for_backward(input_img, output)
+        return output
+
+    @staticmethod
+    def backward(self, grad_output):
+        conv_output, fcn_output = self.saved_tensors
+
+        return generic_backward(conv_output, grad_output)
+
+
+class GuidedBackpropHardSwish(Function):
+    @staticmethod
+    def forward(self, input_img):
+        output = input_img.mul(relu6(input_img+3.)/6.)
+        self.save_for_backward(input_img, output)
+        return output
+
+    @staticmethod
+    def backward(self, grad_output):
+        conv_output, fcn_output = self.saved_tensors
+
+        return generic_backward(conv_output, grad_output)
 
 
 class GuidedBackpropReLUModel:
@@ -154,16 +210,24 @@ class GuidedBackpropReLUModel:
         self.model.eval()
         self.device = next(iter(model.parameters())).device
 
-        def recursive_relu_apply(module_top):
+        def recursive_function_apply(module_top):
             for idx, module in module_top._modules.items():
-                recursive_relu_apply(module)
-                if module.__class__.__name__ in ['LeakyReLU', 'ReLU', 'ReLU6', 'Swish', 'HardSwish']:
+                recursive_function_apply(module)
+                if module.__class__.__name__ == 'LeakyReLU':
+                    module_top._modules[idx] = GuidedBackpropLeakyReLU.apply
+                elif module.__class__.__name__ == 'ReLU':
                     module_top._modules[idx] = GuidedBackpropReLU.apply
+                elif module.__class__.__name__ == 'ReLU6':
+                    module_top._modules[idx] = GuidedBackpropReLU6.apply
                 elif module.__class__.__name__ == 'Sigmoid':
                     module_top._modules[idx] = GuidedBackpropSigmoid.apply
-                
-        # replace LeakyReLU with GuidedBackpropReLU
-        recursive_relu_apply(self.model)
+                elif module.__class__.__name__ == 'Swish':
+                    module_top._modules[idx] = GuidedBackpropSwish.apply
+                elif module.__class__.__name__ == 'HardSwish':
+                    module_top._modules[idx] = GuidedBackpropHardSwish.apply
+
+        # replace ReLU with GuidedBackpropReLU
+        recursive_function_apply(self.model)
 
     def forward(self, input):
         return self.model(input)
