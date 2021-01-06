@@ -39,11 +39,11 @@ def save_images(original_pth: list, teacher_pth: list, reduced_pth: list, studen
         cv2.imwrite(path_to + os.sep + window_name, stacked)
 
         
-def load_paths(r: str, model: str, visu: str, loss: str) -> list:
+def load_paths(r: str, dt: str, model: str, visu: str, loss: str) -> list:
     result = []
     for root, _, files in os.walk(r):
         for f in files:
-            if model in root and visu in f and loss in root and 'group' not in root:
+            if model in root and dt in root and visu in f and loss in root and 'group' not in root:
                 result.append(root + os.sep + f)
     result.sort()
     return result
@@ -68,18 +68,19 @@ if __name__ == "__main__":
     parser.add_argument('--reduced', default='nano', help='folder model used as student, but in normal training')
     parser.add_argument('--student', default='nano_kd36', help='folder model used as student, trained with KD')
     parser.add_argument('--root', default='output/GradCam', help='root folder with features to visualize')
+    parser.add_argument('--dataset', default='exdark', help='dataset to generate the features')
     parser.add_argument('--visu', default='grad', choices=['grad', 'cam-gb', 'gb'], help='kind of visualization')
     parser.add_argument('--loss', default='self', help='kind of loss used to compute the visualizations. If self, means the pseudo-original GradCam loss,\
         otherwise, it expects a number')
     parser.add_argument('--visualize', action='store_true', help='only visualize the images. Otherwise, it will be saved')
     args = vars(parser.parse_args())
 
-    teacher_pth = load_paths(args['root'], args['teacher'] + os.sep, args['visu'], args['loss'])
-    reduced_pth = load_paths(args['root'], args['reduced'] + os.sep, args['visu'], args['loss'])
-    student_pth = load_paths(args['root'], args['student'] + os.sep, args['visu'], args['loss'])
+    teacher_pth = load_paths(args['root'], args['dataset'], args['teacher'] + os.sep, args['visu'], args['loss'])
+    reduced_pth = load_paths(args['root'], args['dataset'], args['reduced'] + os.sep, args['visu'], args['loss'])
+    student_pth = load_paths(args['root'], args['dataset'], args['student'] + os.sep, args['visu'], args['loss'])
     original_pth = get_original_imgs(teacher_pth)
     
     if args['visualize']: show_images(original_pth, teacher_pth, reduced_pth, student_pth)
     else: 
-        path_to = args['root'] + os.sep + 'groups' + os.sep + f"{args['teacher']}_{args['reduced']}_{args['student']}" + os.sep + args['visu']
+        path_to = args['root'] + os.sep + 'groups' + os.sep + f"{args['dataset']}_{args['teacher']}_{args['reduced']}_{args['student']}" + os.sep + args['visu']
         save_images(original_pth, teacher_pth, reduced_pth, student_pth, path_to)
