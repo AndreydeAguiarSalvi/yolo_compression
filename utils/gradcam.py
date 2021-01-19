@@ -96,7 +96,7 @@ class GradCam:
         for i, w in enumerate(weights):
             cam += w * target[i, :, :]
 
-        cam = cam = torch.where(cam > 0, cam, torch.tensor(0., device=self.device))
+        cam = torch.where(cam > 0, cam, torch.tensor(0., device=self.device))
         resize = Transforms.Compose([ Transforms.ToPILImage(), Transforms.Resize(input.shape[2:]), Transforms.ToTensor() ])
         cam = resize(torch.stack([cam.cpu()]))[0] # torch resizes only 3D or moreD tensors, not 2D
         cam = cam - torch.min(cam)
