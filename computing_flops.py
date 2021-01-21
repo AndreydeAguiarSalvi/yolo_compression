@@ -48,6 +48,6 @@ else:
     sparse = SparseYOLO(model).to(device)
     total_ops, total_params = profile(sparse, (x, ), verbose=True)
 
-print("%s | %s" % ("Params", "FLOPs"))
+print("%s | %s" % ("Params", "MACs"))
 print("---|---")
 print("%.2f | %.2f" % (total_params, total_ops ))
