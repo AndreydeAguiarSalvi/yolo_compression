@@ -353,7 +353,9 @@ class M2MSparseConv(nn.Module):
         self.P_W, self.P_H = original_conv.padding
         self.S_W, self.S_H = original_conv.stride
         # Parameters
-        W = original_conv.weight.data.view(self.OUT_CH, -1)
+        if type(original_conv) is SoftMaskedConv2d: params = original_conv.weight * original_conv.mask
+        else: params = original_conv.weight
+        W = params.view(self.OUT_CH, -1)
         shape = W.shape
         indexes = torch.where(W != 0)
         indexes = torch.stack([ indexes[0], indexes[1] ])
