@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import torch.nn as nn
+import torch.sparse as sparse
 import torch.nn.functional as F
 from collections import OrderedDict
 ONNX_EXPORT = False
@@ -85,6 +86,17 @@ class Mish(nn.Module):  # https://github.com/digantamisra98/Mish
 class HardSwish(nn.Module):
     def forward(self, x):
         return x.mul_(relu6(x+3.)/6.)
+
+
+def get_activation(activation):
+    if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
+    if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
+    elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
+    elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
+    elif activation == 'swish': act_ftn = Swish()
+    elif activation == 'hswish': act_ftn = HardSwish()
+    assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
+    return act_ftn
 
 
 class MultiBiasConv(nn.Module):
@@ -217,15 +229,6 @@ class SoftMaskedConv2d(nn.Module):
 
 # Adapted from https://github.com/liux0614/yolo_nano/blob/master/models/yolo_nano.py
 def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, activation='relu6'):
-    act_ftn = None
-    if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
-    if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
-    elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
-    elif activation == 'swish': act_ftn = Swish()
-    elif activation == 'hswish': act_ftn = HardSwish()
-    assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
-    
     # 1x1 convolution without padding
     if bn == True:
         return nn.Sequential(
@@ -233,7 +236,7 @@ def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, acti
                 input_channels, output_channels, kernel_size=1,
                 stride=stride, bias=bias),
             nn.BatchNorm2d(output_channels),
-            act_ftn
+            get_activation(activation)
         )
     else:
         return nn.Conv2d(
@@ -242,15 +245,6 @@ def conv1x1(input_channels, output_channels, stride=1, bn=True, bias=False, acti
 
 
 def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='relu6'):
-    act_ftn = None
-    if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
-    if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
-    elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
-    elif activation == 'swish': act_ftn = Swish()
-    elif activation == 'hswish': act_ftn = HardSwish()
-    assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
-    
     # 3x3 convolution with padding=1
     if bn == True:
         return nn.Sequential(
@@ -258,7 +252,7 @@ def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='relu
                 input_channels, output_channels, kernel_size=3,
                 stride=stride, padding=1, bias=False),
             nn.BatchNorm2d(output_channels),
-            act_ftn
+            get_activation(activation)
         )
     else:
         nn.Conv2d(
@@ -267,14 +261,6 @@ def conv3x3(input_channels, output_channels, stride=1, bn=True, activation='relu
 
 
 def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1, activation='relu6'):
-    act_ftn = None
-    if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
-    if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
-    elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-    elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
-    elif activation == 'swish': act_ftn = Swish()
-    elif activation == 'hswish': act_ftn = HardSwish()
-    assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
     
     return nn.Sequential(
         # pw
@@ -282,13 +268,13 @@ def sepconv3x3(input_channels, output_channels, stride=1, expand_ratio=1, activa
             input_channels, input_channels * expand_ratio,
             kernel_size=1, stride=1, bias=False),
         nn.BatchNorm2d(input_channels * expand_ratio),
-        act_ftn,
+        get_activation(activation),
         # dw
         nn.Conv2d(
             input_channels * expand_ratio, input_channels * expand_ratio, kernel_size=3, 
             stride=stride, padding=1, groups=input_channels * expand_ratio, bias=False),
         nn.BatchNorm2d(input_channels * expand_ratio),
-        act_ftn,
+        get_activation(activation),
         # pw-linear
         nn.Conv2d(
             input_channels * expand_ratio, output_channels,
@@ -340,20 +326,11 @@ class FCA(nn.Module):
         self.channels = channels
         self.reduction_ratio = reduction_ratio
 
-        act_ftn = None
-        if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
-        if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
-        elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-        elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
-        elif activation == 'swish': act_ftn = Swish()
-        elif activation == 'hswish': act_ftn = HardSwish()
-        assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
-
         hidden_channels = channels // reduction_ratio
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
             nn.Linear(channels, hidden_channels, bias=False),
-            act_ftn,
+            get_activation(activation),
             nn.Linear(hidden_channels, channels, bias=False),
             nn.Sigmoid()
         )
@@ -528,24 +505,16 @@ class MobileBottleneck(nn.Module):
         assert stride in [1, 2]
 
         self.identity = stride == 1 and in_channels == out_channels
-        act_ftn = None
         '''
             Default activations from MobileNet V3: relu and hswish
         '''
-        if activation == 'relu': act_ftn = nn.ReLU(inplace=True)
-        if activation == 'relu6': act_ftn = nn.ReLU6(inplace=True)
-        elif activation == 'leaky': act_ftn = nn.LeakyReLU(0.1, inplace=True)
-        elif activation == 'sigmoid': act_ftn == nn.Sigmoid(inplace=True)
-        elif activation == 'swish': act_ftn = Swish()
-        elif activation == 'hswish': act_ftn = HardSwish()
-        assert(activation in ['relu', 'relu6', 'leaky', 'sigmoid', 'swish', 'hswish'])
 
         if in_channels == hidden_dim:
             self.conv = nn.Sequential(
                 # dw
                 nn.Conv2d(hidden_dim, hidden_dim, kernel_size, stride, (kernel_size - 1) // 2, groups=hidden_dim, bias=False),
                 nn.BatchNorm2d(hidden_dim),
-                act_ftn,
+                get_activation(activation),
                 # Squeeze-and-Excite
                 SELayer(hidden_dim) if use_se else nn.Identity(),
                 # pw-linear
@@ -557,13 +526,13 @@ class MobileBottleneck(nn.Module):
                 # pw
                 nn.Conv2d(in_channels, hidden_dim, 1, 1, 0, bias=False),
                 nn.BatchNorm2d(hidden_dim),
-                act_ftn,
+                get_activation(activation),
                 # dw
                 nn.Conv2d(hidden_dim, hidden_dim, kernel_size, stride, (kernel_size - 1) // 2, groups=hidden_dim, bias=False),
                 nn.BatchNorm2d(hidden_dim),
                 # Squeeze-and-Excite
                 SELayer(hidden_dim) if use_se else nn.Identity(),
-                act_ftn,
+                get_activation(activation),
                 # pw-linear
                 nn.Conv2d(hidden_dim, out_channels, 1, 1, 0, bias=False),
                 nn.BatchNorm2d(out_channels),
@@ -733,3 +702,39 @@ class SynFlowIdentity2d(nn.Module):
     def forward(self, input):
         W = self.weight_mask * self.weight
         return input * W
+
+
+class Factorized_DW_Conv(nn.Module):
+    def __init__(self, in_channels, receptive_field, activation, bias):
+        super(Factorized_DW_Conv, self).__init__()
+        self.in_channels = in_channels
+        self.receptive_field = receptive_field
+        self.bias = bias
+        self.module_list = nn.ModuleList()
+
+        modules = nn.Sequential()
+        n_convs = (receptive_field - 3)//2 + 1
+        
+        for i in range(n_convs):
+            modules.add_module(
+                f"convW{i}", nn.Conv2d(
+                    in_channels=in_channels, out_channels=in_channels,
+                    kernel_size=(1, 3), padding=(0, 1),
+                    groups=in_channels, bias=bias
+                )
+            )
+            modules.add_module(
+                f"convH{i}", nn.Conv2d(
+                    in_channels=in_channels, out_channels=in_channels,
+                    kernel_size=(3, 1), padding=(1, 0),
+                    groups=in_channels, bias=bias
+                )
+            )
+        # self.modules.add_module('activation', get_activation(activation))
+        self.module_list.append(modules)
+
+    def forward(self, input):
+        for module in self.module_list:
+            input = module(input)
+        
+        return input
