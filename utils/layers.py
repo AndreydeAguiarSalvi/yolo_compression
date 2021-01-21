@@ -346,12 +346,22 @@ class FCA(nn.Module):
 class M2MSparseConv(nn.Module):
     def __init__(self, original_conv):
         super(M2MSparseConv, self).__init__()
+        
         # Math attributes
         self.IN_CH = original_conv.in_channels
         self.OUT_CH = original_conv.out_channels
-        self.K_W, self.K_H = original_conv.kernel_size
-        self.P_W, self.P_H = original_conv.padding
-        self.S_W, self.S_H = original_conv.stride
+        if isinstance(original_conv.kernel_size, int):
+            self.K_W, self.K_H = original_conv.kernel_size, original_conv.kernel_size
+        else: self.K_W, self.K_H = original_conv.kernel_size
+        
+        if isinstance(original_conv.padding, int):
+            self.P_W, self.P_H = original_conv.padding, original_conv.padding
+        else: self.P_W, self.P_H = original_conv.padding
+        
+        if isinstance(original_conv.stride, int):
+            self.S_W, self.S_H = original_conv.stride, original_conv.stride
+        else: self.S_W, self.S_H = original_conv.stride
+        
         # Parameters
         if type(original_conv) is SoftMaskedConv2d: params = original_conv.weight * original_conv.mask
         else: params = original_conv.weight
@@ -362,9 +372,10 @@ class M2MSparseConv(nn.Module):
         values = W.flatten()[W.flatten() != .0]
         self.W = sparse.FloatTensor(indexes, values, shape)
         self.B = None
-        if original_conv.bias is not None:
-            self.B = \
-                original_conv.bias.data.unsqueeze(1).unsqueeze(2).unsqueeze(0)
+        if hasattr(original_conv, 'bias'):
+            if original_conv.bias is not None:
+                self.B = \
+                    original_conv.bias.data.unsqueeze(1).unsqueeze(2).unsqueeze(0)
     
     def forward(self, X):
         _, _, IN_W, IN_H = X.shape
