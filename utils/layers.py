@@ -343,6 +343,61 @@ class FCA(nn.Module):
         return out
 
 
+class M2MSparseConv(nn.Module):
+    def __init__(self, original_conv):
+        super(M2MSparseConv, self).__init__()
+        # Math attributes
+        self.IN_CH = original_conv.in_channels
+        self.OUT_CH = original_conv.out_channels
+        self.K_W, self.K_H = original_conv.kernel_size
+        self.P_W, self.P_H = original_conv.padding
+        self.S_W, self.S_H = original_conv.stride
+        # Parameters
+        W = original_conv.weight.data.view(self.OUT_CH, -1)
+        shape = W.shape
+        indexes = torch.where(W != 0)
+        indexes = torch.stack([ indexes[0], indexes[1] ])
+        values = W.flatten()[W.flatten() != .0]
+        self.W = sparse.FloatTensor(indexes, values, shape)
+        self.B = None
+        if original_conv.bias is not None:
+            self.B = \
+                original_conv.bias.data.unsqueeze(1).unsqueeze(2).unsqueeze(0)
+    
+    def forward(self, X):
+        _, _, IN_W, IN_H = X.shape
+        OUT_W = int((IN_W - self.K_W + 2*self.P_W)/self.S_W +1)
+        OUT_H = int((IN_H - self.K_H + 2*self.P_H)/self.S_H +1)
+
+        Xunfold = F.unfold(
+            X, kernel_size=(self.K_W, self.K_H), 
+            stride=(self.S_W, self.S_H), 
+            padding=(self.P_W, self.P_H)
+        )
+
+        Y = self.sparse_mm_broadcasting(self.W, Xunfold)
+
+        Y = Y.view(-1, self.OUT_CH, OUT_W, OUT_H)
+        if self.B is not None: Y += self.B
+
+        return Y
+
+    # Based on https://github.com/pytorch/pytorch/issues/14489 -> sebftw
+    def sparse_mm_broadcasting(self, flattened_kernel, flattened_input):
+        """
+        :param flattened_kernel: Sparse matrix, size (m, n).
+        :param flattened_input: Batched dense matrices, size (b, n, k).
+        :return: The batched matrix-matrix product, size (m, n) x (b, n, k) = (b, m, k).
+        """
+        batch_size = flattened_input.shape[0]
+        # Stack the vector batch into columns. (b, n, k) -> (n, b, k) -> (n, b*k)
+        vectors = flattened_input.transpose(0, 1).reshape(flattened_kernel.shape[1], -1)
+
+        # A matrix-matrix product is a batched matrix-vector product of the columns.
+        # And then reverse the reshaping. (m, n) x (n, b*k) = (m, b*k) -> (m, b, k) -> (b, m, k)
+        return sparse.mm(flattened_kernel, vectors).reshape(flattened_kernel.shape[0], batch_size, -1).transpose(1, 0)
+
+
 class SparseConv(nn.Module):
 
     def __init__(self, original_conv):
@@ -459,6 +514,7 @@ class View(nn.Module):
 
     def forward(self, x): # [Batch-size, flatten]
         return x.view(x.shape[0], -1) 
+
 
 # Adapted from https://github.com/d-li14/mobilenetv3.pytorch/blob/master/mobilenetv3.py
 def make_divisible(v, divisor, min_value=None):
