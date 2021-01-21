@@ -24,7 +24,7 @@ if 'soft' in args['model'] or 'soft' in args['cfg']:
     _ = model(x)
 else:
     if 'nano' in args['cfg']: model = YOLO_Nano(args['cfg']).to(device)
-    else: Darknet(args['cfg']).to(device)    
+    else: model = Darknet(args['cfg']).to(device)    
 
 if args['model']:
     checkpoint = torch.load(args['model'], map_location=device)
@@ -45,7 +45,7 @@ if (args['mask'] or args['embbed']):
 
 if not (args['mask'] or args['embbed'] or 'soft' in args['model']): total_ops, total_params = profile(model, (x,), verbose=True)
 else:
-    sparse = SparseYOLO(model).to(device)
+    sparse = Ch_Wise_SparseYOLO(model).to(device)
     total_ops, total_params = profile(sparse, (x, ), verbose=True)
 
 print("%s | %s" % ("Params", "MACs"))
