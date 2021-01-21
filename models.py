@@ -923,9 +923,42 @@ def generic_forward(model, x, fts_indexes=[], verbose=False):
         return torch.cat(io, 1), p
 
 
-class Ch_Wise_SparseYOLO(nn.Module):
-    # YOLOv3 with sparse convolutional channels
+class FullSparseYOLO(nn.Module):
+    def __init__(self, pruned_yolo):
+        super(FullSparseYOLO, self).__init__()
+        self.module_defs = pruned_yolo.module_defs
+        self.create_module_list(pruned_yolo)
+        self.yolo_layers = pruned_yolo.yolo_layers
+        self.verbose = False
 
+    def info(self, verbose=False):
+        torch_utils.model_info(self, verbose)
+    
+    def create_module_list(self, pruned_yolo):
+        self.module_list = nn.ModuleList()
+
+        for i in range(len(pruned_yolo.module_list)):
+            my_module = deepcopy(pruned_yolo.module_list[i])
+            if type(my_module) is nn.Sequential:
+                if len(my_module): # route has no len
+                    # convs before YOLOLayer has no pruning
+                    if type(pruned_yolo.module_list[i+1]) is not YOLOLayer:
+                        my_module[0] = M2MSparseConv(my_module[0])
+            self.module_list.append(my_module)
+        
+        self.routs = pruned_yolo.routs
+    
+    def forward(self, x, fts_indexes=[], verbose=False):
+        return generic_forward(self, x, fts_indexes, verbose)
+
+
+'''
+    Reconstructed YOLO removing the full-pruned channels
+    Improves the MACs efficiency whiles pruning is very 
+    aggressive: Ex rho > 0.95
+        pruned_yolo: a model already pruned by LTH or CS
+'''
+class Ch_Wise_SparseYOLO(nn.Module):
     def __init__(self, pruned_yolo):
         super(Ch_Wise_SparseYOLO, self).__init__()
 
@@ -935,7 +968,6 @@ class Ch_Wise_SparseYOLO(nn.Module):
 
         # Darknet Header https://github.com/AlexeyAB/darknet/issues/2914#issuecomment-496675346
         self.version = np.array([0, 2, 5], dtype=np.int32)  # (int32) version info: major, minor, revision
-        self.seen = np.array([0], dtype=np.int64)  # (int64) number of images seen during training
         self.verbose = False
 
     def fuse(self):
