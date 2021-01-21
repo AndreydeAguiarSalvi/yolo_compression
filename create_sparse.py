@@ -1,6 +1,6 @@
 import torch
 from utils.datasets import LoadImages
-from models import Darknet, SparseYOLO, SoftDarknet
+from models import Darknet, Ch_Wise_SparseYOLO, SoftDarknet
 from utils.utils import non_max_suppression
 from utils.pruning import apply_mask_LTH, create_mask_LTH
 
@@ -33,7 +33,7 @@ else:
     mask.load_state_dict(ck_mask)
     apply_mask_LTH(yolo, mask)
 
-sparse = SparseYOLO(yolo).to(device)
+sparse = Ch_Wise_SparseYOLO(yolo).to(device)
 
 yolo.eval()
 sparse.eval()
