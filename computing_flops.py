@@ -5,6 +5,14 @@ from models import *
 from utils.pruning import create_mask_LTH, apply_mask_LTH
 
 
+def count_M2MSparsable(m, x, y):
+    m.total_ops = torch.DoubleTensor([m.parameters().numel() * m.IN_SH[-1]])
+
+custom_hooks = {
+    M2MSparseConv: count_M2MSparsable
+}
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=str, help='Path to load the model.')
 parser.add_argument('--cfg', type=str, help='args file to create the model.')
@@ -46,7 +54,7 @@ if (args['mask'] or args['embbed']):
 if not (args['mask'] or args['embbed'] or 'soft' in args['model']): total_ops, total_params = profile(model, (x,), verbose=True)
 else:
     sparse = Ch_Wise_SparseYOLO(model).to(device)
-    total_ops, total_params = profile(sparse, (x, ), verbose=True)
+    total_ops, total_params = profile(sparse, (x, ), custom_ops=custom_hooks, verbose=True)
 
 print("%s | %s" % ("Params", "MACs"))
 print("---|---")

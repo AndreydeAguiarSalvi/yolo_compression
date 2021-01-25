@@ -387,13 +387,26 @@ class M2MSparseConv(nn.Module):
             stride=(self.S_W, self.S_H), 
             padding=(self.P_W, self.P_H)
         )
-
+        self.IN_SH = Xunfold.shape
         Y = self.sparse_mm_broadcasting(self.W, Xunfold)
 
         Y = Y.view(-1, self.OUT_CH, OUT_W, OUT_H)
         if self.B is not None: Y += self.B
 
         return Y
+
+    '''
+        This is a pytorch parameters() overriding.
+        It was created to allow the computing of 
+        parameters and MACs with THOP.
+        However, it is not usefull to save the 
+        model or to pass through an optimizer,
+        once time this function returs only the
+        values from the sparse tensor, and not 
+        the indices.
+    '''
+    def parameters(self, recurse=True):
+        return self.W._values()
 
     # Based on https://github.com/pytorch/pytorch/issues/14489 -> sebftw
     def sparse_mm_broadcasting(self, flattened_kernel, flattened_input):
