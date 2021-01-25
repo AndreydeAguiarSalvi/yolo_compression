@@ -6,7 +6,7 @@ from models import *
 from utils.datasets import *
 from utils.utils import *
 from utils.my_utils import create_test_argparser
-
+from utils.pruning import sum_of_the_weights, apply_mask_LTH, create_mask_LTH
 
 def compute_removed_weights(masks):
     return sum(float((m == 0).sum()) for m in masks)
@@ -39,26 +39,12 @@ def test(cfg,
         # Initialize model
         if 'soft' in cfg:
             model = SoftDarknet(cfg=cfg).to(device)
-            model.ticket = True
-
-            x = torch.Tensor(1, 3, 416, 416).to(device)
-            y = model(x)
-            masks = [m.mask for m in model.mask_modules]
-            print(f"Evaluating model with {compute_removed_weights(masks)} parameters removed.")
         else:
             if 'nano' in cfg: model = YOLO_Nano(cfg).to(device)
             else: model = Darknet(cfg=cfg).to(device)
 
         if mask or mask_weight:
-            from utils.pruning import sum_of_the_weights, apply_mask_LTH, create_mask_LTH
             msk = create_mask_LTH(model)
-            initial_weights = sum_of_the_weights(msk)
-            if mask: msk.load_state_dict(torch.load(weights, map_location=device)['mask'])
-            else: msk.load_state_dict(torch.load(mask_weight, map_location=device))
-            final_weights = sum_of_the_weights(msk)
-            apply_mask_LTH(model, msk)
-            print(f'Evaluating model with initial weights number of {initial_weights} and final of {final_weights}. \nReduction of {final_weights * 100. / initial_weights}%.')
-            del msk
 
         # Load weights
         attempt_download(weights)
@@ -72,6 +58,25 @@ def test(cfg,
 
         if device.type != 'cpu' and torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
+
+        # Counting parameters
+        if 'soft' in cfg:
+            model.ticket = True
+
+            x = torch.Tensor(1, 3, 416, 416).to(device)
+            y = model(x)
+            masks = [m.mask for m in model.mask_modules]
+            print(f"Evaluating model with {compute_removed_weights(masks)} parameters removed.")
+        elif mask or mask_weight:
+            # Loading LTH mask
+            initial_weights = sum_of_the_weights(msk)
+            if mask: msk.load_state_dict(torch.load(weights, map_location=device)['mask'])
+            else: msk.load_state_dict(torch.load(mask_weight, map_location=device))
+            final_weights = sum_of_the_weights(msk)
+            apply_mask_LTH(model, msk)
+            print(f'Evaluating model with initial weights number of {initial_weights} and final of {final_weights}. \nReduction of {final_weights * 100. / initial_weights}%.')
+            del msk
+
     else:  # called by train.py
         device = next(model.parameters()).device  # get model device
         verbose = False
