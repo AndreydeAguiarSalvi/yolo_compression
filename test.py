@@ -62,7 +62,7 @@ def test(cfg,
         # Counting parameters
         if 'soft' in cfg:
             model.ticket = True
-
+            model.temp = 1.
             x = torch.Tensor(1, 3, 416, 416).to(device)
             y = model(x)
             masks = [m.mask for m in model.mask_modules]
