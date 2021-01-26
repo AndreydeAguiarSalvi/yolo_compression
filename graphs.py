@@ -46,10 +46,6 @@ elif 'soft' in args['cfg']:
     model.temp = 1.
     _ = model(x)
 
-# Re-parameterizing model
-if args['mask'] or args['embed'] or 'soft' in args['cfg']:
-    sparse = FullSparseYOLO(model)
-
 if args['output']:
     if not os.path.exists(args['output']): os.makedirs(args['output'])
 
