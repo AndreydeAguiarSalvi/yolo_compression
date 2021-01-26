@@ -56,7 +56,7 @@ elif 'soft' in args['cfg']:
     model.temp = 1.
     _ = model(x)
 
-if not (args['mask'] or args['embbed'] or 'soft' in args['model']) or args['macs_reduction'] == 'none': 
+if not (args['mask'] or args['embbed'] or 'soft' in args['cfg']) or args['macs_reduction'] == 'none': 
     print('using model with no MACs reduction')
     total_ops, total_params = profile(model, (x,), custom_ops=custom_hooks, verbose=True)
 
