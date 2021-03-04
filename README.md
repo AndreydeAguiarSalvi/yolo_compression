@@ -29,6 +29,26 @@ Basically, run
 * my_kd_gan.py to perform my adapted GAN based KD
 In utils/my_utils.py, you can see the argument parser, to see all the available parameters
 
+# Results
+## Pascal VOC 2007 test set
+|Model           |Training     |mAP          |Final Params      |MACs                            |Storage (MB) |
+|----------------|-------------|-------------|------------------|--------------------------------|-------------|
+|YOLOv3-Tiny     |Default      |0.379 ± 0.003|8, 713, 766       |2, 753, 665, 551                |33.29        |
+|YOLOv3          |Default      |0.547 ± 0.012|61, 626, 049      |32, 829, 119, 167               |235.44       |
+|YOLO Nano       |Default      |0.385 ± 0.007|2, 890, 527       |2, 082, 423, 381                |11.38        |
+|YOLOv3-Mobile   |Default      |0.009 ± 0.008|4, 395, 985       |1, 419, 864, 487                |17.59        |
+|YOLOv3          |LTH Local    |0.549 ± 0.009|6, 331, 150 ± 1   |3, 468, 547, 347 ± 278          |118.26       |
+|YOLOv3          |LTH Global   |0.561 ± 0.009|6, 331, 114 ± 1   |8, 796, 051, 025 ± 225, 877, 824|118.26       |
+|YOLOv3          |CS 1 It      |0.442 ± 0.010|740, 072 ± 12, 161|1, 137, 839, 381 ± 44, 191, 983 |11.618 ± 0.23|
+|YOLOv3          |CS 3 It      |0.316 ± 0.015|421, 721 ± 3, 544 |618, 724, 616 ± 20, 611, 379    |5.544 ± 0.07 |
+|YOLO Nanoleaky  |KD fts 79    |0.421 ± 0.007|2, 890, 527       |2, 098, 305, 681                |11.38        |
+|YOLO Nanoleaky  |KD fts 36, 61|0.408 ± 0.008|2, 890, 527       |2, 098, 305, 681                |11.38        |
+|YOLO Mobileleaky|KD fts 91    |0.253 ± 0.023|4, 395, 985       |1, 458, 910, 247                |17.59        |
+|YOLO Mobileleaky|KD fts 36, 91|0.244 ± 0.010|4, 395, 985       |1, 458, 910, 247                |17.59        |
+|YOLO Nanoleaky  |KD GAN       |0.395 ± 0.012|2, 890, 527       |2, 098, 305, 681                |11.38        |
+|YOLO Mobileleaky|KD GAN       |0.311 ± 0.006|4, 395, 985       |1, 458, 910, 247                |17.59        |
+
+
 # References
 * [YOLOv3](https://arxiv.org/abs/1804.02767)
 * [LTH](https://arxiv.org/abs/1903.01611)
